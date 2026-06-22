@@ -6,8 +6,11 @@ import type {
   CustomerPortfolio,
   CustomerTransaction,
   PriceComponent,
+  PortfolioProductComponent,
   ProductConfiguration,
   ProductConfigurationComponent,
+  QFactorSet,
+  QFactorValue,
 } from "./types.ts";
 
 export type PrototypeDatabase = {
@@ -20,6 +23,10 @@ export type PrototypeDatabase = {
   productConfigurations: Map<string, ProductConfiguration>;
   productConfigurationComponents: Map<string, ProductConfigurationComponent>;
   priceComponents: Map<string, PriceComponent>;
+  portfolioProductComponents: Map<string, PortfolioProductComponent>;
+  qFactorSets: Map<string, QFactorSet>;
+  qFactorValues: Map<string, QFactorValue>;
+  qFactorValuesBySetMonth: Map<string, string>;
   calloffs: Map<string, Calloff>;
   transactions: Map<string, CustomerTransaction>;
 };
@@ -35,6 +42,10 @@ export function createSchema(): PrototypeDatabase {
     productConfigurations: new Map(),
     productConfigurationComponents: new Map(),
     priceComponents: new Map(),
+    portfolioProductComponents: new Map(),
+    qFactorSets: new Map(),
+    qFactorValues: new Map(),
+    qFactorValuesBySetMonth: new Map(),
     calloffs: new Map(),
     transactions: new Map(),
   };

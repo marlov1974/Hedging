@@ -10,9 +10,12 @@ import {
   type CustomerPortfolioWithForecasts,
   type CustomerTransaction,
   type PriceComponent,
+  type PortfolioProductComponent,
   type ProductConfiguration,
   type ProductConfigurationComponent,
   type ProductConfigurationWithComponents,
+  type QFactorSet,
+  type QFactorValue,
 } from "./types.ts";
 import { assertDate, assertFiniteNumber, assertKnownComponentCode, assertMonth, assertRequiredString } from "./validation.ts";
 
@@ -54,7 +57,7 @@ export function insertCustomerPortfolio(database: PrototypeDatabase, input: Cust
     throw new DatabaseError("not_found", `customer_id ${input.customer_id} does not exist`);
   }
 
-  if (!database.calendars.has(input.calendar_id)) {
+  if (!calendarExists(database, input.calendar_id)) {
     throw new DatabaseError("not_found", `calendar_id ${input.calendar_id} does not exist`);
   }
 
@@ -124,6 +127,67 @@ export function insertPriceComponent(database: PrototypeDatabase, input: PriceCo
   return input;
 }
 
+export function insertQFactorSet(database: PrototypeDatabase, input: QFactorSet): QFactorSet {
+  assertUniqueKey(database.qFactorSets, input.qfactor_set_id, "qfactor_set_id");
+  assertRequiredString(input.name, "name");
+  assertKnownComponentCode(input.component);
+  assertRequiredString(input.description, "description");
+
+  database.qFactorSets.set(input.qfactor_set_id, input);
+  return input;
+}
+
+export function insertQFactorValue(database: PrototypeDatabase, input: QFactorValue): QFactorValue {
+  assertUniqueKey(database.qFactorValues, input.qfactor_value_id, "qfactor_value_id");
+  assertRequiredString(input.qfactor_set_id, "qfactor_set_id");
+  assertMonth(input.month, "month");
+  assertFiniteNumber(input.value, "value");
+
+  if (!database.qFactorSets.has(input.qfactor_set_id)) {
+    throw new DatabaseError("not_found", `qfactor_set_id ${input.qfactor_set_id} does not exist`);
+  }
+
+  const setMonthKey = qFactorSetMonthKey(input.qfactor_set_id, input.month);
+  if (database.qFactorValuesBySetMonth.has(setMonthKey)) {
+    throw new DatabaseError("duplicate_key", `qfactor value already exists for ${input.qfactor_set_id} ${input.month}`);
+  }
+
+  database.qFactorValues.set(input.qfactor_value_id, input);
+  database.qFactorValuesBySetMonth.set(setMonthKey, input.qfactor_value_id);
+  return input;
+}
+
+export function insertPortfolioProductComponent(
+  database: PrototypeDatabase,
+  input: PortfolioProductComponent,
+): PortfolioProductComponent {
+  assertUniqueKey(database.portfolioProductComponents, input.portfolio_productcomponent_id, "portfolio_productcomponent_id");
+  assertRequiredString(input.portfolio_id, "portfolio_id");
+  assertRequiredString(input.productcomponent_id, "productcomponent_id");
+  assertRequiredString(input.qfactor_set_id, "qfactor_set_id");
+
+  if (!database.portfolios.has(input.portfolio_id)) {
+    throw new DatabaseError("not_found", `portfolio_id ${input.portfolio_id} does not exist`);
+  }
+
+  const productComponent = database.productConfigurationComponents.get(input.productcomponent_id);
+  if (!productComponent) {
+    throw new DatabaseError("not_found", `productcomponent_id ${input.productcomponent_id} does not exist`);
+  }
+
+  const qFactorSet = database.qFactorSets.get(input.qfactor_set_id);
+  if (!qFactorSet) {
+    throw new DatabaseError("not_found", `qfactor_set_id ${input.qfactor_set_id} does not exist`);
+  }
+
+  if (qFactorSet.component !== productComponent.component) {
+    throw new DatabaseError("invalid_input", "qfactor set component must match product component component");
+  }
+
+  database.portfolioProductComponents.set(input.portfolio_productcomponent_id, input);
+  return input;
+}
+
 export function insertCalloff(database: PrototypeDatabase, input: Calloff): Calloff {
   assertUniqueKey(database.calloffs, input.calloff_id, "calloff_id");
   assertRequiredString(input.product_id, "product_id");
@@ -178,7 +242,7 @@ export function getCustomerPortfolioWithForecasts(
   }
 
   const customer = database.customers.get(portfolio.customer_id);
-  const calendar = database.calendars.get(portfolio.calendar_id);
+  const calendar = findCalendar(database, portfolio.calendar_id);
   if (!customer || !calendar) {
     return undefined;
   }
@@ -210,6 +274,21 @@ export function getProductConfigurationWithComponents(
     }));
 
   return { product, components };
+}
+
+export function getPortfolioProductComponents(
+  database: PrototypeDatabase,
+  portfolioId: string,
+): PortfolioProductComponent[] {
+  return [...database.portfolioProductComponents.values()]
+    .filter((component) => component.portfolio_id === portfolioId)
+    .sort((left, right) => left.portfolio_productcomponent_id.localeCompare(right.portfolio_productcomponent_id));
+}
+
+export function getQFactorValuesBySet(database: PrototypeDatabase, qFactorSetId: string): QFactorValue[] {
+  return [...database.qFactorValues.values()]
+    .filter((value) => value.qfactor_set_id === qFactorSetId)
+    .sort((left, right) => left.month.localeCompare(right.month));
 }
 
 export function getCalloffWithTransactions(
@@ -267,4 +346,23 @@ function getSortedTransactions(database: PrototypeDatabase): CustomerTransaction
 
 function forecastKey(portfolioId: string, month: string): string {
   return `${portfolioId}|${month}`;
+}
+
+function qFactorSetMonthKey(qFactorSetId: string, month: string): string {
+  return `${qFactorSetId}|${month}`;
+}
+
+function calendarExists(database: PrototypeDatabase, calendarId: string): boolean {
+  return Boolean(findCalendar(database, calendarId));
+}
+
+function findCalendar(database: PrototypeDatabase, calendarId: string): Calendar | undefined {
+  const exact = database.calendars.get(calendarId);
+  if (exact) {
+    return exact;
+  }
+
+  return [...database.calendars.values()]
+    .filter((calendar) => calendar.calendar_id.startsWith(`${calendarId}:`))
+    .sort((left, right) => left.month.localeCompare(right.month))[0];
 }

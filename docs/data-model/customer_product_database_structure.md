@@ -22,6 +22,12 @@ The prototype database layer stores generic customer, portfolio, forecast, calen
 
 `Price Component` stores numeric component prices and a required currency for each product configuration component.
 
+`Portfolio Product Component` stores a portfolio-specific instance of a product configuration component and points to a Q-factor set.
+
+`QFactorSet` stores the component-level Q-factor grouping for a portfolio product component.
+
+`QFactorValue` stores one monthly Q-factor value per Q-factor set and month.
+
 ## Relationships
 
 ```text
@@ -30,4 +36,8 @@ Customer Portfolio 1..n Customer Forecast
 Customer Portfolio n..1 Calendar
 Product Configuration 1..n Product Configuration Component
 Product Configuration Component 1..n Price Component
+Customer Portfolio 1..n Portfolio Product Component
+Product Configuration Component 1..n Portfolio Product Component
+Portfolio Product Component n..1 QFactorSet
+QFactorSet 1..n QFactorValue
 ```

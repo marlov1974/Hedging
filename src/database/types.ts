@@ -48,6 +48,27 @@ export type PriceComponent = {
   currency: string;
 };
 
+export type PortfolioProductComponent = {
+  portfolio_productcomponent_id: string;
+  portfolio_id: string;
+  productcomponent_id: string;
+  qfactor_set_id: string;
+};
+
+export type QFactorSet = {
+  qfactor_set_id: string;
+  name: string;
+  component: string;
+  description: string;
+};
+
+export type QFactorValue = {
+  qfactor_value_id: string;
+  qfactor_set_id: string;
+  month: string;
+  value: number;
+};
+
 export type Calloff = {
   calloff_id: string;
   product_id: string;
