@@ -31,6 +31,7 @@ docs/product-configurations/config_fixed.md
 docs/product-configurations/config_peaks.md
 docs/product-configurations/config_profiles.md
 docs/product-configurations/product_configurations.md
+docs/purchase/baseloads_purchase_flow.md
 memory/00-index.md
 memory/01-project-overview.md
 memory/02-design-principles.md
@@ -64,6 +65,9 @@ requirements/package-runs/P0014/review.md
 requirements/package-runs/P0015/design.md
 requirements/package-runs/P0015/functions.md
 requirements/package-runs/P0015/review.md
+requirements/package-runs/P0016/design.md
+requirements/package-runs/P0016/functions.md
+requirements/package-runs/P0016/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -80,6 +84,7 @@ requirements/packages/P0012-peak-model-comparison-poc.md
 requirements/packages/P0013-energy-partition-product-structure-poc.md
 requirements/packages/P0014-calloff-transaction-database-model.md
 requirements/packages/P0015-seed-data-component-qfactor-poc.md
+requirements/packages/P0016-baseloads-purchase-flow.md
 src/README.md
 src/database/fixtures.ts
 src/database/pocSeedData.ts
@@ -98,6 +103,10 @@ src/price-api/providers.ts
 src/price-api/realProviders.ts
 src/price-api/server.ts
 src/price-api/types.ts
+src/purchase/BaseloadsPurchaseView.ts
+src/purchase/baseloadsPurchase.ts
+src/purchase/periodOptions.ts
+src/purchase/server.ts
 tests/README.md
 tests/database/calloffTransactionModel.test.ts
 tests/database/customerProductSchema.test.ts
@@ -105,4 +114,5 @@ tests/database/pocSeedData.test.ts
 tests/price-api/priceApi.test.ts
 tests/price-api/priceApiV2.test.ts
 tests/price-api/realProviders.test.ts
+tests/purchase/baseloadsPurchase.test.ts
 ```

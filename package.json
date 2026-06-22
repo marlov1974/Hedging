@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/**/*.test.ts",
-    "price-api:live-check": "node src/price-api/liveCheck.ts"
+    "price-api:live-check": "node src/price-api/liveCheck.ts",
+    "purchase:baseloads": "node src/purchase/server.ts"
   }
 }
