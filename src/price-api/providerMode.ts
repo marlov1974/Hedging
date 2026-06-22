@@ -1,5 +1,6 @@
 import { createPriceApi, createDefaultPriceApi } from "./priceApi.ts";
 import { ConfiguredHttpFuturesPriceProvider, RealCurrencyProvider, type HttpFetch } from "./realProviders.ts";
+import { StaticCurrencyProvider, StaticDerivativePriceProvider } from "./staticDerivativePrices.ts";
 import { PriceApiError, type PriceApi } from "./types.ts";
 
 const DEFAULT_CURRENCY_SOURCE_URL = "https://api.frankfurter.dev/v2/rate/EUR/SEK";
@@ -15,6 +16,15 @@ export async function createPriceApiFromProviderMode(options: {
 
   if (mode === "fixture") {
     return createDefaultPriceApi();
+  }
+
+  if (mode === "static") {
+    const staticDerivativeProvider = new StaticDerivativePriceProvider();
+    return createPriceApi({
+      futuresPriceProvider: staticDerivativeProvider,
+      currencyProvider: new StaticCurrencyProvider(),
+      blockPriceProvider: staticDerivativeProvider,
+    });
   }
 
   if (mode !== "real") {

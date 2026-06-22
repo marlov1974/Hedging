@@ -9,8 +9,8 @@ README.md
 REPOSITORY_FILES.md
 docs/README.md
 docs/components/currency_component.md
-docs/data-model/calloff_transaction_database_model.md
 docs/data-model/calloff_model.md
+docs/data-model/calloff_transaction_database_model.md
 docs/data-model/customer_product_database_structure.md
 docs/data-model/customer_transaction_list.md
 docs/data-model/poc_seed_data.md
@@ -28,6 +28,7 @@ docs/price-api/price_api_v2_profile_request.md
 docs/price-api/price_api_v2_stacking.md
 docs/price-api/price_api_v2_virtual_blocks.md
 docs/price-api/real_price_providers.md
+docs/price-api/static_derivative_price_list.md
 docs/product-configurations/component_vocabulary.md
 docs/product-configurations/config_baseloads.md
 docs/product-configurations/config_fixed.md
@@ -35,6 +36,7 @@ docs/product-configurations/config_peaks.md
 docs/product-configurations/config_profiles.md
 docs/product-configurations/product_configurations.md
 docs/purchase/baseloads_purchase_flow.md
+docs/settlement/static_spot_actuals.md
 memory/00-index.md
 memory/01-project-overview.md
 memory/02-design-principles.md
@@ -77,6 +79,9 @@ requirements/package-runs/P0017/review.md
 requirements/package-runs/P0018/design.md
 requirements/package-runs/P0018/functions.md
 requirements/package-runs/P0018/review.md
+requirements/package-runs/P0019/design.md
+requirements/package-runs/P0019/functions.md
+requirements/package-runs/P0019/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -96,6 +101,8 @@ requirements/packages/P0015-seed-data-component-qfactor-poc.md
 requirements/packages/P0016-baseloads-purchase-flow.md
 requirements/packages/P0017-hedging-tool-shell-and-baseloads-calloff-list.md
 requirements/packages/P0018-hedging-tool-minimal-layout-and-position-report.md
+requirements/packages/P0019-static-derivative-and-spot-actual-price-lists.md
+requirements/packages/P0020-minimal-ui-and-financial-settlement.md
 src/README.md
 src/database/fixtures.ts
 src/database/pocSeedData.ts
@@ -120,11 +127,14 @@ src/price-api/providerMode.ts
 src/price-api/providers.ts
 src/price-api/realProviders.ts
 src/price-api/server.ts
+src/price-api/staticDerivativePrices.ts
 src/price-api/types.ts
 src/purchase/BaseloadsPurchaseView.ts
 src/purchase/baseloadsPurchase.ts
 src/purchase/periodOptions.ts
 src/purchase/server.ts
+src/settlement/spotActuals.ts
+src/settlement/staticSpotActualPrices.ts
 tests/README.md
 tests/database/calloffTransactionModel.test.ts
 tests/database/customerProductSchema.test.ts
@@ -136,5 +146,7 @@ tests/hedging/positionReport.test.ts
 tests/price-api/priceApi.test.ts
 tests/price-api/priceApiV2.test.ts
 tests/price-api/realProviders.test.ts
+tests/price-api/staticDerivativePrices.test.ts
 tests/purchase/baseloadsPurchase.test.ts
+tests/settlement/staticSpotActuals.test.ts
 ```
