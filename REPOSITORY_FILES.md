@@ -4,6 +4,7 @@ Tracked files:
 
 ```text
 AGENTS.md
+P0008-profile-based-price-api.md
 PROJECT_OVERVIEW.md
 README.md
 REPOSITORY_FILES.md
@@ -30,6 +31,9 @@ memory/02-design-principles.md
 memory/03-component-model.md
 memory/bootstrap-manifest.json
 package.json
+price_api_v2_profile_request.md
+price_api_v2_stacking.md
+price_api_v2_virtual_blocks.md
 requirements/README.md
 requirements/package-runs/P0001/review.md
 requirements/package-runs/P0002/review.md
@@ -56,3 +60,5 @@ src/price-api/types.ts
 tests/README.md
 tests/price-api/priceApi.test.ts
 ```
+
+Note: P0008 and its v2 docs were created in root and should be moved to the appropriate `requirements/packages/` and `docs/price-api/` locations by a future repository cleanup or package run.
