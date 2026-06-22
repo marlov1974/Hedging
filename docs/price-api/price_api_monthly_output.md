@@ -21,7 +21,7 @@ Example:
 month
 base.sys
 base.epad
-currency_rate
+currency.sek
 ```
 
 ## Missing data
