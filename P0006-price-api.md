@@ -37,7 +37,7 @@ The first version supports:
 - `base.sys`,
 - `base.epad`,
 - one supported EPAD area code: `STO`,
-- currency rate output.
+- one currency component: `SEK`.
 
 ## Request
 
@@ -58,12 +58,12 @@ The API returns one row per month:
 month
 base.sys
 base.epad
-currency_rate
+currency.sek
 ```
 
-Prices are returned in EUR/MWh.
+`base.sys` and `base.epad` are returned in EUR/MWh.
 
-Currency rate is returned as a separate value and must not be embedded in `base.sys` or `base.epad`.
+`currency.sek` is returned as a separate currency component. It must not be embedded in `base.sys` or `base.epad`.
 
 ## Source policy
 
@@ -71,7 +71,7 @@ The implementation must use provider adapters.
 
 The source for futures prices may require a licensed or manually configured provider. The implementation must not hard-code credentials or private URLs.
 
-The source for currency rates should be configured as an adapter as well.
+The source for the SEK currency component should be configured as an adapter as well.
 
 ## Verification
 
