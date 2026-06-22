@@ -35,6 +35,13 @@ describe("hedging tool shell", () => {
     assert.doesNotMatch(html, /<span>Product<\/span>/);
   });
 
+  it("omits duplicated selected portfolio text and visual Open control", () => {
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_BASELOADS", feature_id: "portfolio-details" });
+
+    assert.doesNotMatch(html, /class="selected-name"/);
+    assert.doesNotMatch(html, />Open<\/button>/);
+  });
+
   it("shows selected portfolio context", () => {
     const database = createPocSeedData();
     const portfolio = getPortfolioOptions(database).find((option) => option.portfolio_id === "PORT_BASELOADS");
@@ -64,11 +71,12 @@ describe("hedging tool shell", () => {
     assert.equal(features.find((feature) => feature.feature_id === "baseloads-calloff-list")?.available, true);
   });
 
-  it("feature menu includes Portfolio Details and Position Report", () => {
+  it("feature menu includes Portfolio Details, Position Report and Financial Settlement", () => {
     const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_BASELOADS" });
 
     assert.match(html, /Portfolio Details/);
     assert.match(html, /Position Report/);
+    assert.match(html, /Financial Settlement/);
   });
 
   it("non-Baseloads selected portfolio shows clear unavailable message", () => {

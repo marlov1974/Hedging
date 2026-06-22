@@ -10,7 +10,12 @@ export type PortfolioOption = {
   product_configuration_name?: string;
 };
 
-export type HedgingFeatureId = "buy-baseloads" | "baseloads-calloff-list" | "portfolio-details" | "position-report";
+export type HedgingFeatureId =
+  | "buy-baseloads"
+  | "baseloads-calloff-list"
+  | "portfolio-details"
+  | "position-report"
+  | "financial-settlement";
 
 export type HedgingFeature = {
   feature_id: HedgingFeatureId;
@@ -64,6 +69,12 @@ export function getAvailableFeaturesForPortfolio(database: PrototypeDatabase, po
       label: "Position Report",
       available: Boolean(selectedPortfolio),
       unavailable_reason: selectedPortfolio ? undefined : reason,
+    },
+    {
+      feature_id: "financial-settlement",
+      label: "Financial Settlement",
+      available: baseloadsAvailable,
+      unavailable_reason: baseloadsAvailable ? undefined : reason,
     },
   ];
 }

@@ -16,6 +16,7 @@ docs/data-model/customer_transaction_list.md
 docs/data-model/poc_seed_data.md
 docs/data-model/transaction_model.md
 docs/hedging/baseloads_calloff_list.md
+docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
 docs/hedging/position_report.md
 docs/market-derivation/market_derivation.md
@@ -82,6 +83,9 @@ requirements/package-runs/P0018/review.md
 requirements/package-runs/P0019/design.md
 requirements/package-runs/P0019/functions.md
 requirements/package-runs/P0019/review.md
+requirements/package-runs/P0020/design.md
+requirements/package-runs/P0020/functions.md
+requirements/package-runs/P0020/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -114,6 +118,7 @@ src/hedging/HedgingToolView.ts
 src/hedging/calloffList.ts
 src/hedging/derivativeNames.ts
 src/hedging/features.ts
+src/hedging/financialSettlement.ts
 src/hedging/portfolioDetails.ts
 src/hedging/positionReport.ts
 src/hedging/server.ts
@@ -140,6 +145,7 @@ tests/database/calloffTransactionModel.test.ts
 tests/database/customerProductSchema.test.ts
 tests/database/pocSeedData.test.ts
 tests/hedging/baseloadsCalloffList.test.ts
+tests/hedging/financialSettlement.test.ts
 tests/hedging/hedgingTool.test.ts
 tests/hedging/portfolioDetails.test.ts
 tests/hedging/positionReport.test.ts

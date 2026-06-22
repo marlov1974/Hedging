@@ -2,6 +2,7 @@ import type { PrototypeDatabase } from "../database/schema.ts";
 import type { BaseloadsPurchaseResult } from "../purchase/baseloadsPurchase.ts";
 import { getBaseloadsPurchasePeriods } from "../purchase/periodOptions.ts";
 import { getBaseloadsCalloffListRows } from "./calloffList.ts";
+import { calculateFinancialSettlementForMonth, getFinancialSettlementMonths } from "./financialSettlement.ts";
 import { getPortfolioDetails } from "./portfolioDetails.ts";
 import { getPositionReportRows, getPositionReportYears } from "./positionReport.ts";
 import {
@@ -17,6 +18,7 @@ export type HedgingToolState = {
   mw?: string;
   selected_period_id?: string;
   selected_year?: string;
+  selected_month?: string;
   error?: string;
   purchase_result?: BaseloadsPurchaseResult;
 };
@@ -59,8 +61,7 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
       margin: 0 auto;
       padding: 14px 0 24px;
     }
-    h1, h2, h3 { margin: 0; letter-spacing: 0; }
-    h1 { font-size: 20px; line-height: 1.15; }
+    h2, h3 { margin: 0; letter-spacing: 0; }
     h2 { font-size: 18px; }
     h3 { font-size: 15px; }
     p { margin: 0; color: var(--muted); }
@@ -126,11 +127,10 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
     }
     .compact-selector {
       display: grid;
-      grid-template-columns: minmax(180px, 280px) auto;
+      grid-template-columns: minmax(180px, 280px);
       gap: 10px;
       align-items: end;
     }
-    .selected-name { color: var(--muted); font-weight: 650; }
     .details-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -196,7 +196,6 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
   <main>
     <section class="topbar">
       ${renderPortfolioSelector(portfolios, selectedPortfolio, activeFeature)}
-      <span class="selected-name">${selectedPortfolio ? escapeHtml(selectedPortfolio.portfolio_name) : "No portfolio selected"}</span>
     </section>
     <section class="layout">
       <aside class="panel stack">
@@ -223,7 +222,6 @@ function renderPortfolioSelector(portfolios: PortfolioOption[], selectedPortfoli
           .join("")}
       </select>
     </label>
-    <button type="submit">Open</button>
   </form>`;
 }
 
@@ -270,6 +268,10 @@ function renderActiveFeature(
 
   if (activeFeature === "position-report") {
     return renderPositionReport(database, selectedPortfolio, state);
+  }
+
+  if (activeFeature === "financial-settlement") {
+    return renderFinancialSettlement(database, selectedPortfolio, state);
   }
 
   return renderBuyBaseloads(selectedPortfolio, state);
@@ -404,6 +406,72 @@ function renderPositionReport(database: PrototypeDatabase, selectedPortfolio: Po
             </tbody>
           </table>`
     }
+  </div>`;
+}
+
+function renderFinancialSettlement(database: PrototypeDatabase, selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+  const months = getFinancialSettlementMonths(database, selectedPortfolio.portfolio_id);
+  const selectedMonth = state.selected_month ?? months[0] ?? "";
+
+  let content = `<div class="notice"><p>No hedge transactions for ${escapeHtml(selectedMonth)}.</p></div>`;
+  if (selectedMonth) {
+    try {
+      const settlement = calculateFinancialSettlementForMonth(database, selectedPortfolio.portfolio_id, selectedMonth);
+      content =
+        settlement.rows.length === 0
+          ? `<div class="notice"><p>No hedge transactions for ${escapeHtml(selectedMonth)}.</p></div>`
+          : `<table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Calloff id</th>
+                  <th>Derivative name</th>
+                  <th>Component group</th>
+                  <th>Hedge volume MWh</th>
+                  <th>Hedge price</th>
+                  <th>Monthly spot price</th>
+                  <th>Settlement</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${settlement.rows
+                  .map(
+                    (row) => `<tr>
+                      <td>${escapeHtml(row.month)}</td>
+                      <td>${escapeHtml(row.calloff_id)}</td>
+                      <td>${escapeHtml(row.derivative_name)}</td>
+                      <td>${escapeHtml(row.component_group)}</td>
+                      <td class="number">${formatNumber(row.hedge_volume_mwh)}</td>
+                      <td class="number">${formatNumber(row.hedge_price)}</td>
+                      <td class="number">${formatNumber(row.monthly_spot_price)}</td>
+                      <td class="number">${formatNumber(row.financial_settlement)}</td>
+                    </tr>`,
+                  )
+                  .join("")}
+              </tbody>
+            </table>`;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Financial settlement calculation failed";
+      content = `<div class="notice error">${escapeHtml(message)}</div>`;
+    }
+  }
+
+  return `<div class="stack">
+    <div>
+      <h2>Financial Settlement</h2>
+      <p>Settlement = hedge_volume_mwh * (monthly_spot_price - hedge_price). Positive value means spot price is above hedge price.</p>
+    </div>
+    <form method="get" action="/hedging" class="compact-selector">
+      <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      <input type="hidden" name="feature_id" value="financial-settlement">
+      <label>
+        Month
+        <select name="selected_month" onchange="this.form.submit()">
+          ${months.map((month) => `<option value="${escapeHtml(month)}"${month === selectedMonth ? " selected" : ""}>${escapeHtml(month)}</option>`).join("")}
+        </select>
+      </label>
+    </form>
+    ${content}
   </div>`;
 }
 

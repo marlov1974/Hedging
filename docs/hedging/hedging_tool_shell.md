@@ -1,12 +1,12 @@
 # Hedging tool shell
 
-P0017 introduced the first local hedging tool shell. P0018 refines it into a compact work surface.
+P0017 introduced the first local hedging tool shell. P0018 refined it into a compact work surface. P0020 removes remaining visual-only shell elements and adds the Financial Settlement feature.
 
 ## Portfolio Context
 
 The tool starts with portfolio selection. The selected portfolio becomes the active context for all feature panels.
 
-The compact top selector shows portfolio choices from the synthetic seed database. Once selected, the selected portfolio name remains visible in the top bar.
+The compact top selector shows portfolio choices from the synthetic seed database. The selected portfolio is visible inside the selector and is not duplicated elsewhere in the shell.
 
 Detailed portfolio fields are shown only in the `Portfolio Details` feature:
 
@@ -30,13 +30,14 @@ Buy Baseloads
 Baseloads Calloff List
 Portfolio Details
 Position Report
+Financial Settlement
 ```
 
 Feature availability is evaluated from the active portfolio context. Baseloads features are available only when the selected portfolio is linked to the Baseloads product configuration.
 
 ## Minimal Layout
 
-The shell intentionally avoids a large page heading and subtitle. The top area is reserved for compact portfolio context and navigation.
+The shell intentionally avoids large page headings, subtitles, decorative cards and visual-only status controls. The top area is reserved for compact portfolio selection.
 
 Portfolio details are not repeated above every feature. They live in the dedicated `Portfolio Details` feature.
 
@@ -75,6 +76,20 @@ component
 ```
 
 The report uses MWh and weighted average price rules documented in `position_report.md`.
+
+## Financial Settlement Feature
+
+`Financial Settlement` shows monthly settlement rows for the selected Baseloads portfolio.
+
+The feature uses a month dropdown and combines `base.sys + base.epad` into one component group. The settlement formula is:
+
+```text
+financial_settlement = hedge_volume_mwh * (monthly_spot_price - hedge_price)
+```
+
+Positive value means spot price is above hedge price.
+
+The feature uses monthly average spot actuals from the static spot actual list. Peak/offpeak actuals remain available for later reports but are not used here.
 
 ## UI Entry Point
 

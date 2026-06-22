@@ -14,3 +14,4 @@ Durable design and function documentation lives here.
 - [Real price providers](price-api/real_price_providers.md)
 - [Price API v2 profile request](price-api/price_api_v2_profile_request.md)
 - [Static spot actuals](settlement/static_spot_actuals.md)
+- [Financial Settlement](hedging/financial_settlement.md)
