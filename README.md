@@ -77,5 +77,5 @@ Every code change must reference exactly one package id. Rollback is also a new 
 Current bootstrap package:
 
 ```text
-requirements/packages/P0001-bootstrap-hedging-repo.md
+requirements/packages/P0001-bootstrap-cleanup.md
 ```

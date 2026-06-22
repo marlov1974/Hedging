@@ -1,0 +1,10 @@
+{
+  "read_order": [
+    "memory/00-index.md",
+    "memory/01-project-overview.md",
+    "memory/02-design-principles.md",
+    "memory/03-component-model.md",
+    "requirements/README.md",
+    "requirements/packages/P0001-bootstrap-cleanup.md"
+  ]
+}
