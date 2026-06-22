@@ -74,6 +74,21 @@ export type PriceBlock = {
   source_block_id?: string;
 };
 
+export type NormalizedMarketPriceBlock = {
+  component: PriceComponentCode;
+  price_area: PriceArea;
+  block_type: BlockType;
+  block_id: string;
+  start_month: string;
+  end_month: string;
+  price: number;
+  currency: string;
+  price_unit: string;
+  retrieved_at: string;
+  source_name: string;
+  source_instrument: string;
+};
+
 export interface BlockPriceProvider {
   getBlock(component: EnergyComponentCode, priceArea: PriceArea, blockType: BlockType, period: string): PriceBlock | undefined;
 }
@@ -95,9 +110,9 @@ export type PriceApiResponseWithTrace = {
 };
 
 export class PriceApiError extends Error {
-  readonly code: "invalid_request" | "missing_data";
+  readonly code: "invalid_request" | "missing_data" | "configuration_error" | "provider_error";
 
-  constructor(code: "invalid_request" | "missing_data", message: string) {
+  constructor(code: "invalid_request" | "missing_data" | "configuration_error" | "provider_error", message: string) {
     super(message);
     this.code = code;
     this.name = "PriceApiError";

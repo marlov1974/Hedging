@@ -22,6 +22,7 @@ docs/price-api/price_api_sources.md
 docs/price-api/price_api_v2_profile_request.md
 docs/price-api/price_api_v2_stacking.md
 docs/price-api/price_api_v2_virtual_blocks.md
+docs/price-api/real_price_providers.md
 docs/product-configurations/component_vocabulary.md
 docs/product-configurations/config_baseloads.md
 docs/product-configurations/config_fixed.md
@@ -51,6 +52,10 @@ requirements/package-runs/P0009/review.md
 requirements/package-runs/P0010/design.md
 requirements/package-runs/P0010/functions.md
 requirements/package-runs/P0010/review.md
+requirements/package-runs/P0011/design.md
+requirements/package-runs/P0011/functions.md
+requirements/package-runs/P0011/review.md
+requirements/package-runs/P0011/source-research.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -71,14 +76,18 @@ src/database/types.ts
 src/database/validation.ts
 src/price-api/blockProviders.ts
 src/price-api/blockStacking.ts
+src/price-api/liveCheck.ts
 src/price-api/monthRange.ts
 src/price-api/priceApi.ts
 src/price-api/profileRequest.ts
+src/price-api/providerMode.ts
 src/price-api/providers.ts
+src/price-api/realProviders.ts
 src/price-api/server.ts
 src/price-api/types.ts
 tests/README.md
 tests/database/customerProductSchema.test.ts
 tests/price-api/priceApi.test.ts
 tests/price-api/priceApiV2.test.ts
+tests/price-api/realProviders.test.ts
 ```
