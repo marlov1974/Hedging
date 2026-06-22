@@ -6,6 +6,18 @@ Extend the Price API so it can fetch real market prices from internet-accessible
 
 This is a coding package with a required research step.
 
+## PoC boundary
+
+This package is for a proof of concept only.
+
+The solution is not intended for production use, high request volume, automated trading, operational pricing, or SLA-backed service delivery.
+
+Expected use is low-volume manual testing and demonstration.
+
+This means the implementation may prioritize simplicity and evidence of feasibility over production-grade resilience.
+
+A web crawler is acceptable if it reads public pages without login, credentials, cookies, session tokens, paywall bypassing, or aggressive traffic.
+
 ## Context
 
 Earlier packages created fixture-based Price API providers. This package must keep the existing provider abstraction and add real provider adapters behind the same interface.
@@ -27,10 +39,10 @@ The provider may use:
 ```text
 open API
 public downloadable files
-web crawler
+simple public-page scraping
 ```
 
-Use the safest and most stable source available.
+Use the simplest source that works for a PoC.
 
 ## Hard constraints
 
@@ -47,6 +59,8 @@ licensed data dumps
 ```
 
 If the best futures price source requires credentials or paid licensing, do not bypass it. Instead implement a clean provider interface and document the limitation.
+
+Do not create high-frequency scraping or background polling.
 
 ## Research task
 
@@ -77,6 +91,8 @@ instrument coverage
 implementation recommendation
 ```
 
+The recommendation may explicitly say that a source is acceptable for PoC but not production.
+
 ## Provider design
 
 Keep fixture providers.
@@ -97,6 +113,8 @@ ConfiguredHttpFuturesPriceProvider
 ```
 
 that reads a configured public URL or local file path from environment/config, but does not include real private values in the repository.
+
+For the PoC, a provider may also be implemented as a simple scraper if it targets public data and is manually invoked.
 
 ## Required behavior
 
@@ -155,13 +173,15 @@ Add tests with mocked HTTP/file responses for:
 
 ## Optional manual script
 
-It is acceptable to add a manual command for live verification, for example:
+Add a manual command for live PoC verification if useful, for example:
 
 ```text
 npm run price-api:live-check
 ```
 
 The command must be safe if configuration is missing and must not be part of the normal test suite.
+
+It is acceptable if this manual command is slower or somewhat fragile, as long as failures are clear and do not break tests.
 
 ## Documentation
 
@@ -174,11 +194,14 @@ docs/price-api/real_price_providers.md
 Document:
 
 ```text
+PoC boundary
 provider modes
 required environment variables
 source limitations
 how to run fixture tests
 how to run optional live check
+why the selected source is acceptable for PoC
+what would need to change for production
 ```
 
 ## Verification
@@ -199,6 +222,7 @@ Report:
 
 - selected source approach,
 - source research summary,
+- whether the approach is PoC-only or production-suitable,
 - files changed,
 - provider mode design,
 - tests added,
