@@ -1,6 +1,7 @@
 import { DatabaseError } from "./types.ts";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
 const KNOWN_COMPONENT_CODES = new Set([
   "base",
@@ -28,6 +29,12 @@ export function assertRequiredString(value: string, fieldName: string): void {
 export function assertMonth(value: string, fieldName: string): void {
   if (!MONTH_PATTERN.test(value)) {
     throw new DatabaseError("invalid_input", `${fieldName} must use YYYY-MM format`);
+  }
+}
+
+export function assertDate(value: string, fieldName: string): void {
+  if (!DATE_PATTERN.test(value)) {
+    throw new DatabaseError("invalid_input", `${fieldName} must use YYYY-MM-DD format`);
   }
 }
 

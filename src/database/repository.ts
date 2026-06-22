@@ -2,16 +2,19 @@ import type { PrototypeDatabase } from "./schema.ts";
 import {
   DatabaseError,
   type Calendar,
+  type Calloff,
+  type CalloffWithTransactions,
   type Customer,
   type CustomerForecast,
   type CustomerPortfolio,
   type CustomerPortfolioWithForecasts,
+  type CustomerTransaction,
   type PriceComponent,
   type ProductConfiguration,
   type ProductConfigurationComponent,
   type ProductConfigurationWithComponents,
 } from "./types.ts";
-import { assertFiniteNumber, assertKnownComponentCode, assertMonth, assertRequiredString } from "./validation.ts";
+import { assertDate, assertFiniteNumber, assertKnownComponentCode, assertMonth, assertRequiredString } from "./validation.ts";
 
 export function insertCustomer(database: PrototypeDatabase, input: Customer): Customer {
   assertUniqueKey(database.customers, input.customer_id, "customer_id");
@@ -121,6 +124,50 @@ export function insertPriceComponent(database: PrototypeDatabase, input: PriceCo
   return input;
 }
 
+export function insertCalloff(database: PrototypeDatabase, input: Calloff): Calloff {
+  assertUniqueKey(database.calloffs, input.calloff_id, "calloff_id");
+  assertRequiredString(input.product_id, "product_id");
+  assertRequiredString(input.portfolio_id, "portfolio_id");
+  assertDate(input.date, "date");
+
+  if (!database.productConfigurations.has(input.product_id)) {
+    throw new DatabaseError("not_found", `product_id ${input.product_id} does not exist`);
+  }
+
+  if (!database.portfolios.has(input.portfolio_id)) {
+    throw new DatabaseError("not_found", `portfolio_id ${input.portfolio_id} does not exist`);
+  }
+
+  database.calloffs.set(input.calloff_id, input);
+  return input;
+}
+
+export function insertTransaction(database: PrototypeDatabase, input: CustomerTransaction): CustomerTransaction {
+  assertUniqueKey(database.transactions, input.transaction_id, "transaction_id");
+  assertRequiredString(input.calloff_id, "calloff_id");
+  assertMonth(input.month, "month");
+  assertRequiredString(input.productcomponent_id, "productcomponent_id");
+  assertFiniteNumber(input.mw, "mw");
+  assertFiniteNumber(input.q_factor, "q_factor");
+
+  const calloff = database.calloffs.get(input.calloff_id);
+  if (!calloff) {
+    throw new DatabaseError("not_found", `calloff_id ${input.calloff_id} does not exist`);
+  }
+
+  const productComponent = database.productConfigurationComponents.get(input.productcomponent_id);
+  if (!productComponent) {
+    throw new DatabaseError("not_found", `productcomponent_id ${input.productcomponent_id} does not exist`);
+  }
+
+  if (productComponent.product_id !== calloff.product_id) {
+    throw new DatabaseError("invalid_input", "transaction productcomponent_id must belong to calloff product_id");
+  }
+
+  database.transactions.set(input.transaction_id, input);
+  return input;
+}
+
 export function getCustomerPortfolioWithForecasts(
   database: PrototypeDatabase,
   portfolioId: string,
@@ -165,11 +212,57 @@ export function getProductConfigurationWithComponents(
   return { product, components };
 }
 
+export function getCalloffWithTransactions(
+  database: PrototypeDatabase,
+  calloffId: string,
+): CalloffWithTransactions | undefined {
+  const calloff = database.calloffs.get(calloffId);
+  if (!calloff) {
+    return undefined;
+  }
+
+  return {
+    calloff,
+    transactions: getSortedTransactions(database).filter((transaction) => transaction.calloff_id === calloffId),
+  };
+}
+
+export function getTransactionsByPortfolio(database: PrototypeDatabase, portfolioId: string): CustomerTransaction[] {
+  const calloffIds = new Set(
+    [...database.calloffs.values()]
+      .filter((calloff) => calloff.portfolio_id === portfolioId)
+      .map((calloff) => calloff.calloff_id),
+  );
+
+  return getSortedTransactions(database).filter((transaction) => calloffIds.has(transaction.calloff_id));
+}
+
+export function getTransactionsByProduct(database: PrototypeDatabase, productId: string): CustomerTransaction[] {
+  const calloffIds = new Set(
+    [...database.calloffs.values()]
+      .filter((calloff) => calloff.product_id === productId)
+      .map((calloff) => calloff.calloff_id),
+  );
+
+  return getSortedTransactions(database).filter((transaction) => calloffIds.has(transaction.calloff_id));
+}
+
 function assertUniqueKey<T>(map: Map<string, T>, key: string, fieldName: string): void {
   assertRequiredString(key, fieldName);
   if (map.has(key)) {
     throw new DatabaseError("duplicate_key", `${fieldName} ${key} already exists`);
   }
+}
+
+function getSortedTransactions(database: PrototypeDatabase): CustomerTransaction[] {
+  return [...database.transactions.values()].sort((left, right) => {
+    const monthOrder = left.month.localeCompare(right.month);
+    if (monthOrder !== 0) {
+      return monthOrder;
+    }
+
+    return left.transaction_id.localeCompare(right.transaction_id);
+  });
 }
 
 function forecastKey(portfolioId: string, month: string): string {

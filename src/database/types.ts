@@ -48,6 +48,22 @@ export type PriceComponent = {
   currency: string;
 };
 
+export type Calloff = {
+  calloff_id: string;
+  product_id: string;
+  portfolio_id: string;
+  date: string;
+};
+
+export type CustomerTransaction = {
+  transaction_id: string;
+  calloff_id: string;
+  month: string;
+  productcomponent_id: string;
+  mw: number;
+  q_factor: number;
+};
+
 export type CustomerPortfolioWithForecasts = {
   portfolio: CustomerPortfolio;
   customer: Customer;
@@ -63,6 +79,11 @@ export type ProductConfigurationComponentWithPrices = {
 export type ProductConfigurationWithComponents = {
   product: ProductConfiguration;
   components: ProductConfigurationComponentWithPrices[];
+};
+
+export type CalloffWithTransactions = {
+  calloff: Calloff;
+  transactions: CustomerTransaction[];
 };
 
 export class DatabaseError extends Error {

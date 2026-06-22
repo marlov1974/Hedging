@@ -1,8 +1,10 @@
 import type {
   Calendar,
+  Calloff,
   Customer,
   CustomerForecast,
   CustomerPortfolio,
+  CustomerTransaction,
   PriceComponent,
   ProductConfiguration,
   ProductConfigurationComponent,
@@ -18,6 +20,8 @@ export type PrototypeDatabase = {
   productConfigurations: Map<string, ProductConfiguration>;
   productConfigurationComponents: Map<string, ProductConfigurationComponent>;
   priceComponents: Map<string, PriceComponent>;
+  calloffs: Map<string, Calloff>;
+  transactions: Map<string, CustomerTransaction>;
 };
 
 export function createSchema(): PrototypeDatabase {
@@ -31,5 +35,7 @@ export function createSchema(): PrototypeDatabase {
     productConfigurations: new Map(),
     productConfigurationComponents: new Map(),
     priceComponents: new Map(),
+    calloffs: new Map(),
+    transactions: new Map(),
   };
 }

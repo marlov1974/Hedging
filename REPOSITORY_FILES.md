@@ -9,6 +9,7 @@ README.md
 REPOSITORY_FILES.md
 docs/README.md
 docs/components/currency_component.md
+docs/data-model/calloff_transaction_database_model.md
 docs/data-model/calloff_model.md
 docs/data-model/customer_product_database_structure.md
 docs/data-model/customer_transaction_list.md
@@ -56,6 +57,9 @@ requirements/package-runs/P0011/design.md
 requirements/package-runs/P0011/functions.md
 requirements/package-runs/P0011/review.md
 requirements/package-runs/P0011/source-research.md
+requirements/package-runs/P0014/design.md
+requirements/package-runs/P0014/functions.md
+requirements/package-runs/P0014/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -68,6 +72,10 @@ requirements/packages/P0009-price-api-profile-stacking-prototype.md
 requirements/packages/P0010-customer-product-database-structure.md
 requirements/packages/P0011-poc-scope-addendum.md
 requirements/packages/P0011-real-market-price-providers.md
+requirements/packages/P0012-peak-model-comparison-poc.md
+requirements/packages/P0013-energy-partition-product-structure-poc.md
+requirements/packages/P0014-calloff-transaction-database-model.md
+requirements/packages/P0015-seed-data-component-qfactor-poc.md
 src/README.md
 src/database/fixtures.ts
 src/database/repository.ts
@@ -86,6 +94,7 @@ src/price-api/realProviders.ts
 src/price-api/server.ts
 src/price-api/types.ts
 tests/README.md
+tests/database/calloffTransactionModel.test.ts
 tests/database/customerProductSchema.test.ts
 tests/price-api/priceApi.test.ts
 tests/price-api/priceApiV2.test.ts
