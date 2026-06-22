@@ -4,6 +4,7 @@ Tracked files:
 
 ```text
 AGENTS.md
+P0007-price-api-prototype.md
 PROJECT_OVERVIEW.md
 README.md
 REPOSITORY_FILES.md
@@ -45,3 +46,5 @@ requirements/packages/P0006-price-api.md
 src/README.md
 tests/README.md
 ```
+
+Note: P0007 was created in root and should be moved to `requirements/packages/` by the package run.
