@@ -7,6 +7,7 @@ AGENTS.md
 P0001-bootstrap-cleanup.md
 P0002-product-vocabulary.md
 P0003-calloff-transaction-model.md
+P0004-currency-component.md
 PROJECT_OVERVIEW.md
 README.md
 REPOSITORY_FILES.md
@@ -16,6 +17,7 @@ config_baseloads.md
 config_fixed.md
 config_peaks.md
 config_profiles.md
+currency_component.md
 customer_transaction_list.md
 product_configurations.md
 test.txt
