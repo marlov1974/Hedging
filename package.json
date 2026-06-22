@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node --test tests/**/*.test.ts",
     "price-api:live-check": "node src/price-api/liveCheck.ts",
-    "purchase:baseloads": "node src/purchase/server.ts"
+    "purchase:baseloads": "node src/purchase/server.ts",
+    "hedging:tool": "node src/hedging/server.ts"
   }
 }
