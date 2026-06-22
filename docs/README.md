@@ -6,6 +6,7 @@ Durable design and function documentation lives here.
 
 - [Product configurations](product-configurations/product_configurations.md)
 - [Data model](data-model/calloff_model.md)
+- [Customer product database structure](data-model/customer_product_database_structure.md)
 - [Currency component](components/currency_component.md)
 - [Market derivation](market-derivation/market_derivation.md)
 - [Price API](price-api/price_api_contract.md)

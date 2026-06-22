@@ -10,6 +10,7 @@ REPOSITORY_FILES.md
 docs/README.md
 docs/components/currency_component.md
 docs/data-model/calloff_model.md
+docs/data-model/customer_product_database_structure.md
 docs/data-model/customer_transaction_list.md
 docs/data-model/transaction_model.md
 docs/market-derivation/market_derivation.md
@@ -47,6 +48,9 @@ requirements/package-runs/P0008/review.md
 requirements/package-runs/P0009/design.md
 requirements/package-runs/P0009/functions.md
 requirements/package-runs/P0009/review.md
+requirements/package-runs/P0010/design.md
+requirements/package-runs/P0010/functions.md
+requirements/package-runs/P0010/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -56,7 +60,15 @@ requirements/packages/P0006-price-api.md
 requirements/packages/P0007-price-api-prototype.md
 requirements/packages/P0008-profile-based-price-api.md
 requirements/packages/P0009-price-api-profile-stacking-prototype.md
+requirements/packages/P0010-customer-product-database-structure.md
+requirements/packages/P0011-poc-scope-addendum.md
+requirements/packages/P0011-real-market-price-providers.md
 src/README.md
+src/database/fixtures.ts
+src/database/repository.ts
+src/database/schema.ts
+src/database/types.ts
+src/database/validation.ts
 src/price-api/blockProviders.ts
 src/price-api/blockStacking.ts
 src/price-api/monthRange.ts
@@ -66,6 +78,7 @@ src/price-api/providers.ts
 src/price-api/server.ts
 src/price-api/types.ts
 tests/README.md
+tests/database/customerProductSchema.test.ts
 tests/price-api/priceApi.test.ts
 tests/price-api/priceApiV2.test.ts
 ```
