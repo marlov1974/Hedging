@@ -2,6 +2,8 @@ import type { PrototypeDatabase } from "../database/schema.ts";
 import type { BaseloadsPurchaseResult } from "../purchase/baseloadsPurchase.ts";
 import { getBaseloadsPurchasePeriods } from "../purchase/periodOptions.ts";
 import { getBaseloadsCalloffListRows } from "./calloffList.ts";
+import { getPortfolioDetails } from "./portfolioDetails.ts";
+import { getPositionReportRows, getPositionReportYears } from "./positionReport.ts";
 import {
   getAvailableFeaturesForPortfolio,
   getPortfolioOptions,
@@ -14,6 +16,7 @@ export type HedgingToolState = {
   feature_id?: HedgingFeatureId;
   mw?: string;
   selected_period_id?: string;
+  selected_year?: string;
   error?: string;
   purchase_result?: BaseloadsPurchaseResult;
 };
@@ -22,7 +25,7 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
   const portfolios = getPortfolioOptions(database);
   const selectedPortfolio = portfolios.find((portfolio) => portfolio.portfolio_id === state.portfolio_id);
   const features = getAvailableFeaturesForPortfolio(database, selectedPortfolio?.portfolio_id);
-  const activeFeature = state.feature_id ?? "buy-baseloads";
+  const activeFeature = state.feature_id ?? "portfolio-details";
 
   return `<!doctype html>
 <html lang="en">
@@ -52,20 +55,12 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
       font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     main {
-      width: min(1180px, calc(100% - 32px));
+      width: min(1180px, calc(100% - 24px));
       margin: 0 auto;
-      padding: 28px 0;
-    }
-    header {
-      display: flex;
-      justify-content: space-between;
-      gap: 24px;
-      align-items: flex-end;
-      padding-bottom: 18px;
-      border-bottom: 1px solid var(--line);
+      padding: 14px 0 24px;
     }
     h1, h2, h3 { margin: 0; letter-spacing: 0; }
-    h1 { font-size: 28px; line-height: 1.15; }
+    h1 { font-size: 20px; line-height: 1.15; }
     h2 { font-size: 18px; }
     h3 { font-size: 15px; }
     p { margin: 0; color: var(--muted); }
@@ -73,16 +68,15 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
       display: grid;
       grid-template-columns: 300px minmax(0, 1fr);
       gap: 20px;
-      margin-top: 20px;
       align-items: start;
     }
     .panel {
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 18px;
+      padding: 16px;
     }
-    .stack { display: grid; gap: 16px; }
+    .stack { display: grid; gap: 14px; }
     label { display: grid; gap: 6px; font-weight: 650; }
     select, input {
       width: 100%;
@@ -123,11 +117,24 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
       background: var(--accent-soft);
       color: var(--accent);
     }
-    .portfolio-card {
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .compact-selector {
       display: grid;
-      gap: 8px;
-      padding-top: 14px;
-      border-top: 1px solid var(--line);
+      grid-template-columns: minmax(180px, 280px) auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .selected-name { color: var(--muted); font-weight: 650; }
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 18px;
     }
     .kv {
       display: flex;
@@ -175,26 +182,24 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
     }
     td.number { text-align: right; font-variant-numeric: tabular-nums; }
     @media (max-width: 780px) {
-      main { width: min(100% - 24px, 1180px); }
-      header { display: block; }
+      main { width: min(100% - 18px, 1180px); }
+      .topbar { display: block; }
       .layout { grid-template-columns: 1fr; }
+      .compact-selector { grid-template-columns: 1fr; margin-bottom: 10px; }
       .form-grid { grid-template-columns: 1fr; }
+      .details-grid { grid-template-columns: 1fr; }
       table { display: block; overflow-x: auto; }
     }
   </style>
 </head>
 <body>
   <main>
-    <header>
-      <div>
-        <h1>Hedging Tool</h1>
-        <p>Portfolio based hedging workflow prototype.</p>
-      </div>
-      <p>${selectedPortfolio ? escapeHtml(selectedPortfolio.portfolio_name) : "No portfolio selected"}</p>
-    </header>
+    <section class="topbar">
+      ${renderPortfolioSelector(portfolios, selectedPortfolio, activeFeature)}
+      <span class="selected-name">${selectedPortfolio ? escapeHtml(selectedPortfolio.portfolio_name) : "No portfolio selected"}</span>
+    </section>
     <section class="layout">
       <aside class="panel stack">
-        ${renderPortfolioSelector(portfolios, selectedPortfolio, activeFeature)}
         ${renderFeatureNav(features, selectedPortfolio, activeFeature)}
       </aside>
       <section class="panel stack">
@@ -207,7 +212,7 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
 }
 
 function renderPortfolioSelector(portfolios: PortfolioOption[], selectedPortfolio: PortfolioOption | undefined, activeFeature: HedgingFeatureId): string {
-  return `<form method="get" action="/hedging" class="stack">
+  return `<form method="get" action="/hedging" class="compact-selector">
     <input type="hidden" name="feature_id" value="${escapeHtml(activeFeature)}">
     <label>
       Portfolio
@@ -218,17 +223,8 @@ function renderPortfolioSelector(portfolios: PortfolioOption[], selectedPortfoli
           .join("")}
       </select>
     </label>
-  </form>
-  ${
-    selectedPortfolio
-      ? `<div class="portfolio-card">
-          <div class="kv"><span>Customer</span><strong>${escapeHtml(selectedPortfolio.customer_name)}</strong></div>
-          <div class="kv"><span>Customer no.</span><strong>${escapeHtml(selectedPortfolio.customer_number)}</strong></div>
-          <div class="kv"><span>Price area</span><strong>${escapeHtml(selectedPortfolio.price_area)}</strong></div>
-          <div class="kv"><span>Product</span><strong>${escapeHtml(selectedPortfolio.product_configuration_name ?? "Unknown")}</strong></div>
-        </div>`
-      : ""
-  }`;
+    <button type="submit">Open</button>
+  </form>`;
 }
 
 function renderFeatureNav(features: ReturnType<typeof getAvailableFeaturesForPortfolio>, selectedPortfolio: PortfolioOption | undefined, activeFeature: HedgingFeatureId): string {
@@ -266,6 +262,14 @@ function renderActiveFeature(
 
   if (activeFeature === "baseloads-calloff-list") {
     return renderCalloffList(database, selectedPortfolio);
+  }
+
+  if (activeFeature === "portfolio-details") {
+    return renderPortfolioDetails(database, selectedPortfolio);
+  }
+
+  if (activeFeature === "position-report") {
+    return renderPositionReport(database, selectedPortfolio, state);
   }
 
   return renderBuyBaseloads(selectedPortfolio, state);
@@ -314,7 +318,6 @@ function renderCalloffList(database: PrototypeDatabase, selectedPortfolio: Portf
         <tr>
           <th>Datum</th>
           <th>Derivatnamn</th>
-          <th>Component</th>
           <th>MWh</th>
           <th>Pris</th>
         </tr>
@@ -325,7 +328,6 @@ function renderCalloffList(database: PrototypeDatabase, selectedPortfolio: Portf
             (row) => `<tr>
               <td>${escapeHtml(row.date)}</td>
               <td>${escapeHtml(row.derivative_name)}</td>
-              <td>${escapeHtml(row.component)}</td>
               <td class="number">${formatNumber(row.mwh)}</td>
               <td class="number">${formatNumber(row.price)}</td>
             </tr>`,
@@ -333,6 +335,75 @@ function renderCalloffList(database: PrototypeDatabase, selectedPortfolio: Portf
           .join("")}
       </tbody>
     </table>
+  </div>`;
+}
+
+function renderPortfolioDetails(database: PrototypeDatabase, selectedPortfolio: PortfolioOption): string {
+  const details = getPortfolioDetails(database, selectedPortfolio.portfolio_id);
+  if (!details) {
+    return `<div class="notice"><h2>Portfolio Details</h2><p>Portfolio details are not available.</p></div>`;
+  }
+
+  return `<div class="stack">
+    <h2>Portfolio Details</h2>
+    <div class="details-grid">
+      <div class="kv"><span>Portfolio</span><strong>${escapeHtml(details.portfolio_name)}</strong></div>
+      <div class="kv"><span>Customer</span><strong>${escapeHtml(details.customer_name)}</strong></div>
+      <div class="kv"><span>Customer no.</span><strong>${escapeHtml(details.customer_number)}</strong></div>
+      <div class="kv"><span>Price area</span><strong>${escapeHtml(details.price_area)}</strong></div>
+      <div class="kv"><span>Product</span><strong>${escapeHtml(details.product_configuration_name ?? "Unknown")}</strong></div>
+      <div class="kv"><span>Calendar</span><strong>${escapeHtml(details.calendar_id)}</strong></div>
+    </div>
+  </div>`;
+}
+
+function renderPositionReport(database: PrototypeDatabase, selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+  const years = getPositionReportYears(database, selectedPortfolio.portfolio_id);
+  const selectedYear = state.selected_year ?? years[0] ?? "";
+  const rows = selectedYear ? getPositionReportRows(database, selectedPortfolio.portfolio_id, selectedYear) : [];
+
+  return `<div class="stack">
+    <div>
+      <h2>Position Report</h2>
+      <p>Monthly aggregated positions by component.</p>
+    </div>
+    <form method="get" action="/hedging" class="compact-selector">
+      <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      <input type="hidden" name="feature_id" value="position-report">
+      <label>
+        Year
+        <select name="selected_year">
+          ${years.map((year) => `<option value="${escapeHtml(year)}"${year === selectedYear ? " selected" : ""}>${escapeHtml(year)}</option>`).join("")}
+        </select>
+      </label>
+      <button type="submit">Show</button>
+    </form>
+    ${
+      rows.length === 0
+        ? `<div class="notice"><p>No positions for ${escapeHtml(selectedYear)}.</p></div>`
+        : `<table>
+            <thead>
+              <tr>
+                <th>Månad</th>
+                <th>Volym</th>
+                <th>Pris</th>
+                <th>Component</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map(
+                  (row) => `<tr>
+                    <td>${escapeHtml(row.month)}</td>
+                    <td class="number">${formatNumber(row.volume_mwh)}</td>
+                    <td class="number">${formatNumber(row.price)}</td>
+                    <td>${escapeHtml(row.component)}</td>
+                  </tr>`,
+                )
+                .join("")}
+            </tbody>
+          </table>`
+    }
   </div>`;
 }
 

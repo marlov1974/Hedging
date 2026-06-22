@@ -8,9 +8,15 @@ describe("hedging tool shell", () => {
   it("renders portfolio selector", () => {
     const html = renderHedgingTool(createPocSeedData());
 
-    assert.match(html, /Hedging Tool/);
     assert.match(html, /Select portfolio/);
     assert.match(html, /PORT_BASELOADS/);
+  });
+
+  it("large Hedging Tool heading and subtitle are no longer rendered", () => {
+    const html = renderHedgingTool(createPocSeedData());
+
+    assert.doesNotMatch(html, /<h1>Hedging Tool<\/h1>/);
+    assert.doesNotMatch(html, /Portfolio based hedging workflow prototype/);
   });
 
   it("selecting a portfolio exposes feature navigation", () => {
@@ -19,6 +25,14 @@ describe("hedging tool shell", () => {
     assert.match(html, /Feature navigation/);
     assert.match(html, /Buy Baseloads/);
     assert.match(html, /Baseloads Calloff List/);
+  });
+
+  it("top portfolio selector stays compact and omits inline details", () => {
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_BASELOADS", feature_id: "buy-baseloads" });
+
+    assert.match(html, /class="compact-selector"/);
+    assert.doesNotMatch(html, /<span>Customer<\/span>/);
+    assert.doesNotMatch(html, /<span>Product<\/span>/);
   });
 
   it("shows selected portfolio context", () => {
@@ -48,6 +62,13 @@ describe("hedging tool shell", () => {
     const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "PORT_BASELOADS");
 
     assert.equal(features.find((feature) => feature.feature_id === "baseloads-calloff-list")?.available, true);
+  });
+
+  it("feature menu includes Portfolio Details and Position Report", () => {
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_BASELOADS" });
+
+    assert.match(html, /Portfolio Details/);
+    assert.match(html, /Position Report/);
   });
 
   it("non-Baseloads selected portfolio shows clear unavailable message", () => {

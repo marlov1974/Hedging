@@ -17,6 +17,7 @@ docs/data-model/poc_seed_data.md
 docs/data-model/transaction_model.md
 docs/hedging/baseloads_calloff_list.md
 docs/hedging/hedging_tool_shell.md
+docs/hedging/position_report.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
 docs/market-derivation/runtime_derivation_policy.md
@@ -73,6 +74,9 @@ requirements/package-runs/P0016/review.md
 requirements/package-runs/P0017/design.md
 requirements/package-runs/P0017/functions.md
 requirements/package-runs/P0017/review.md
+requirements/package-runs/P0018/design.md
+requirements/package-runs/P0018/functions.md
+requirements/package-runs/P0018/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -91,6 +95,7 @@ requirements/packages/P0014-calloff-transaction-database-model.md
 requirements/packages/P0015-seed-data-component-qfactor-poc.md
 requirements/packages/P0016-baseloads-purchase-flow.md
 requirements/packages/P0017-hedging-tool-shell-and-baseloads-calloff-list.md
+requirements/packages/P0018-hedging-tool-minimal-layout-and-position-report.md
 src/README.md
 src/database/fixtures.ts
 src/database/pocSeedData.ts
@@ -102,6 +107,8 @@ src/hedging/HedgingToolView.ts
 src/hedging/calloffList.ts
 src/hedging/derivativeNames.ts
 src/hedging/features.ts
+src/hedging/portfolioDetails.ts
+src/hedging/positionReport.ts
 src/hedging/server.ts
 src/price-api/blockProviders.ts
 src/price-api/blockStacking.ts
@@ -124,6 +131,8 @@ tests/database/customerProductSchema.test.ts
 tests/database/pocSeedData.test.ts
 tests/hedging/baseloadsCalloffList.test.ts
 tests/hedging/hedgingTool.test.ts
+tests/hedging/portfolioDetails.test.ts
+tests/hedging/positionReport.test.ts
 tests/price-api/priceApi.test.ts
 tests/price-api/priceApiV2.test.ts
 tests/price-api/realProviders.test.ts

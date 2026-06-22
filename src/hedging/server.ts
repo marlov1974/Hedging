@@ -81,6 +81,7 @@ function readStateFromUrl(url: URL) {
   return {
     portfolio_id: url.searchParams.get("portfolio_id") ?? undefined,
     feature_id: (url.searchParams.get("feature_id") as HedgingFeatureId | null) ?? undefined,
+    selected_year: url.searchParams.get("selected_year") ?? undefined,
   };
 }
 

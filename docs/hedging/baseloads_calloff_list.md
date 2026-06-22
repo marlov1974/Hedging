@@ -20,10 +20,11 @@ The UI table shows:
 ```text
 Datum
 Derivatnamn
-Component
 MWh
 Pris
 ```
+
+The component is no longer shown as a separate visible column. Component distinction is carried in `Derivatnamn`.
 
 ## Component-Split Rows
 
@@ -40,12 +41,14 @@ A quarter Baseloads calloff has six transactions:
 3 months * 2 components = 6 transactions
 ```
 
-It renders as two table rows:
+It still renders as two table rows:
 
 ```text
 one base.sys row
 one base.epad row
 ```
+
+The visible table has no separate `Component` column.
 
 ## MWh Aggregation
 

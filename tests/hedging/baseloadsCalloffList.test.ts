@@ -82,7 +82,7 @@ describe("Baseloads calloff list", () => {
     );
   });
 
-  it("UI shows Datum, Derivatnamn, Component, MWh and Pris columns", () => {
+  it("UI shows Datum, Derivatnamn, MWh and Pris columns without visible Component column", () => {
     const html = renderHedgingTool(seedQuarterCalloff(), {
       portfolio_id: "PORT_BASELOADS",
       feature_id: "baseloads-calloff-list",
@@ -90,10 +90,10 @@ describe("Baseloads calloff list", () => {
 
     assert.match(html, /Datum/);
     assert.match(html, /Derivatnamn/);
-    assert.match(html, /Component/);
     assert.match(html, /MWh/);
     assert.match(html, /Pris/);
     assert.match(html, /SE3 base\.sys Q1-27/);
+    assert.doesNotMatch(html, /<th>Component<\/th>/);
   });
 });
 
