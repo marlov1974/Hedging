@@ -8,6 +8,7 @@ P0001-bootstrap-cleanup.md
 P0002-product-vocabulary.md
 P0003-calloff-transaction-model.md
 P0004-currency-component.md
+P0005-market-derivation.md
 PROJECT_OVERVIEW.md
 README.md
 REPOSITORY_FILES.md
@@ -19,7 +20,10 @@ config_peaks.md
 config_profiles.md
 currency_component.md
 customer_transaction_list.md
+market_derivation.md
 product_configurations.md
+q_factor_model.md
+runtime_derivation_policy.md
 test.txt
 transaction_model.md
 ```
