@@ -4,14 +4,15 @@ import { PriceApiError, type PriceApi } from "./types.ts";
 
 export function createPriceApiServer(api: PriceApi = createDefaultPriceApi()) {
   return createServer(async (request, response) => {
-    if (request.method !== "POST" || request.url !== "/price-api/monthly") {
+    if (request.method !== "POST" || (request.url !== "/price-api/monthly" && request.url !== "/price-api/profile")) {
       writeJson(response, 404, { error: "not_found" });
       return;
     }
 
     try {
       const body = await readJson(request);
-      writeJson(response, 200, api.getMonthlyPrices(body));
+      const result = request.url === "/price-api/profile" ? api.getProfilePrices(body) : api.getMonthlyPrices(body);
+      writeJson(response, 200, result);
     } catch (error) {
       if (error instanceof PriceApiError) {
         writeJson(response, error.code === "invalid_request" ? 400 : 422, {

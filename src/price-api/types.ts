@@ -18,6 +18,14 @@ export type PriceApiResponse = {
   rows: PriceApiRow[];
 };
 
+export type PriceArea = "STO";
+
+export type EnergyComponentCode = "base.sys" | "base.epad";
+
+export type PriceComponentCode = EnergyComponentCode | "currency.sek";
+
+export type BlockType = "year" | "quarter" | "month";
+
 export type AnnualFuturesPrice = {
   year: string;
   area_code: "STO";
@@ -39,6 +47,53 @@ export interface CurrencyProvider {
   getAnnualRate(year: string, componentCode: "currency.sek"): AnnualCurrencyRate | undefined;
 }
 
+export type ProfilePoint = {
+  month: string;
+  mw: number;
+};
+
+export type ProfilePriceApiRequest = {
+  price_area: string;
+  profile: ProfilePoint[];
+};
+
+export type NormalizedProfilePriceApiRequest = {
+  price_area: PriceArea;
+  profile: ProfilePoint[];
+};
+
+export type PriceBlock = {
+  id: string;
+  component: EnergyComponentCode;
+  price_area: PriceArea;
+  block_type: BlockType;
+  period: string;
+  price: number;
+  virtual: boolean;
+  virtual_rule_id?: string;
+  source_block_id?: string;
+};
+
+export interface BlockPriceProvider {
+  getBlock(component: EnergyComponentCode, priceArea: PriceArea, blockType: BlockType, period: string): PriceBlock | undefined;
+}
+
+export type PriceApiTraceEntry = {
+  month: string;
+  component: PriceComponentCode;
+  source_block_type: BlockType | "annual_currency";
+  source_block_id: string;
+  block_price: number;
+  block_mw_used: number;
+  virtual: boolean;
+  virtual_rule_id?: string;
+};
+
+export type PriceApiResponseWithTrace = {
+  response: PriceApiResponse;
+  trace: PriceApiTraceEntry[];
+};
+
 export class PriceApiError extends Error {
   readonly code: "invalid_request" | "missing_data";
 
@@ -51,4 +106,6 @@ export class PriceApiError extends Error {
 
 export type PriceApi = {
   getMonthlyPrices(request: PriceApiRequest): PriceApiResponse;
+  getProfilePrices(request: ProfilePriceApiRequest): PriceApiResponse;
+  getProfilePricesWithTrace(request: ProfilePriceApiRequest): PriceApiResponseWithTrace;
 };
