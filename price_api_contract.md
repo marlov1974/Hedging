@@ -17,14 +17,14 @@ The Price API returns monthly component prices for a requested month range.
 
 ```json
 {
-  "currency": "EUR",
+  "base_currency": "EUR",
   "price_unit": "EUR/MWh",
   "rows": [
     {
       "month": "2027-01",
       "base.sys": 0.0,
       "base.epad": 0.0,
-      "currency_rate": 0.0
+      "currency.sek": 0.0
     }
   ]
 }
@@ -35,6 +35,8 @@ The Price API returns monthly component prices for a requested month range.
 - Return one row per month.
 - `base.sys` is returned in EUR/MWh.
 - `base.epad` is returned in EUR/MWh.
-- `currency_rate` is a separate value.
+- `currency.sek` is a separate currency component.
+- The base currency is EUR.
+- The currency component is SEK.
 - Currency must not be embedded in the component prices.
 - Example numeric values are synthetic placeholders.
