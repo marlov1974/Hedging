@@ -83,8 +83,8 @@ The PoC uses:
 base.sys
 base.epad
 allocation.peak
-peak.premium.sys
-peak.premium.epad
+peak.sys
+peak.epad
 profile.sys
 profile.epad
 volume
@@ -98,8 +98,8 @@ Peaks.Classic and Peaks.Modern both use canonical component rows in seed data:
 allocation.peak
 base.sys
 base.epad
-peak.premium.sys
-peak.premium.epad
+peak.sys
+peak.epad
 profile.sys
 profile.epad
 volume
@@ -112,8 +112,10 @@ Deprecated aliases are accepted only for compatibility:
 ```text
 PeaksModern -> Peaks.Modern
 PeaksClassic -> Peaks.Classic
-peak.modern.sys -> peak.premium.sys
-peak.modern.epad -> peak.premium.epad
+peak.modern.sys -> peak.sys
+peak.modern.epad -> peak.epad
+peak.premium.sys -> peak.sys
+peak.premium.epad -> peak.epad
 ```
 
 ## PortfolioProductComponent
@@ -159,7 +161,7 @@ Deterministic values stay inside these ranges:
 ```text
 base.sys / base.epad = 1.0
 allocation.peak = 0
-peak.premium.sys / peak.premium.epad = 1.2-1.5
+peak.sys / peak.epad = 1.2-1.5
 profile.sys / profile.epad = 1.03-1.09
 volume = 0
 ```

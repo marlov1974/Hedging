@@ -66,7 +66,13 @@ export function projectLegacyCalloffMonth(
 
   const base = selectComponentMw(database, transactions, ["base.sys", "base.epad"], "base", warnings);
   const allocationPeak = findComponentTransaction(database, transactions, "allocation.peak");
-  const peakPremium = selectComponentMw(database, transactions, ["peak.premium.sys", "peak.premium.epad", "peak.modern.sys", "peak.modern.epad"], "peak premium", warnings);
+  const peak = selectComponentMw(
+    database,
+    transactions,
+    ["peak.sys", "peak.epad", "peak.premium.sys", "peak.premium.epad", "peak.modern.sys", "peak.modern.epad"],
+    "peak",
+    warnings,
+  );
 
   if (base.mw === null || !allocationPeak) {
     if (!allocationPeak) {
@@ -75,13 +81,13 @@ export function projectLegacyCalloffMonth(
     return errorRows(calloff, month, warnings.join("; "));
   }
 
-  const basePrice = sumComponentPrices(database, calloff.product_id, ["base.sys", "base.epad"], warnings, "base price");
-  const peakPremiumPrice = sumComponentPrices(
+  const basePrice = sumTransactionComponentPrices(database, transactions, ["base.sys", "base.epad"], warnings, "base price");
+  const peakPrice = sumTransactionComponentPrices(
     database,
-    calloff.product_id,
-    ["peak.premium.sys", "peak.premium.epad", "peak.modern.sys", "peak.modern.epad"],
+    transactions,
+    ["peak.sys", "peak.epad", "peak.premium.sys", "peak.premium.epad", "peak.modern.sys", "peak.modern.epad"],
     warnings,
-    "peak premium price",
+    "peak price",
   );
 
   const baseMwh = base.mw * calendar.total_h;
@@ -89,10 +95,10 @@ export function projectLegacyCalloffMonth(
   const legacyOffpeakMwh = baseMwh - legacyPeakMwh;
   const legacyOffpeakMw = legacyOffpeakMwh / offpeakHours;
   const legacyPeakMw = allocationPeak.mw;
-  const peakPremiumMwh = (peakPremium.mw ?? 0) * calendar.peak_h;
+  const peakMwh = (peak.mw ?? 0) * calendar.peak_h;
   const baseValue = baseMwh * basePrice;
-  const peakPremiumValue = peakPremiumMwh * peakPremiumPrice;
-  const totalValue = baseValue + peakPremiumValue;
+  const peakValue = peakMwh * peakPrice;
+  const totalValue = baseValue + peakValue;
   const legacyOffpeakPrice = basePrice;
   const legacyOffpeakValue = legacyOffpeakMwh * legacyOffpeakPrice;
   const legacyPeakPrice = legacyPeakMwh === 0 ? null : (totalValue - legacyOffpeakValue) / legacyPeakMwh;
@@ -195,16 +201,16 @@ function findComponentTransaction(
   );
 }
 
-function sumComponentPrices(
+function sumTransactionComponentPrices(
   database: PrototypeDatabase,
-  productId: string,
+  transactions: CustomerTransaction[],
   componentCodes: string[],
   warnings: string[],
   label: string,
 ): number {
-  const components = [...database.productConfigurationComponents.values()].filter(
-    (component) => component.product_id === productId && componentCodes.includes(component.component),
-  );
+  const components = transactions
+    .map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id))
+    .filter((component) => component && componentCodes.includes(component.component));
   let price = 0;
   for (const component of components) {
     const priceComponent = [...database.priceComponents.values()].find(

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Peaks.Modern separates total monthly hedge volume from the premium/shape volume above a flat base profile.
+Peaks.Modern separates total monthly hedge volume from the peak component above or below a flat base profile.
 
 ## Base Components
 
@@ -30,25 +30,25 @@ allocation_peak_mw = forecast_mwh * hedge_pct * peak_pct / peak_h
 
 It has price `0`, q-factor `0`, and is excluded from market projection.
 
-## Peak Premium Components
+## Peak Components
 
-The `peak.premium` components carry only the premium/shape MW above the flat base level. They must not store full peak-hour consumption, because base already carries the total monthly hedge.
-
-```text
-peak_premium_mw = allocation_peak_mw - base_mw
-peak_premium_mwh = peak_premium_mw * peak_h
-```
-
-The same peak premium MW is stored on:
+The `peak` components carry only the peak MW above or below the flat base level. They must not store full peak-hour consumption, because base already carries the total monthly hedge.
 
 ```text
-peak.premium.sys
-peak.premium.epad
+peak_mw = allocation_peak_mw - base_mw
+peak_mwh = peak_mw * peak_h
 ```
 
-## Negative Peak Premium
+The same peak MW is stored on:
 
-`peak_premium_mwh` and `peak_premium_mw` may be negative.
+```text
+peak.sys
+peak.epad
+```
+
+## Negative Peak
+
+`peak_mwh` and `peak_mw` may be negative.
 
 A negative value means the forecast peak share is lower than the flat base share implied by the calendar. The value is kept as-is in the PoC instead of being floored to zero.
 
@@ -60,8 +60,8 @@ Accepting a Peaks.Modern forecast hedge creates five transactions per month:
 allocation.peak
 base.sys
 base.epad
-peak.premium.sys
-peak.premium.epad
+peak.sys
+peak.epad
 ```
 
 Each transaction still reads its own q-factor from the selected portfolio product component and month.

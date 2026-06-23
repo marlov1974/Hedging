@@ -734,8 +734,8 @@ function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile:
           <th>Base MWh</th>
           <th>Base MW</th>
           <th>Allocation Peak MW</th>
-          <th>Peak Premium MWh</th>
-          <th>Peak Premium MW</th>
+          <th>Peak MWh</th>
+          <th>Peak MW</th>
         </tr>
       </thead>
       <tbody>

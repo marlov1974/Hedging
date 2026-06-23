@@ -21,6 +21,8 @@ const KNOWN_COMPONENT_CODES = new Set([
   "peak.modern.epad",
   "peak.premium.sys",
   "peak.premium.epad",
+  "peak.sys",
+  "peak.epad",
   "profile.peak",
   "profile.15m",
   "profile.sys",

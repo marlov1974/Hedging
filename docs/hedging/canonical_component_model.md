@@ -18,8 +18,8 @@ component_mwh = component_mw * relevant_hours
 allocation.peak
 base.sys
 base.epad
-peak.premium.sys
-peak.premium.epad
+peak.sys
+peak.epad
 ```
 
 `allocation.peak` is a helper component. It stores the customer's forecast peak-hour effect in MW, uses `peak_h`, has price `0`, q-factor `0`, and does not create market quantity.
@@ -32,22 +32,24 @@ Classic/Legacy customer projections use `allocation.peak` as the peak-hour volum
 base_mw = forecast_mwh * hedge_pct / total_h
 ```
 
-`peak.premium.sys` and `peak.premium.epad` carry the positive or negative peak shape above flat base:
+`peak.sys` and `peak.epad` carry the positive or negative canonical peak component relative to flat base:
 
 ```text
 allocation_peak_mw = forecast_mwh * hedge_pct * peak_pct / peak_h
-peak_premium_mw = allocation_peak_mw - base_mw
+peak_mw = allocation_peak_mw - base_mw
 ```
 
-`peak_premium_mw` may be negative.
+`peak_mw` may be negative.
 
 ## Compatibility
 
 Deprecated component aliases:
 
 ```text
-peak.modern.sys -> peak.premium.sys
-peak.modern.epad -> peak.premium.epad
+peak.modern.sys -> peak.sys
+peak.modern.epad -> peak.epad
+peak.premium.sys -> peak.sys
+peak.premium.epad -> peak.epad
 ```
 
-New generated transactions use `peak.premium.*`.
+New generated transactions use `peak.*`.

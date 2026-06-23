@@ -14,8 +14,8 @@ The projection reads canonical rows:
 allocation.peak
 base.sys
 base.epad
-peak.premium.sys
-peak.premium.epad
+peak.sys
+peak.epad
 ```
 
 `allocation.peak` drives legacy peak volume. It is not shown as a separate customer row and has no projected value.

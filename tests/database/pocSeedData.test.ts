@@ -9,7 +9,13 @@ import {
   listSeedMonths,
 } from "../../src/database/pocSeedData.ts";
 import { getPortfolioProductComponents, getQFactorValuesBySet } from "../../src/database/repository.ts";
-import { canonicalProductPackageName, isCustomerProjectionComponent, isInternalProjectionComponent, isMarketProjectionComponent } from "../../src/database/canonicalComponents.ts";
+import {
+  canonicalComponentCode,
+  canonicalProductPackageName,
+  isCustomerProjectionComponent,
+  isInternalProjectionComponent,
+  isMarketProjectionComponent,
+} from "../../src/database/canonicalComponents.ts";
 
 describe("P0015 PoC seed data", () => {
   it("creates five customers, five portfolios and five product configurations", () => {
@@ -203,8 +209,8 @@ describe("P0015 PoC seed data", () => {
 
     assert.equal(byComponent.get("base.sys")?.component_category, "base");
     assert.equal(byComponent.get("base.sys")?.hour_basis, "total_h");
-    assert.equal(byComponent.get("peak.premium.sys")?.component_category, "peak");
-    assert.equal(byComponent.get("peak.premium.sys")?.hour_basis, "peak_h");
+    assert.equal(byComponent.get("peak.sys")?.component_category, "peak");
+    assert.equal(byComponent.get("peak.sys")?.hour_basis, "peak_h");
     assert.equal(byComponent.get("profile.sys")?.component_category, "profile");
     assert.equal(byComponent.get("volume")?.component_category, "volume");
   });
@@ -219,12 +225,14 @@ describe("P0015 PoC seed data", () => {
     assert.ok(peaksClassic.has("allocation.peak"));
     assert.ok(peaksClassic.has("base.sys"));
     assert.ok(peaksClassic.has("base.epad"));
-    assert.ok(peaksClassic.has("peak.premium.sys"));
-    assert.ok(peaksClassic.has("peak.premium.epad"));
+    assert.ok(peaksClassic.has("peak.sys"));
+    assert.ok(peaksClassic.has("peak.epad"));
+    assert.ok(!peaksClassic.has("peak.premium.sys"));
     assert.ok(!peaksClassic.has("peak.modern.sys"));
     assert.ok(peaksModern.has("allocation.peak"));
-    assert.ok(peaksModern.has("peak.premium.sys"));
-    assert.ok(peaksModern.has("peak.premium.epad"));
+    assert.ok(peaksModern.has("peak.sys"));
+    assert.ok(peaksModern.has("peak.epad"));
+    assert.ok(!peaksModern.has("peak.premium.sys"));
     assert.ok(!peaksModern.has("peak.modern.sys"));
     assert.ok(profilesClassic.has("profile.sys"));
     assert.ok(profilesClassic.has("profile.epad"));
@@ -235,6 +243,16 @@ describe("P0015 PoC seed data", () => {
   it("normalizes deprecated product package aliases", () => {
     assert.equal(canonicalProductPackageName("PeaksModern"), "Peaks.Modern");
     assert.equal(canonicalProductPackageName("PeaksClassic"), "Peaks.Classic");
+  });
+
+  it("normalizes deprecated peak component aliases", () => {
+    assert.equal(canonicalComponentCode("peak.premium.sys"), "peak.sys");
+    assert.equal(canonicalComponentCode("peak.premium.epad"), "peak.epad");
+    assert.equal(canonicalComponentCode("peak.modern.sys"), "peak.sys");
+    assert.equal(canonicalComponentCode("peak.modern.epad"), "peak.epad");
+    assert.equal(isMarketProjectionComponent("peak.sys"), true);
+    assert.equal(isCustomerProjectionComponent("peak.sys"), true);
+    assert.equal(isInternalProjectionComponent("peak.sys"), true);
   });
 
   it("creates deterministic price components for all product components", () => {

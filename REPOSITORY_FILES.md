@@ -117,6 +117,10 @@ requirements/package-runs/P0026/design.md
 requirements/package-runs/P0026/findings.md
 requirements/package-runs/P0026/functions.md
 requirements/package-runs/P0026/review.md
+requirements/package-runs/P0027/design.md
+requirements/package-runs/P0027/findings.md
+requirements/package-runs/P0027/functions.md
+requirements/package-runs/P0027/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -145,6 +149,7 @@ requirements/packages/P0023-raw-data-viewer-feature.md
 requirements/packages/P0024-correct-peaks-modern-premium-volume.md
 requirements/packages/P0025-canonical-product-model-realignment.md
 requirements/packages/P0026-peaks-classic-legacy-calloff-list.md
+requirements/packages/P0027-rename-peak-premium-to-peak.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts

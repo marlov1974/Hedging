@@ -13,8 +13,10 @@ export const PRODUCT_PACKAGE_ALIASES = new Map([
 ]);
 
 export const COMPONENT_ALIASES = new Map([
-  ["peak.modern.sys", "peak.premium.sys"],
-  ["peak.modern.epad", "peak.premium.epad"],
+  ["peak.modern.sys", "peak.sys"],
+  ["peak.modern.epad", "peak.epad"],
+  ["peak.premium.sys", "peak.sys"],
+  ["peak.premium.epad", "peak.epad"],
 ]);
 
 const COMPONENT_METADATA = new Map<string, ComponentMetadata>([
@@ -28,8 +30,8 @@ const COMPONENT_METADATA = new Map<string, ComponentMetadata>([
   ["offpeak", { component_category: "peak", hour_basis: "offpeak_h" }],
   ["peak.classic.sys", { component_category: "peak", hour_basis: "peak_h" }],
   ["peak.classic.epad", { component_category: "peak", hour_basis: "peak_h" }],
-  ["peak.premium.sys", { component_category: "peak", hour_basis: "peak_h" }],
-  ["peak.premium.epad", { component_category: "peak", hour_basis: "peak_h" }],
+  ["peak.sys", { component_category: "peak", hour_basis: "peak_h" }],
+  ["peak.epad", { component_category: "peak", hour_basis: "peak_h" }],
   ["profile.peak", { component_category: "profile", hour_basis: "peak_h" }],
   ["profile.15m", { component_category: "profile", hour_basis: "total_h" }],
   ["profile.sys", { component_category: "profile", hour_basis: "total_h" }],

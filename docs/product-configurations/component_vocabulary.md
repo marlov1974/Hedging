@@ -32,8 +32,8 @@ offpeak
 allocation.peak
 peak.classic.sys
 peak.classic.epad
-peak.premium.sys
-peak.premium.epad
+peak.sys
+peak.epad
 profile.peak
 profile.15m
 profile.sys
@@ -48,8 +48,10 @@ adjustment.*
 Deprecated aliases retained for compatibility:
 
 ```text
-peak.modern.sys -> peak.premium.sys
-peak.modern.epad -> peak.premium.epad
+peak.modern.sys -> peak.sys
+peak.modern.epad -> peak.epad
+peak.premium.sys -> peak.sys
+peak.premium.epad -> peak.epad
 ```
 
 ## PoC component families
@@ -69,8 +71,8 @@ Modern canonical exposure components:
 allocation.peak
 base.sys
 base.epad
-peak.premium.sys
-peak.premium.epad
+peak.sys
+peak.epad
 profile.sys
 profile.epad
 volume
@@ -101,8 +103,10 @@ PeaksModern -> Peaks.Modern
 PeaksClassic -> Peaks.Classic
 ProfilesModern -> Profiles.Modern
 ProfilesClassic -> Profiles.Classic
-peak.modern.sys -> peak.premium.sys
-peak.modern.epad -> peak.premium.epad
+peak.modern.sys -> peak.sys
+peak.modern.epad -> peak.epad
+peak.premium.sys -> peak.sys
+peak.premium.epad -> peak.epad
 ```
 
 ## Model objects

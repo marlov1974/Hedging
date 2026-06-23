@@ -62,8 +62,8 @@ describe("Peaks.Classic Legacy Calloff List", () => {
     assertApprox(projectedValue, 8653.76344);
   });
 
-  it("allows negative peak premium and can project peak price below base price", () => {
-    const database = createWorkedExampleDatabase({ allocation_peak_mw: 0.109375, peak_premium_mw: -0.0250336022 });
+  it("allows negative peak MW and can project peak price below base price", () => {
+    const database = createWorkedExampleDatabase({ allocation_peak_mw: 0.109375, peak_mw: -0.0250336022 });
     const peak = getLegacyCalloffListRows(database, "CUS01-0").find((row) => row.block === "Peak");
 
     assert.ok(peak);
@@ -80,8 +80,8 @@ describe("Peaks.Classic Legacy Calloff List", () => {
 
     assert.doesNotMatch(html, /allocation\.peak/);
     assert.ok(rawComponents.includes("allocation.peak"));
-    assert.ok(rawComponents.includes("peak.premium.sys"));
-    assert.ok(rawComponents.includes("peak.premium.epad"));
+    assert.ok(rawComponents.includes("peak.sys"));
+    assert.ok(rawComponents.includes("peak.epad"));
   });
 
   it("ignores adjustment/internal-only rows in the customer legacy projection", () => {
@@ -103,7 +103,7 @@ describe("Peaks.Classic Legacy Calloff List", () => {
       month: "2027-02",
       base_mw: 100 / 672,
       allocation_peak_mw: 60 / 320,
-      peak_premium_mw: 60 / 320 - 100 / 672,
+      peak_mw: 60 / 320 - 100 / 672,
     });
     const calloff = database.calloffs.get("CAL20");
     assert.ok(calloff);
@@ -152,10 +152,23 @@ describe("Peaks.Classic Legacy Calloff List", () => {
 
     assert.match(rows[0].warnings.join("; "), /mismatched base MW/);
   });
+
+  it("reads old peak.premium aliases", () => {
+    const database = createWorkedExampleDatabase({ use_legacy_peak_premium_components: true });
+    const peak = getLegacyCalloffListRows(database, "CUS01-0").find((row) => row.block === "Peak");
+
+    assert.equal(peak?.price, 88.075269);
+  });
 });
 
 function createWorkedExampleDatabase(
-  overrides: Partial<{ base_mw: number; base_epad_mw: number; allocation_peak_mw: number; peak_premium_mw: number }> = {},
+  overrides: Partial<{
+    base_mw: number;
+    base_epad_mw: number;
+    allocation_peak_mw: number;
+    peak_mw: number;
+    use_legacy_peak_premium_components: boolean;
+  }> = {},
 ): PrototypeDatabase {
   const database = createPocSeedData();
   const calendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
@@ -169,7 +182,8 @@ function createWorkedExampleDatabase(
     base_mw: overrides.base_mw ?? 100 / 744,
     base_epad_mw: overrides.base_epad_mw,
     allocation_peak_mw: overrides.allocation_peak_mw ?? 0.15625,
-    peak_premium_mw: overrides.peak_premium_mw ?? 0.0218413978,
+    peak_mw: overrides.peak_mw ?? 0.0218413978,
+    use_legacy_peak_premium_components: overrides.use_legacy_peak_premium_components,
   });
   return database;
 }
@@ -182,7 +196,8 @@ function createClassicCanonicalCalloff(
     base_mw: number;
     base_epad_mw?: number;
     allocation_peak_mw: number;
-    peak_premium_mw: number;
+    peak_mw: number;
+    use_legacy_peak_premium_components?: boolean;
   },
 ): void {
   insertCalloff(database, {
@@ -194,12 +209,17 @@ function createClassicCanonicalCalloff(
     delivery_end_month: input.month,
   });
 
+  const peakComponents = input.use_legacy_peak_premium_components
+    ? (["peak.premium.sys", "peak.premium.epad"] as const)
+    : (["peak.sys", "peak.epad"] as const);
+  ensureLegacyPeakComponents(database, input.use_legacy_peak_premium_components ?? false);
+
   const rows = [
     ["allocation.peak", input.allocation_peak_mw],
     ["base.sys", input.base_mw],
     ["base.epad", input.base_epad_mw ?? input.base_mw],
-    ["peak.premium.sys", input.peak_premium_mw],
-    ["peak.premium.epad", input.peak_premium_mw],
+    [peakComponents[0], input.peak_mw],
+    [peakComponents[1], input.peak_mw],
   ] as const;
 
   rows.forEach(([component, mw], index) => {
@@ -218,6 +238,8 @@ function setClassicPrices(database: PrototypeDatabase): void {
   const prices = new Map([
     ["base.sys", 70],
     ["base.epad", 15],
+    ["peak.sys", 20],
+    ["peak.epad", 2],
     ["peak.premium.sys", 20],
     ["peak.premium.epad", 2],
   ]);
@@ -235,6 +257,32 @@ function setClassicPrices(database: PrototypeDatabase): void {
     );
     assert.ok(priceComponent);
     priceComponent.price = price;
+  }
+}
+
+function ensureLegacyPeakComponents(database: PrototypeDatabase, enabled: boolean): void {
+  if (!enabled) {
+    return;
+  }
+
+  for (const component of ["peak.premium.sys", "peak.premium.epad"]) {
+    const productcomponent_id = `PRO01:${component}`;
+    if (database.productConfigurationComponents.has(productcomponent_id)) {
+      continue;
+    }
+    insertProductConfigurationComponent(database, {
+      productcomponent_id,
+      product_id: "PRO01",
+      name: `Peaks.Classic ${component}`,
+      component,
+      productitem: "peak",
+    });
+    insertPriceComponent(database, {
+      pricecomponent_id: `PRI:PRO01:${component}`,
+      productcomponent_id,
+      price: component.endsWith(".sys") ? 20 : 2,
+      currency: "EUR",
+    });
   }
 }
 

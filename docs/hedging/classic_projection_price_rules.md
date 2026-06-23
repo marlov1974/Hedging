@@ -10,7 +10,7 @@ For each month:
 
 ```text
 base_price = base.sys.price + base.epad.price
-peak_premium_price = peak.premium.sys.price + peak.premium.epad.price
+peak_price = peak.sys.price + peak.epad.price
 ```
 
 If a price component is missing, the available part is used and a warning is shown.
@@ -19,9 +19,9 @@ If a price component is missing, the available part is used and a warning is sho
 
 ```text
 base_value = base_mwh * base_price
-peak_premium_mwh = peak_premium_mw * peak_h
-peak_premium_value = peak_premium_mwh * peak_premium_price
-total_value = base_value + peak_premium_value
+peak_mwh = peak_mw * peak_h
+peak_value = peak_mwh * peak_price
+total_value = base_value + peak_value
 ```
 
 `allocation.peak` has no value because price is `0` and q-factor is `0`.
@@ -50,6 +50,6 @@ legacy_offpeak_mwh * legacy_offpeak_price
 = total_value
 ```
 
-Negative peak premium is valid and can make projected peak price lower than base price.
+Negative peak MW is valid and can make projected peak price lower than base price.
 
 Projected legacy prices are presentation prices. They are not original market transaction prices.
