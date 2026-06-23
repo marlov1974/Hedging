@@ -10,6 +10,7 @@ import {
 } from "../../src/hedging/forecastHedge.ts";
 import { getApplicationFeaturesForPortfolio } from "../../src/hedging/applicationConfig.ts";
 import { getModernProjectedTransactionsForPortfolioYear } from "../../src/hedging/dataViewer.ts";
+import { getPeaksClassicCalloffTransactionRows } from "../../src/hedging/peaksCalloffTransactionList.ts";
 import { getMarketProjectionRows } from "../../src/hedging/marketProjection.ts";
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 
@@ -90,6 +91,45 @@ describe("Forecast hedge feature", () => {
     assert.match(html, /value="54\.265"/);
     assert.doesNotMatch(html, /value="560\.735294"/);
     assert.doesNotMatch(html, /value="54\.264706"/);
+  });
+
+  it("Classic Hedge Forecast proposal uses Offpeak and Peak MWh fields", () => {
+    const profile = buildForecastHedgeProfile(createPocSeedData(), {
+      portfolio_id: "CUS00-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      perspective_id: "classic",
+    });
+    const html = renderHedgingTool(createPocSeedData(), {
+      portfolio_id: "CUS00-0",
+      feature_id: "forecast-hedge",
+      perspective_id: "classic",
+      forecast_hedge_profile: profile,
+    });
+
+    assert.match(html, /Forecast Offpeak MWh/);
+    assert.match(html, /Forecast Peak MWh/);
+    assert.match(html, /name="classic_offpeak_mwh_2027-01"/);
+    assert.match(html, /name="classic_peak_mwh_2027-01"/);
+    assert.doesNotMatch(html, /name="modern_base_mwh_2027-01"/);
+  });
+
+  it("Classic Hedge Forecast percentage scales Offpeak MWh and Peak MWh", () => {
+    const row = buildForecastHedgeProfile(createPocSeedData(), {
+      portfolio_id: "CUS00-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      perspective_id: "classic",
+    }).rows[0];
+
+    assert.equal(row.forecast_classic_offpeak_mwh, 615);
+    assert.equal(row.forecast_classic_peak_mwh, 615);
+    assert.equal(row.classic_offpeak_mwh, 307.5);
+    assert.equal(row.classic_peak_mwh, 307.5);
+    assert.equal(row.total_mwh, 615);
+    assert.equal(row.percentage, 0.5);
   });
 
   it("generates profile for a 3-month range", () => {
@@ -547,6 +587,98 @@ describe("Forecast hedge feature", () => {
     );
   });
 
+  it("accepting Classic Hedge Forecast writes Peaks.Classic canonical rows only", () => {
+    const database = createPocSeedData();
+    const rows = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS00-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      perspective_id: "classic",
+    }).rows.map(toClassicAcceptRow);
+
+    const result = acceptForecastHedgeProfile(database, {
+      portfolio_id: "CUS00-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      perspective_id: "classic",
+      date: "2027-01-15",
+      calloff_id: "CALLOFF_CLASSIC",
+      rows,
+    });
+    const rowsByComponent = new Map(
+      result.transactions.map((transaction) => [
+        database.productConfigurationComponents.get(transaction.productcomponent_id)?.component,
+        transaction,
+      ]),
+    );
+
+    assert.equal(result.calloff.product_id, "PRO01");
+    assert.equal(rowsByComponent.get("allocation.peak.sys")?.mw, 0.915179);
+    assert.equal(rowsByComponent.get("allocation.peak.epad")?.mw, 0.915179);
+    assert.equal(rowsByComponent.get("base.sys")?.mw, 0.826613);
+    assert.equal(rowsByComponent.get("base.epad")?.mw, 0.826613);
+    assert.equal(rowsByComponent.get("peak.sys")?.mw, 0.088566);
+    assert.equal(rowsByComponent.get("peak.epad")?.mw, 0.088566);
+    assert.equal([...rowsByComponent.keys()].some((component) => String(component).startsWith("classic.")), false);
+    assert.equal(rowsByComponent.get("allocation.peak.sys")?.q_factor, 0);
+  });
+
+  it("Classic Hedge Forecast allows negative canonical peak from non-negative customer values", () => {
+    const database = createPocSeedData();
+    const rows = [
+      {
+        month: "2027-01",
+        classic_offpeak_mwh: "65",
+        classic_peak_mwh: "35",
+      },
+    ];
+    const result = acceptForecastHedgeProfile(database, {
+      portfolio_id: "CUS00-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "100",
+      perspective_id: "classic",
+      date: "2027-01-15",
+      calloff_id: "CALLOFF_NEGATIVE_CLASSIC",
+      rows,
+    });
+    const peakSys = result.transactions.find(
+      (transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component === "peak.sys",
+    );
+
+    assert.ok(peakSys);
+    assert.ok(peakSys.mw < 0);
+  });
+
+  it("Classic Calloff List displays MWh values after Classic Hedge Forecast accept", () => {
+    const database = createPocSeedData();
+    const rows = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS00-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      perspective_id: "classic",
+    }).rows.map(toClassicAcceptRow);
+
+    acceptForecastHedgeProfile(database, {
+      portfolio_id: "CUS00-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      perspective_id: "classic",
+      date: "2027-01-15",
+      calloff_id: "CALLOFF_CLASSIC",
+      rows,
+    });
+
+    const classicRows = getPeaksClassicCalloffTransactionRows(database, "CUS00-0");
+    assertApprox(classicRows[0].offpeak_mwh, 307.5);
+    assertApprox(classicRows[0].peak_mwh, 307.5);
+    assert.equal(classicRows[0].projected_total_value, classicRows[0].canonical_total_value);
+  });
+
   it("rejects end month before start month", () => {
     assert.throws(() => getForecastHedgeMonthRange("2027-03", "2027-01"), /end_month/);
   });
@@ -564,6 +696,23 @@ function toAcceptRow(row: {
   };
 }
 
+function toClassicAcceptRow(row: {
+  month: string;
+  classic_offpeak_mwh: number;
+  classic_peak_mwh: number;
+}): { month: string; classic_offpeak_mwh: string; classic_peak_mwh: string } {
+  return {
+    month: row.month,
+    classic_offpeak_mwh: String(row.classic_offpeak_mwh),
+    classic_peak_mwh: String(row.classic_peak_mwh),
+  };
+}
+
 function decimalPlaces(value: string): number {
   return value.includes(".") ? value.split(".")[1].length : 0;
+}
+
+function assertApprox(actual: number | undefined, expected: number, tolerance = 0.001): void {
+  assert.ok(actual !== undefined);
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} !== ${expected}`);
 }

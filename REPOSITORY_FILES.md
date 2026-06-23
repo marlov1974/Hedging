@@ -15,12 +15,14 @@ docs/data-model/customer_product_database_structure.md
 docs/data-model/customer_transaction_list.md
 docs/data-model/poc_seed_data.md
 docs/data-model/transaction_model.md
+docs/functions/classic_projection.md
 docs/functions/hedging_tool_view.md
 docs/hedging/application_configurations.md
 docs/hedging/baseloads_calloff_list.md
 docs/hedging/canonical_component_model.md
 docs/hedging/classic_projection_peak_offpeak_rules.md
 docs/hedging/classic_projection_price_rules.md
+docs/hedging/classic_to_canonical_conversion.md
 docs/hedging/component_categories_and_projection_listeners.md
 docs/hedging/data_viewer.md
 docs/hedging/feature_level_perspective_switching.md
@@ -32,6 +34,8 @@ docs/hedging/modern_projected_transactions.md
 docs/hedging/modern_projection_base_peak_rules.md
 docs/hedging/modern_to_canonical_conversion.md
 docs/hedging/peaks_classic_calloff_transaction_list.md
+docs/hedging/peaks_classic_forecast_feature.md
+docs/hedging/peaks_classic_hedge_forecast_flow.md
 docs/hedging/peaks_classic_legacy_calloff_list.md
 docs/hedging/peaks_modern_calloff_transaction_list.md
 docs/hedging/peaks_modern_forecast_feature.md
@@ -169,6 +173,10 @@ requirements/package-runs/P0035/design.md
 requirements/package-runs/P0035/findings.md
 requirements/package-runs/P0035/functions.md
 requirements/package-runs/P0035/review.md
+requirements/package-runs/P0036/design.md
+requirements/package-runs/P0036/findings.md
+requirements/package-runs/P0036/functions.md
+requirements/package-runs/P0036/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -206,6 +214,7 @@ requirements/packages/P0032-modern-projected-transaction-model.md
 requirements/packages/P0033-peaks-modern-forecast-and-hedge-flow-use-modern-projection.md
 requirements/packages/P0034-universal-model-perspective-features.md
 requirements/packages/P0035-single-portfolio-feature-perspective-tabs.md
+requirements/packages/P0036-peaks-classic-forecast-and-hedge-forecast.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
@@ -217,6 +226,7 @@ src/database/validation.ts
 src/hedging/HedgingToolView.ts
 src/hedging/applicationConfig.ts
 src/hedging/calloffList.ts
+src/hedging/classicProjection.ts
 src/hedging/dataViewer.ts
 src/hedging/derivativeNames.ts
 src/hedging/features.ts
@@ -254,6 +264,7 @@ tests/database/customerProductSchema.test.ts
 tests/database/pocSeedData.test.ts
 tests/hedging/applicationConfig.test.ts
 tests/hedging/baseloadsCalloffList.test.ts
+tests/hedging/classicProjection.test.ts
 tests/hedging/dataViewer.test.ts
 tests/hedging/financialSettlement.test.ts
 tests/hedging/forecastFeature.test.ts

@@ -830,7 +830,7 @@ function renderForecastFeature(
             <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
             ${renderPerspectiveHidden(selectedPerspective)}
             <input type="hidden" name="selected_year" value="${escapeHtml(selectedYear)}">
-            ${renderForecastTable(rows)}
+            ${selectedPerspective === "classic" ? renderClassicForecastTable(rows) : renderForecastTable(rows)}
             <button class="primary" type="submit">Save forecast</button>
           </form>`
     }
@@ -863,6 +863,40 @@ function renderForecastTable(rows: ForecastDisplayRow[]): string {
             </td>
             <td><input name="modern_base_mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(formatInputNumber(row.modern_base_mwh))}"></td>
             <td><input name="modern_peak_mwh_${escapeHtml(row.month)}" type="number" step="0.001" value="${escapeHtml(formatInputNumber(row.modern_peak_mwh))}"></td>
+            <td class="number">${formatNumber(row.mwh)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
+}
+
+function renderClassicForecastTable(rows: ForecastDisplayRow[]): string {
+  return `<table class="forecast-table">
+    <colgroup>
+      <col class="month">
+      <col class="base">
+      <col class="peak">
+      <col class="total">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Month</th>
+        <th>Offpeak MWh</th>
+        <th>Peak MWh</th>
+        <th>Total MWh</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td class="month-cell">
+              ${escapeHtml(row.month)}
+              <input type="hidden" name="month" value="${escapeHtml(row.month)}">
+            </td>
+            <td><input name="classic_offpeak_mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(formatInputNumber(row.classic_offpeak_mwh))}"></td>
+            <td><input name="classic_peak_mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(formatInputNumber(row.classic_peak_mwh))}"></td>
             <td class="number">${formatNumber(row.mwh)}</td>
           </tr>`,
         )
@@ -918,7 +952,13 @@ function renderForecastHedgeFeature(
       </div>
       <button type="submit">Build hedge profile</button>
     </form>
-    ${state.forecast_hedge_profile ? renderForecastHedgeProfile(selectedPortfolio, state.forecast_hedge_profile, selectedPerspective) : ""}
+    ${
+      state.forecast_hedge_profile
+        ? selectedPerspective === "classic"
+          ? renderClassicForecastHedgeProfile(selectedPortfolio, state.forecast_hedge_profile, selectedPerspective)
+          : renderForecastHedgeProfile(selectedPortfolio, state.forecast_hedge_profile, selectedPerspective)
+        : ""
+    }
   </div>`;
 }
 
@@ -989,6 +1029,56 @@ function renderForecastHedgeProfile(
         });
       });
     </script>
+  </form>`;
+}
+
+function renderClassicForecastHedgeProfile(
+  selectedPortfolio: PortfolioOption,
+  profile: ForecastHedgeProfile,
+  perspectiveId: PerspectiveId | undefined,
+): string {
+  return `<form method="post" action="/hedging/forecast-hedge/accept" class="stack">
+    <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+    ${renderPerspectiveHidden(perspectiveId)}
+    <input type="hidden" name="start_month" value="${escapeHtml(profile.start_month)}">
+    <input type="hidden" name="end_month" value="${escapeHtml(profile.end_month)}">
+    <input type="hidden" name="percentage" value="${escapeHtml(String(formatPercentInput(profile.percentage)))}">
+    <table class="hedge-table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Forecast Offpeak MWh</th>
+          <th>Forecast Peak MWh</th>
+          <th>Hedge %</th>
+          <th>Offpeak MWh</th>
+          <th>Offpeak MW</th>
+          <th>Peak MWh</th>
+          <th>Peak MW</th>
+          <th>Total MWh</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${profile.rows
+          .map(
+            (row) => `<tr>
+              <td>
+                ${escapeHtml(row.month)}
+                <input type="hidden" name="month" value="${escapeHtml(row.month)}">
+              </td>
+              <td class="number">${formatNumber(row.forecast_classic_offpeak_mwh)}</td>
+              <td class="number">${formatNumber(row.forecast_classic_peak_mwh)}</td>
+              <td><output data-role="hedge-percent">${formatNumber(row.percentage * 100)}</output></td>
+              <td><input name="classic_offpeak_mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(formatInputNumber(row.classic_offpeak_mwh))}"></td>
+              <td><output>${formatNumber(row.classic_offpeak_mw)}</output></td>
+              <td><input name="classic_peak_mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(formatInputNumber(row.classic_peak_mwh))}"></td>
+              <td><output>${formatNumber(row.classic_peak_mw)}</output></td>
+              <td><output>${formatNumber(row.total_mwh)}</output></td>
+            </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+    <button class="primary" type="submit">Accept hedge profile</button>
   </form>`;
 }
 

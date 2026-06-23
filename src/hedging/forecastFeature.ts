@@ -1,5 +1,7 @@
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { CustomerForecast } from "../database/types.ts";
+import type { PerspectiveId } from "./applicationConfig.ts";
+import { ClassicProjectionError, convertClassicForecastToStored, deriveClassicFromForecast } from "./classicProjection.ts";
 import { convertModernForecastToStored, deriveModernFromForecast, ModernProjectionError } from "./modernProjection.ts";
 
 export class ForecastFeatureError extends Error {
@@ -20,18 +22,27 @@ export type ForecastDisplayRow = {
   peak_percent: number;
   modern_base_mwh: number;
   modern_peak_mwh: number;
+  classic_offpeak_mwh: number;
+  classic_peak_mwh: number;
+  classic_offpeak_mw: number;
+  classic_peak_mw: number;
   peak_level_mwh: number;
+  warnings: string[];
 };
 
 export type ForecastUpdateInput = {
   portfolio_id: string;
   month: string;
-  modern_base_mwh: string | number | undefined;
-  modern_peak_mwh: string | number | undefined;
+  perspective_id?: PerspectiveId;
+  modern_base_mwh?: string | number | undefined;
+  modern_peak_mwh?: string | number | undefined;
+  classic_offpeak_mwh?: string | number | undefined;
+  classic_peak_mwh?: string | number | undefined;
 };
 
 export type ForecastRowsUpdateInput = {
   portfolio_id: string;
+  perspective_id?: PerspectiveId;
   rows: ForecastUpdateInput[];
 };
 
@@ -42,6 +53,8 @@ export type NormalizedForecastUpdate = {
   peak_pct: number;
   modern_base_mwh: number;
   modern_peak_mwh: number;
+  classic_offpeak_mwh: number;
+  classic_peak_mwh: number;
 };
 
 export function getForecastYears(database: PrototypeDatabase, portfolioId: string): string[] {
@@ -60,6 +73,12 @@ export function getForecastRowsForYear(database: PrototypeDatabase, portfolioId:
         total_h: calendar.total_h,
         peak_h: calendar.peak_h,
       });
+      const classic = deriveClassicFromForecast({
+        total_mwh: forecast.mwh,
+        peak_pct: forecast.peak_pct,
+        total_h: calendar.total_h,
+        peak_h: calendar.peak_h,
+      });
       return {
         forecast_id: forecast.forecast_id,
         month: forecast.month,
@@ -68,13 +87,18 @@ export function getForecastRowsForYear(database: PrototypeDatabase, portfolioId:
         peak_percent: roundPercent(forecast.peak_pct * 100),
         modern_base_mwh: modern.modern_base_mwh,
         modern_peak_mwh: modern.modern_peak_mwh,
+        classic_offpeak_mwh: classic.classic_offpeak_mwh,
+        classic_peak_mwh: classic.classic_peak_mwh,
+        classic_offpeak_mw: classic.classic_offpeak_mw,
+        classic_peak_mw: classic.classic_peak_mw,
         peak_level_mwh: modern.peak_level_mwh,
+        warnings: classic.warnings,
       };
     });
 }
 
 export function updateForecastRows(database: PrototypeDatabase, input: ForecastRowsUpdateInput): CustomerForecast[] {
-  return input.rows.map((row) => updateForecastRow(database, row));
+  return input.rows.map((row) => updateForecastRow(database, { ...row, perspective_id: row.perspective_id ?? input.perspective_id }));
 }
 
 export function updateForecastRow(database: PrototypeDatabase, input: ForecastUpdateInput): CustomerForecast {
@@ -101,9 +125,39 @@ export function validateForecastUpdate(database: PrototypeDatabase, input: Forec
     throw new ForecastFeatureError("invalid_input", "month must use YYYY-MM format");
   }
 
+  const calendar = getCalendar(database, month);
+  if (input.perspective_id === "classic" || input.classic_offpeak_mwh !== undefined || input.classic_peak_mwh !== undefined) {
+    const classicOffpeakMwh = parseRequiredNumber(input.classic_offpeak_mwh, "Offpeak MWh");
+    const classicPeakMwh = parseRequiredNumber(input.classic_peak_mwh, "Peak MWh");
+    let stored;
+    try {
+      stored = convertClassicForecastToStored({
+        classic_offpeak_mwh: classicOffpeakMwh,
+        classic_peak_mwh: classicPeakMwh,
+        total_h: calendar.total_h,
+        peak_h: calendar.peak_h,
+      });
+    } catch (error) {
+      if (error instanceof ClassicProjectionError) {
+        throw new ForecastFeatureError("invalid_input", error.message);
+      }
+      throw error;
+    }
+
+    return {
+      portfolio_id: portfolioId,
+      month,
+      mwh: stored.total_mwh,
+      peak_pct: stored.peak_pct,
+      modern_base_mwh: 0,
+      modern_peak_mwh: 0,
+      classic_offpeak_mwh: stored.classic_offpeak_mwh,
+      classic_peak_mwh: stored.classic_peak_mwh,
+    };
+  }
+
   const modernBaseMwh = parseRequiredNumber(input.modern_base_mwh, "Modern Base MWh");
   const modernPeakMwh = parseRequiredNumber(input.modern_peak_mwh, "Modern Peak MWh");
-  const calendar = getCalendar(database, month);
   let stored;
   try {
     stored = convertModernForecastToStored({
@@ -126,6 +180,8 @@ export function validateForecastUpdate(database: PrototypeDatabase, input: Forec
     peak_pct: stored.peak_pct,
     modern_base_mwh: roundMwh(modernBaseMwh),
     modern_peak_mwh: roundMwh(modernPeakMwh),
+    classic_offpeak_mwh: 0,
+    classic_peak_mwh: 0,
   };
 }
 

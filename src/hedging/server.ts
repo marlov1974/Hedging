@@ -72,11 +72,16 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
       try {
         updateForecastRows(database, {
           portfolio_id,
+          perspective_id,
           rows: months.map((month) => ({
             portfolio_id,
             month,
-            modern_base_mwh: String(body.get(`modern_base_mwh_${month}`) ?? ""),
-            modern_peak_mwh: String(body.get(`modern_peak_mwh_${month}`) ?? ""),
+            perspective_id,
+            modern_base_mwh: perspective_id === "classic" ? undefined : String(body.get(`modern_base_mwh_${month}`) ?? ""),
+            modern_peak_mwh: perspective_id === "classic" ? undefined : String(body.get(`modern_peak_mwh_${month}`) ?? ""),
+            classic_offpeak_mwh:
+              perspective_id === "classic" ? String(body.get(`classic_offpeak_mwh_${month}`) ?? "") : undefined,
+            classic_peak_mwh: perspective_id === "classic" ? String(body.get(`classic_peak_mwh_${month}`) ?? "") : undefined,
           })),
         });
 
@@ -122,6 +127,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           start_month,
           end_month,
           percentage,
+          perspective_id,
         });
         writeHtml(
           response,
@@ -165,10 +171,14 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           start_month,
           end_month,
           percentage,
+          perspective_id,
           rows: months.map((month) => ({
             month,
-            modern_base_mwh: String(body.get(`modern_base_mwh_${month}`) ?? ""),
-            modern_peak_mwh: String(body.get(`modern_peak_mwh_${month}`) ?? ""),
+            modern_base_mwh: perspective_id === "classic" ? undefined : String(body.get(`modern_base_mwh_${month}`) ?? ""),
+            modern_peak_mwh: perspective_id === "classic" ? undefined : String(body.get(`modern_peak_mwh_${month}`) ?? ""),
+            classic_offpeak_mwh:
+              perspective_id === "classic" ? String(body.get(`classic_offpeak_mwh_${month}`) ?? "") : undefined,
+            classic_peak_mwh: perspective_id === "classic" ? String(body.get(`classic_peak_mwh_${month}`) ?? "") : undefined,
           })),
         });
         writeHtml(
@@ -186,7 +196,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
         const message = error instanceof ForecastHedgeError ? error.message : "Forecast hedge accept failed";
         let profile;
         try {
-          profile = buildForecastHedgeProfile(database, { portfolio_id, start_month, end_month, percentage });
+          profile = buildForecastHedgeProfile(database, { portfolio_id, start_month, end_month, percentage, perspective_id });
         } catch {
           profile = undefined;
         }

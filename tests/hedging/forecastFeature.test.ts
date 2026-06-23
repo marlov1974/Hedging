@@ -79,6 +79,72 @@ describe("Forecast feature", () => {
     assert.doesNotMatch(html, /value="1121\.470588"/);
   });
 
+  it("Classic Forecast renders editable Offpeak MWh and Peak MWh fields", () => {
+    const html = renderHedgingTool(createPocSeedData(), {
+      portfolio_id: "CUS00-0",
+      feature_id: "forecast",
+      perspective_id: "classic",
+    });
+
+    assert.match(html, /<th>Offpeak MWh<\/th>/);
+    assert.match(html, /<th>Peak MWh<\/th>/);
+    assert.match(html, /name="classic_offpeak_mwh_2027-01"/);
+    assert.match(html, /name="classic_peak_mwh_2027-01"/);
+    assert.doesNotMatch(html, /name="modern_base_mwh_2027-01"/);
+    assert.doesNotMatch(html, /peak_pct/);
+  });
+
+  it("editing Classic Offpeak MWh and Peak MWh updates stored forecast data", () => {
+    const database = createPocSeedData();
+    const calendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
+    assert.ok(calendar);
+    calendar.total_h = 744;
+    calendar.peak_h = 320;
+
+    updateForecastRow(database, {
+      portfolio_id: "CUS00-0",
+      month: "2027-01",
+      perspective_id: "classic",
+      classic_offpeak_mwh: "50",
+      classic_peak_mwh: "50",
+    });
+
+    const row = getForecastRowsForYear(database, "CUS00-0", "2027")[0];
+    assert.equal(row.mwh, 100);
+    assert.equal(row.peak_pct, 0.5);
+    assert.equal(row.classic_offpeak_mwh, 50);
+    assert.equal(row.classic_peak_mwh, 50);
+    assert.equal(row.classic_offpeak_mw, 0.117925);
+    assert.equal(row.classic_peak_mw, 0.15625);
+  });
+
+  it("rejects negative Classic forecast MWh values", () => {
+    const database = createPocSeedData();
+
+    assert.throws(
+      () =>
+        validateForecastUpdate(database, {
+          portfolio_id: "CUS00-0",
+          month: "2027-01",
+          perspective_id: "classic",
+          classic_offpeak_mwh: "-1",
+          classic_peak_mwh: "1",
+        }),
+      (error) => error instanceof ForecastFeatureError && /Offpeak MWh/.test(error.message),
+    );
+    assert.throws(
+      () =>
+        validateForecastUpdate(database, {
+          portfolio_id: "CUS00-0",
+          month: "2027-01",
+          perspective_id: "classic",
+          classic_offpeak_mwh: "1",
+          classic_peak_mwh: "-1",
+        }),
+      (error) => error instanceof ForecastFeatureError && /Peak MWh/.test(error.message),
+    );
+  });
+
   it("editing Modern Base MWh and Modern Peak MWh updates stored forecast data", () => {
     const database = createPocSeedData();
     const calendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
