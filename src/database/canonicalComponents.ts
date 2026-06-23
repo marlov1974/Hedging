@@ -21,6 +21,8 @@ export const COMPONENT_ALIASES = new Map([
 
 const COMPONENT_METADATA = new Map<string, ComponentMetadata>([
   ["allocation.peak", { component_category: "allocation", hour_basis: "peak_h" }],
+  ["allocation.peak.sys", { component_category: "allocation", hour_basis: "peak_h" }],
+  ["allocation.peak.epad", { component_category: "allocation", hour_basis: "peak_h" }],
   ["base", { component_category: "base", hour_basis: "total_h" }],
   ["base.sys", { component_category: "base", hour_basis: "total_h" }],
   ["base.epad", { component_category: "base", hour_basis: "total_h" }],

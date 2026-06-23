@@ -11,7 +11,14 @@ import { isPeaksModernPortfolio } from "./applicationConfig.ts";
 import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
 
 const PEAKS_MODERN_PRODUCT_NAME = "Peaks.Modern";
-const FORECAST_HEDGE_COMPONENTS = ["allocation.peak", "base.sys", "base.epad", "peak.sys", "peak.epad"];
+const FORECAST_HEDGE_COMPONENTS = [
+  "allocation.peak.sys",
+  "allocation.peak.epad",
+  "base.sys",
+  "base.epad",
+  "peak.sys",
+  "peak.epad",
+];
 
 export class ForecastHedgeError extends Error {
   readonly code: "invalid_input" | "not_found";
@@ -331,7 +338,7 @@ function getForecastHedgeComponents(database: PrototypeDatabase, productId: stri
 }
 
 function transactionMwForComponent(row: ForecastHedgeProfileRow, componentCode: string): number {
-  if (componentCode === "allocation.peak") {
+  if (componentCode === "allocation.peak" || componentCode === "allocation.peak.sys" || componentCode === "allocation.peak.epad") {
     return row.allocation_peak_mw;
   }
   if (

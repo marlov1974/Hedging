@@ -121,6 +121,10 @@ requirements/package-runs/P0027/design.md
 requirements/package-runs/P0027/findings.md
 requirements/package-runs/P0027/functions.md
 requirements/package-runs/P0027/review.md
+requirements/package-runs/P0028/design.md
+requirements/package-runs/P0028/findings.md
+requirements/package-runs/P0028/functions.md
+requirements/package-runs/P0028/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -150,6 +154,7 @@ requirements/packages/P0024-correct-peaks-modern-premium-volume.md
 requirements/packages/P0025-canonical-product-model-realignment.md
 requirements/packages/P0026-peaks-classic-legacy-calloff-list.md
 requirements/packages/P0027-rename-peak-premium-to-peak.md
+requirements/packages/P0028-split-allocation-peak-into-sys-epad.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts

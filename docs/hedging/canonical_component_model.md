@@ -15,16 +15,19 @@ component_mwh = component_mw * relevant_hours
 ## Peaks Components
 
 ```text
-allocation.peak
+allocation.peak.sys
+allocation.peak.epad
 base.sys
 base.epad
 peak.sys
 peak.epad
 ```
 
-`allocation.peak` is a helper component. It stores the customer's forecast peak-hour effect in MW, uses `peak_h`, has price `0`, q-factor `0`, and does not create market quantity.
+The canonical Peaks component set is `allocation.peak.sys`, `allocation.peak.epad`, `base.sys`, `base.epad`, `peak.sys` and `peak.epad`.
 
-Classic/Legacy customer projections use `allocation.peak` as the peak-hour volume driver, but do not display it as its own customer row.
+`allocation.peak.sys` and `allocation.peak.epad` are dimension-specific helper/allocation rows. They normally carry the same MW. They use `peak_h`, have price `0`, q-factor `0`, and do not create market quantity. They must not be summed as physical customer volume.
+
+Classic/Legacy customer projections use one effective allocation peak MW as the peak-hour volume driver, but do not display allocation rows as customer rows. If split allocation rows differ, the projection warns and uses `allocation.peak.sys` as the customer volume carrier.
 
 `base.sys` and `base.epad` carry the flat total monthly hedge:
 
@@ -46,10 +49,11 @@ peak_mw = allocation_peak_mw - base_mw
 Deprecated component aliases:
 
 ```text
+allocation.peak -> allocation.peak.sys and allocation.peak.epad
 peak.modern.sys -> peak.sys
 peak.modern.epad -> peak.epad
 peak.premium.sys -> peak.sys
 peak.premium.epad -> peak.epad
 ```
 
-New generated transactions use `peak.*`.
+New generated transactions use split `allocation.peak.*` and `peak.*` components.

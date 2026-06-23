@@ -23,6 +23,19 @@ Modern customer views present Base/Peak terms.
 
 Both can use the same canonical component model underneath.
 
+The canonical Peaks component set is:
+
+```text
+allocation.peak.sys
+allocation.peak.epad
+base.sys
+base.epad
+peak.sys
+peak.epad
+```
+
+`allocation.peak.sys` and `allocation.peak.epad` are dimension-specific helper rows. They normally carry the same MW, have price `0` and q-factor `0`, and must not be summed as physical customer volume.
+
 The first implemented Classic projection is:
 
 ```text

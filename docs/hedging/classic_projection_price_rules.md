@@ -24,7 +24,7 @@ peak_value = peak_mwh * peak_price
 total_value = base_value + peak_value
 ```
 
-`allocation.peak` has no value because price is `0` and q-factor is `0`.
+`allocation.peak.sys` and `allocation.peak.epad` have no value because price is `0` and q-factor is `0`. They normally carry the same MW and must not be summed as physical customer volume.
 
 ## Projected Prices
 

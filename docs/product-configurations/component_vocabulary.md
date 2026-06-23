@@ -30,6 +30,8 @@ base.classic.epad
 peak
 offpeak
 allocation.peak
+allocation.peak.sys
+allocation.peak.epad
 peak.classic.sys
 peak.classic.epad
 peak.sys
@@ -48,6 +50,7 @@ adjustment.*
 Deprecated aliases retained for compatibility:
 
 ```text
+allocation.peak -> allocation.peak.sys and allocation.peak.epad
 peak.modern.sys -> peak.sys
 peak.modern.epad -> peak.epad
 peak.premium.sys -> peak.sys
@@ -68,7 +71,8 @@ peak.classic.epad
 Modern canonical exposure components:
 
 ```text
-allocation.peak
+allocation.peak.sys
+allocation.peak.epad
 base.sys
 base.epad
 peak.sys
@@ -103,6 +107,7 @@ PeaksModern -> Peaks.Modern
 PeaksClassic -> Peaks.Classic
 ProfilesModern -> Profiles.Modern
 ProfilesClassic -> Profiles.Classic
+allocation.peak -> allocation.peak.sys and allocation.peak.epad
 peak.modern.sys -> peak.sys
 peak.modern.epad -> peak.epad
 peak.premium.sys -> peak.sys

@@ -35,7 +35,8 @@ describe("Peaks.Classic Legacy Calloff List", () => {
       rows.map((row) => row.block),
       ["Offpeak", "Peak"],
     );
-    assert.equal(rows.some((row) => row.block === "allocation.peak" as never), false);
+    assert.equal(rows.some((row) => row.block === "allocation.peak.sys" as never), false);
+    assert.equal(rows.some((row) => row.block === "allocation.peak.epad" as never), false);
   });
 
   it("matches positive example volumes and projected prices", () => {
@@ -78,8 +79,10 @@ describe("Peaks.Classic Legacy Calloff List", () => {
       (row) => database.productConfigurationComponents.get(row.productcomponent_id)?.component,
     );
 
-    assert.doesNotMatch(html, /allocation\.peak/);
-    assert.ok(rawComponents.includes("allocation.peak"));
+    assert.doesNotMatch(html, /allocation\.peak\.sys/);
+    assert.doesNotMatch(html, /allocation\.peak\.epad/);
+    assert.ok(rawComponents.includes("allocation.peak.sys"));
+    assert.ok(rawComponents.includes("allocation.peak.epad"));
     assert.ok(rawComponents.includes("peak.sys"));
     assert.ok(rawComponents.includes("peak.epad"));
   });
@@ -153,6 +156,24 @@ describe("Peaks.Classic Legacy Calloff List", () => {
     assert.match(rows[0].warnings.join("; "), /mismatched base MW/);
   });
 
+  it("mismatched allocation sys and epad MW creates a warning and uses sys volume", () => {
+    const database = createWorkedExampleDatabase({ allocation_peak_epad_mw: 0.2 });
+    const rows = getLegacyCalloffListRows(database, "CUS01-0");
+    const peak = rows.find((row) => row.block === "Peak");
+
+    assert.equal(peak?.mw, 0.15625);
+    assert.match(rows[0].warnings.join("; "), /mismatched allocation peak MW/);
+  });
+
+  it("reads old allocation.peak alias when split rows are absent", () => {
+    const database = createWorkedExampleDatabase({ use_legacy_allocation_peak_component: true });
+    const rows = getLegacyCalloffListRows(database, "CUS01-0");
+    const peak = rows.find((row) => row.block === "Peak");
+
+    assert.equal(peak?.mw, 0.15625);
+    assert.match(rows[0].warnings.join("; "), /legacy allocation\.peak alias/);
+  });
+
   it("reads old peak.premium aliases", () => {
     const database = createWorkedExampleDatabase({ use_legacy_peak_premium_components: true });
     const peak = getLegacyCalloffListRows(database, "CUS01-0").find((row) => row.block === "Peak");
@@ -166,7 +187,9 @@ function createWorkedExampleDatabase(
     base_mw: number;
     base_epad_mw: number;
     allocation_peak_mw: number;
+    allocation_peak_epad_mw: number;
     peak_mw: number;
+    use_legacy_allocation_peak_component: boolean;
     use_legacy_peak_premium_components: boolean;
   }> = {},
 ): PrototypeDatabase {
@@ -182,7 +205,9 @@ function createWorkedExampleDatabase(
     base_mw: overrides.base_mw ?? 100 / 744,
     base_epad_mw: overrides.base_epad_mw,
     allocation_peak_mw: overrides.allocation_peak_mw ?? 0.15625,
+    allocation_peak_epad_mw: overrides.allocation_peak_epad_mw,
     peak_mw: overrides.peak_mw ?? 0.0218413978,
+    use_legacy_allocation_peak_component: overrides.use_legacy_allocation_peak_component,
     use_legacy_peak_premium_components: overrides.use_legacy_peak_premium_components,
   });
   return database;
@@ -196,7 +221,9 @@ function createClassicCanonicalCalloff(
     base_mw: number;
     base_epad_mw?: number;
     allocation_peak_mw: number;
+    allocation_peak_epad_mw?: number;
     peak_mw: number;
+    use_legacy_allocation_peak_component?: boolean;
     use_legacy_peak_premium_components?: boolean;
   },
 ): void {
@@ -212,10 +239,17 @@ function createClassicCanonicalCalloff(
   const peakComponents = input.use_legacy_peak_premium_components
     ? (["peak.premium.sys", "peak.premium.epad"] as const)
     : (["peak.sys", "peak.epad"] as const);
+  const allocationComponents = input.use_legacy_allocation_peak_component
+    ? ([["allocation.peak", input.allocation_peak_mw]] as const)
+    : ([
+        ["allocation.peak.sys", input.allocation_peak_mw],
+        ["allocation.peak.epad", input.allocation_peak_epad_mw ?? input.allocation_peak_mw],
+      ] as const);
+  ensureLegacyAllocationComponent(database, input.use_legacy_allocation_peak_component ?? false);
   ensureLegacyPeakComponents(database, input.use_legacy_peak_premium_components ?? false);
 
   const rows = [
-    ["allocation.peak", input.allocation_peak_mw],
+    ...allocationComponents,
     ["base.sys", input.base_mw],
     ["base.epad", input.base_epad_mw ?? input.base_mw],
     [peakComponents[0], input.peak_mw],
@@ -229,8 +263,33 @@ function createClassicCanonicalCalloff(
       month: input.month,
       productcomponent_id: `PRO01:${component}`,
       mw,
-      q_factor: component === "allocation.peak" ? 0 : 1,
+      q_factor: component.startsWith("allocation.peak") ? 0 : 1,
     });
+  });
+}
+
+function ensureLegacyAllocationComponent(database: PrototypeDatabase, enabled: boolean): void {
+  if (!enabled) {
+    return;
+  }
+
+  const component = "allocation.peak";
+  const productcomponent_id = `PRO01:${component}`;
+  if (database.productConfigurationComponents.has(productcomponent_id)) {
+    return;
+  }
+  insertProductConfigurationComponent(database, {
+    productcomponent_id,
+    product_id: "PRO01",
+    name: `Peaks.Classic ${component}`,
+    component,
+    productitem: "allocation",
+  });
+  insertPriceComponent(database, {
+    pricecomponent_id: `PRI:PRO01:${component}`,
+    productcomponent_id,
+    price: 0,
+    currency: "EUR",
   });
 }
 

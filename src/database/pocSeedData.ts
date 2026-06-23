@@ -17,20 +17,22 @@ export const CALENDAR_SET_ID = "CAL_SE_TRADING";
 
 export const COMPONENTS_BY_PRODUCT = new Map([
   ["Baseloads", ["base.sys", "base.epad"]],
-  ["Peaks.Classic", ["allocation.peak", "base.sys", "base.epad", "peak.sys", "peak.epad"]],
-  ["Peaks.Modern", ["allocation.peak", "base.sys", "base.epad", "peak.sys", "peak.epad"]],
+  ["Peaks.Classic", ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys", "peak.epad"]],
+  ["Peaks.Modern", ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys", "peak.epad"]],
   [
     "Profiles.Classic",
     ["base.classic.sys", "base.classic.epad", "peak.classic.sys", "peak.classic.epad", "profile.sys", "profile.epad", "volume"],
   ],
   [
     "Profiles.Modern",
-    ["allocation.peak", "base.sys", "base.epad", "peak.sys", "peak.epad", "profile.sys", "profile.epad", "volume"],
+    ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys", "peak.epad", "profile.sys", "profile.epad", "volume"],
   ],
 ]);
 
 export const Q_FACTOR_RANGES = new Map([
   ["allocation.peak", [0, 0]],
+  ["allocation.peak.sys", [0, 0]],
+  ["allocation.peak.epad", [0, 0]],
   ["base.sys", [1, 1]],
   ["base.epad", [1, 1]],
   ["base.classic.sys", [1, 1]],
@@ -50,6 +52,8 @@ export const Q_FACTOR_RANGES = new Map([
 
 const PRICE_BY_COMPONENT = new Map([
   ["allocation.peak", 0],
+  ["allocation.peak.sys", 0],
+  ["allocation.peak.epad", 0],
   ["base.sys", 80],
   ["base.epad", 5],
   ["base.classic.sys", 80],
@@ -275,7 +279,7 @@ function componentDisplayName(productName: string, componentCode: string): strin
 }
 
 function productItemFor(componentCode: string): string {
-  if (componentCode === "allocation.peak") {
+  if (componentCode === "allocation.peak" || componentCode.startsWith("allocation.peak.")) {
     return "allocation";
   }
   if (componentCode === "peak.sys" || componentCode === "peak.epad" || componentCode.startsWith("peak.premium.")) {

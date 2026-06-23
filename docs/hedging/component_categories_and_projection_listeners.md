@@ -41,8 +41,10 @@ Market projection ignores `allocation`, `currency`, `volume` and `adjustment` in
 
 Internal projection includes all components.
 
-## allocation.peak
+## Allocation Peak
 
-`allocation.peak` is visible to customer and internal projections because it explains the customer peak-hour allocation.
+`allocation.peak.sys` and `allocation.peak.epad` are visible to customer and internal projections because they explain the customer peak-hour allocation.
 
-It is not visible to markets because it is category `allocation` and has q-factor `0`.
+They are not visible to markets because they are category `allocation` and have q-factor `0`.
+
+They normally carry the same MW and must not be summed as physical customer volume. Deprecated `allocation.peak` rows may be read as a compatibility alias when old fixture rows remain.

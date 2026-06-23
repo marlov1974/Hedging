@@ -22,13 +22,13 @@ base.epad
 
 ## Allocation Peak
 
-`allocation.peak` stores the customer's forecast peak-hour effect in MW.
+`allocation.peak.sys` and `allocation.peak.epad` store the customer's forecast peak-hour effect in MW.
 
 ```text
 allocation_peak_mw = forecast_mwh * hedge_pct * peak_pct / peak_h
 ```
 
-It has price `0`, q-factor `0`, and is excluded from market projection.
+Both rows normally carry the same MW. They have price `0`, q-factor `0`, and are excluded from market projection. They must not be summed as physical customer volume.
 
 ## Peak Components
 
@@ -54,10 +54,11 @@ A negative value means the forecast peak share is lower than the flat base share
 
 ## Transaction Count
 
-Accepting a Peaks.Modern forecast hedge creates five transactions per month:
+Accepting a Peaks.Modern forecast hedge creates six transactions per month:
 
 ```text
-allocation.peak
+allocation.peak.sys
+allocation.peak.epad
 base.sys
 base.epad
 peak.sys

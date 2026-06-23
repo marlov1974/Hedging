@@ -111,7 +111,7 @@ describe("Forecast hedge feature", () => {
     assert.equal(row.modern_peak_mw, 0.088566);
   });
 
-  it("matches the P0027 numeric peak volume example", () => {
+  it("matches the P0028 numeric peak volume example", () => {
     const row = updateForecastHedgeProfileRow({
       month: "2027-01",
       forecast_mwh: 100,
@@ -197,11 +197,11 @@ describe("Forecast hedge feature", () => {
     assert.equal(result.calloff.delivery_end_month, "2027-01");
     assert.deepEqual(
       result.transactions.map((transaction) => transaction.transaction_id),
-      ["CAL00-000", "CAL00-001", "CAL00-002", "CAL00-003", "CAL00-004"],
+      ["CAL00-000", "CAL00-001", "CAL00-002", "CAL00-003", "CAL00-004", "CAL00-005"],
     );
   });
 
-  it("accept creates five transactions per month for allocation, base and peak components", () => {
+  it("accept creates six transactions per month for allocation, base and peak components", () => {
     const database = createPocSeedData();
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
@@ -217,7 +217,7 @@ describe("Forecast hedge feature", () => {
       ],
     });
 
-    assert.equal(result.transactions.length, 15);
+    assert.equal(result.transactions.length, 18);
     assert.equal(result.calloff.delivery_start_month, "2027-01");
     assert.equal(result.calloff.delivery_end_month, "2027-03");
     assert.deepEqual(
@@ -225,10 +225,10 @@ describe("Forecast hedge feature", () => {
       ["2027-01", "2027-02", "2027-03"],
     );
     assert.deepEqual(
-      result.transactions.slice(0, 4).map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component),
-      ["allocation.peak", "base.sys", "base.epad", "peak.sys"],
+      result.transactions.slice(0, 5).map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component),
+      ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys"],
     );
-    assert.equal(database.productConfigurationComponents.get(result.transactions[4].productcomponent_id)?.component, "peak.epad");
+    assert.equal(database.productConfigurationComponents.get(result.transactions[5].productcomponent_id)?.component, "peak.epad");
   });
 
   it("base and peak transactions use separate MW formulas and q-factor values", () => {
@@ -252,10 +252,12 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(rowsByComponent.get("base.sys")?.mw, 0.826613);
     assert.equal(rowsByComponent.get("base.epad")?.mw, 0.826613);
-    assert.equal(rowsByComponent.get("allocation.peak")?.mw, 0.915179);
+    assert.equal(rowsByComponent.get("allocation.peak.sys")?.mw, 0.915179);
+    assert.equal(rowsByComponent.get("allocation.peak.epad")?.mw, 0.915179);
     assert.equal(rowsByComponent.get("peak.sys")?.mw, 0.088566);
     assert.equal(rowsByComponent.get("peak.epad")?.mw, 0.088566);
-    assert.equal(rowsByComponent.get("allocation.peak")?.q_factor, 0);
+    assert.equal(rowsByComponent.get("allocation.peak.sys")?.q_factor, 0);
+    assert.equal(rowsByComponent.get("allocation.peak.epad")?.q_factor, 0);
     assert.equal(rowsByComponent.get("base.sys")?.q_factor, 1);
     assert.equal(rowsByComponent.get("base.epad")?.q_factor, 1);
     assert.equal(rowsByComponent.get("peak.sys")?.q_factor, 1.2);
@@ -279,7 +281,8 @@ describe("Forecast hedge feature", () => {
       projectionRows.map((row) => row.component),
       ["base.sys", "base.epad", "peak.sys", "peak.epad"],
     );
-    assert.equal(projectionRows.some((row) => row.component === "allocation.peak"), false);
+    assert.equal(projectionRows.some((row) => row.component === "allocation.peak.sys"), false);
+    assert.equal(projectionRows.some((row) => row.component === "allocation.peak.epad"), false);
     assert.equal(projectionRows.find((row) => row.component === "base.sys")?.market_mw, 0.826613);
     assert.equal(projectionRows.find((row) => row.component === "peak.sys")?.market_mw, 0.106279);
   });
@@ -305,7 +308,7 @@ describe("Forecast hedge feature", () => {
 
   it("missing peak q-factor value is rejected", () => {
     const database = createPocSeedData();
-    database.qFactorValues.delete("Q23-00");
+    database.qFactorValues.delete("Q24-00");
 
     assert.throws(
       () =>

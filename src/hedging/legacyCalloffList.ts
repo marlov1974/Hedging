@@ -65,7 +65,7 @@ export function projectLegacyCalloffMonth(
   }
 
   const base = selectComponentMw(database, transactions, ["base.sys", "base.epad"], "base", warnings);
-  const allocationPeak = findComponentTransaction(database, transactions, "allocation.peak");
+  const allocationPeak = selectAllocationPeakMw(database, transactions, warnings);
   const peak = selectComponentMw(
     database,
     transactions,
@@ -74,10 +74,7 @@ export function projectLegacyCalloffMonth(
     warnings,
   );
 
-  if (base.mw === null || !allocationPeak) {
-    if (!allocationPeak) {
-      warnings.push("missing allocation.peak");
-    }
+  if (base.mw === null || allocationPeak.mw === null) {
     return errorRows(calloff, month, warnings.join("; "));
   }
 
@@ -137,6 +134,35 @@ export function projectLegacyCalloffMonth(
       hours: calendar.peak_h,
     },
   ];
+}
+
+function selectAllocationPeakMw(
+  database: PrototypeDatabase,
+  transactions: CustomerTransaction[],
+  warnings: string[],
+): { mw: number | null } {
+  const sys = findComponentTransaction(database, transactions, "allocation.peak.sys");
+  const epad = findComponentTransaction(database, transactions, "allocation.peak.epad");
+
+  if (sys || epad) {
+    if (!sys || !epad) {
+      warnings.push("partial allocation peak");
+      return { mw: (sys ?? epad)?.mw ?? null };
+    }
+    if (Math.abs(sys.mw - epad.mw) > EPSILON) {
+      warnings.push("mismatched allocation peak MW");
+    }
+    return { mw: sys.mw };
+  }
+
+  const legacy = findComponentTransaction(database, transactions, "allocation.peak");
+  if (legacy) {
+    warnings.push("legacy allocation.peak alias");
+    return { mw: legacy.mw };
+  }
+
+  warnings.push("missing allocation peak");
+  return { mw: null };
 }
 
 function aggregateCalloffRows(rows: MonthlyProjection[]): LegacyCalloffListRow[] {

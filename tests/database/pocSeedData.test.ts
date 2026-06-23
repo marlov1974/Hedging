@@ -177,7 +177,7 @@ describe("P0015 PoC seed data", () => {
   it("uses qfactor 0 and price 0 for allocation peak components", () => {
     const database = createPocSeedData();
     const allocationComponents = [...database.productConfigurationComponents.values()].filter(
-      (component) => component.component === "allocation.peak",
+      (component) => component.component === "allocation.peak.sys" || component.component === "allocation.peak.epad",
     );
 
     assert.ok(allocationComponents.length > 0);
@@ -209,6 +209,10 @@ describe("P0015 PoC seed data", () => {
 
     assert.equal(byComponent.get("base.sys")?.component_category, "base");
     assert.equal(byComponent.get("base.sys")?.hour_basis, "total_h");
+    assert.equal(byComponent.get("allocation.peak.sys")?.component_category, "allocation");
+    assert.equal(byComponent.get("allocation.peak.sys")?.hour_basis, "peak_h");
+    assert.equal(byComponent.get("allocation.peak.epad")?.component_category, "allocation");
+    assert.equal(byComponent.get("allocation.peak.epad")?.hour_basis, "peak_h");
     assert.equal(byComponent.get("peak.sys")?.component_category, "peak");
     assert.equal(byComponent.get("peak.sys")?.hour_basis, "peak_h");
     assert.equal(byComponent.get("profile.sys")?.component_category, "profile");
@@ -222,14 +226,18 @@ describe("P0015 PoC seed data", () => {
     const profilesClassic = productComponentsByProductName(database, "Profiles.Classic");
     const profilesModern = productComponentsByProductName(database, "Profiles.Modern");
 
-    assert.ok(peaksClassic.has("allocation.peak"));
+    assert.ok(peaksClassic.has("allocation.peak.sys"));
+    assert.ok(peaksClassic.has("allocation.peak.epad"));
+    assert.ok(!peaksClassic.has("allocation.peak"));
     assert.ok(peaksClassic.has("base.sys"));
     assert.ok(peaksClassic.has("base.epad"));
     assert.ok(peaksClassic.has("peak.sys"));
     assert.ok(peaksClassic.has("peak.epad"));
     assert.ok(!peaksClassic.has("peak.premium.sys"));
     assert.ok(!peaksClassic.has("peak.modern.sys"));
-    assert.ok(peaksModern.has("allocation.peak"));
+    assert.ok(peaksModern.has("allocation.peak.sys"));
+    assert.ok(peaksModern.has("allocation.peak.epad"));
+    assert.ok(!peaksModern.has("allocation.peak"));
     assert.ok(peaksModern.has("peak.sys"));
     assert.ok(peaksModern.has("peak.epad"));
     assert.ok(!peaksModern.has("peak.premium.sys"));

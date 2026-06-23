@@ -77,7 +77,8 @@ The call-off uses the Peaks.Modern product configuration and the selected portfo
 For each profile month, the PoC creates one transaction for each Peaks.Modern component:
 
 ```text
-allocation.peak
+allocation.peak.sys
+allocation.peak.epad
 base.sys
 base.epad
 peak.sys
@@ -86,9 +87,9 @@ peak.epad
 
 Base transactions use `hedge_mwh / calendar.total_h`.
 
-`allocation.peak` uses `hedge_mwh * forecast_peak_pct / calendar.peak_h`, price `0`, and q-factor `0`.
+`allocation.peak.sys` and `allocation.peak.epad` use `hedge_mwh * forecast_peak_pct / calendar.peak_h`, price `0`, and q-factor `0`. They normally carry the same MW and must not be summed as physical customer volume.
 
-Peak transactions use `allocation_peak_mw - base_mw`.
+`peak.sys` uses `allocation.peak.sys - base.sys`. `peak.epad` uses `allocation.peak.epad - base.epad`.
 
 Peak MWh and MW may be negative. Negative values mean the forecast peak share is lower than the flat base share implied by the calendar.
 
