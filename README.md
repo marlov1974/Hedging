@@ -12,10 +12,13 @@ For every new AI/chat/Codex session working on this repository:
 2. Read `AGENTS.md`.
 3. Read `memory/bootstrap-manifest.json`.
 4. Read every file listed in the manifest `read_order`, in order.
-5. Read `REPOSITORY_FILES.md` as the tracked path index when file discovery is needed, when planning source/package inspection, or when a task may add, remove or move tracked files.
-6. Treat `REPOSITORY_FILES.md` as a catalog, not as a command to read every tracked file during ordinary bootstrap.
-7. Read the active package in `requirements/packages/` before editing.
-8. If any mandatory read fails, stop and report `BOOTSTRAP FAILED` with the missing file/step.
+5. Read `memory/2026-06-23-canonical-hedging-model-session-summary.md` as the latest canonical hedging model context snapshot.
+6. Read `REPOSITORY_FILES.md` as the tracked path index when file discovery is needed, when planning source/package inspection, or when a task may add, remove or move tracked files.
+7. Treat `REPOSITORY_FILES.md` as a catalog, not as a command to read every tracked file during ordinary bootstrap.
+8. Read the active package in `requirements/packages/` before editing.
+9. If any mandatory read fails, stop and report `BOOTSTRAP FAILED` with the missing file/step.
+
+The current model context snapshot is sanitized and should be treated as the starting point for reasoning about Portfolio Hedging Products, canonical components, projections, feature perspectives, and the P0024-P0036 package sequence.
 
 ## Public-safety boundary
 
