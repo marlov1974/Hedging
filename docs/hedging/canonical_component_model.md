@@ -1,5 +1,7 @@
 # Canonical Component Model
 
+For the complete component glossary, including projected component names and deprecated aliases, see [Component Catalog](component_catalog.md).
+
 ## Rule
 
 Component transactions are stored in MW.

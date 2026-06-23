@@ -17,6 +17,7 @@ Durable design and function documentation lives here.
 - [Financial Settlement](hedging/financial_settlement.md)
 - [Application configurations](hedging/application_configurations.md)
 - [Portfolio Hedging Products](hedging/portfolio_hedging_product_family.md)
+- [Component catalog](hedging/component_catalog.md)
 - [Canonical Component Model](hedging/canonical_component_model.md)
 - [Product packages and feature sets](hedging/product_packages_and_feature_sets.md)
 - [Component categories and projection listeners](hedging/component_categories_and_projection_listeners.md)

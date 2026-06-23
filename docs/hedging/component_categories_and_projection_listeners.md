@@ -1,5 +1,7 @@
 # Component Categories And Projection Listeners
 
+For canonical, projected and deprecated component names by layer, see [Component Catalog](component_catalog.md).
+
 ## Categories
 
 ```text

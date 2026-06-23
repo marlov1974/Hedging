@@ -1,5 +1,7 @@
 # Modern Projected Model
 
+For the complete distinction between canonical source rows and projected `modern.*` names, see [Component Catalog](component_catalog.md).
+
 P0032 defines Modern projection views as read-only compatibility projections from the canonical component model.
 
 Canonical rows remain the source of truth. The raw Data Viewer `Transactions` table continues to show canonical component rows and MW values. The Modern projected views expose derived rows with explicit projected component names so a user can inspect how the same canonical calloff can be viewed as a Peaks.Modern model.

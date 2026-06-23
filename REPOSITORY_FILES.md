@@ -23,6 +23,7 @@ docs/hedging/canonical_component_model.md
 docs/hedging/classic_projection_peak_offpeak_rules.md
 docs/hedging/classic_projection_price_rules.md
 docs/hedging/classic_to_canonical_conversion.md
+docs/hedging/component_catalog.md
 docs/hedging/component_categories_and_projection_listeners.md
 docs/hedging/data_viewer.md
 docs/hedging/feature_level_perspective_switching.md
@@ -73,6 +74,7 @@ memory/00-index.md
 memory/01-project-overview.md
 memory/02-design-principles.md
 memory/03-component-model.md
+memory/2026-06-23-canonical-hedging-model-session-summary.md
 memory/bootstrap-manifest.json
 package.json
 requirements/README.md
@@ -177,6 +179,10 @@ requirements/package-runs/P0036/design.md
 requirements/package-runs/P0036/findings.md
 requirements/package-runs/P0036/functions.md
 requirements/package-runs/P0036/review.md
+requirements/package-runs/P0037/design.md
+requirements/package-runs/P0037/findings.md
+requirements/package-runs/P0037/functions.md
+requirements/package-runs/P0037/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -215,6 +221,7 @@ requirements/packages/P0033-peaks-modern-forecast-and-hedge-flow-use-modern-proj
 requirements/packages/P0034-universal-model-perspective-features.md
 requirements/packages/P0035-single-portfolio-feature-perspective-tabs.md
 requirements/packages/P0036-peaks-classic-forecast-and-hedge-forecast.md
+requirements/packages/P0037-component-catalog-and-projected-component-glossary.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
@@ -265,6 +272,7 @@ tests/database/pocSeedData.test.ts
 tests/hedging/applicationConfig.test.ts
 tests/hedging/baseloadsCalloffList.test.ts
 tests/hedging/classicProjection.test.ts
+tests/hedging/componentCatalog.test.ts
 tests/hedging/dataViewer.test.ts
 tests/hedging/financialSettlement.test.ts
 tests/hedging/forecastFeature.test.ts

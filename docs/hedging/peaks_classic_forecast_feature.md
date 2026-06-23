@@ -1,5 +1,7 @@
 # Peaks.Classic Forecast Feature
 
+For projected Classic names and canonical storage rules, see [Component Catalog](component_catalog.md).
+
 ## Purpose
 
 `Forecast` supports a Peaks.Classic customer perspective for viewing and editing monthly forecast values in Peak/Offpeak terms.

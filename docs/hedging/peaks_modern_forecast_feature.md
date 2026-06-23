@@ -1,5 +1,7 @@
 # Peaks.Modern Forecast Feature
 
+For projected Modern names and canonical storage rules, see [Component Catalog](component_catalog.md).
+
 ## Purpose
 
 `Forecast` is a Peaks.Modern customer-facing feature for viewing and editing monthly forecast values in Modern Projection terms.
