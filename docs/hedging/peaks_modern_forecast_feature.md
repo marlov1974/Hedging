@@ -1,76 +1,53 @@
-# Peaks.Modern Forecast feature
-
-P0021 adds the Forecast feature for Peaks.Modern portfolios.
+# Peaks.Modern Forecast Feature
 
 ## Purpose
 
-The feature lets the user view and edit monthly forecast values for the selected Peaks.Modern portfolio.
+`Forecast` is a Peaks.Modern customer-facing feature for viewing and editing monthly forecast values in Modern Projection terms.
 
-## Data Source
-
-The feature uses existing `CustomerForecast` rows:
+The user edits:
 
 ```text
-portfolio_id
-month
+Modern Base MWh
+Modern Peak MWh
+```
+
+The database still stores the existing internal forecast fields:
+
+```text
 mwh
 peak_pct
 ```
 
-## Field Semantics
+## Customer-Facing Semantics
 
-`mwh` is total monthly customer consumption forecast.
+Modern base is the base layer applied across the whole month.
 
-`peak_pct` is the share of monthly volume/profile allocated to peak information for later Peaks.Modern exposure logic.
-
-## Display And Storage Convention
-
-The UI displays:
+Modern peak is the extra peak layer applied during peak hours. It may be negative.
 
 ```text
-Peak %
+modern.base_mwh = modern_base_mw * total_h
+modern.peak_mwh = modern_peak_mw * peak_h
+total_mwh = modern.base_mwh + modern.peak_mwh
 ```
-
-as a whole percent value between `0` and `100`.
-
-The database stores:
-
-```text
-peak_pct
-```
-
-as a decimal value between `0` and `1`.
-
-Example:
-
-```text
-58% in the UI -> 0.58 in storage
-```
-
-Seeded forecast values model a small industrial customer with own heating. MWh is around `1000` with seasonal variation of about `+/-250`: higher in winter, lower around summer vacation and Christmas. Peak % is around `50%` with higher values in the non-vacation summer half, medium values in winter and vacation months, and lower values around Christmas.
-
-## Year Filter
-
-The feature uses a year dropdown. Current seed data covers:
-
-```text
-2027
-2028
-2029
-```
-
-Each populated year shows 12 monthly rows.
 
 ## Save Behavior
 
-The current implementation saves all rows for the selected year in one form submit.
-
-After save:
+When a user saves modern forecast values, the feature converts them to internal forecast storage:
 
 ```text
-updated MWh values are visible in the UI
-updated Peak % values are visible in the UI
-in-memory forecast rows are updated
+modern_base_mw = modern.base_mwh / total_h
+modern_peak_mw = modern.peak_mwh / peak_h
+allocation_peak_mw = modern_base_mw + modern_peak_mw
+total_mwh = modern.base_mwh + modern.peak_mwh
+peak_level_mwh = allocation_peak_mw * peak_h
+peak_pct = peak_level_mwh / total_mwh
+```
+
+Then it stores:
+
+```text
+CustomerForecast.mwh = total_mwh
+CustomerForecast.peak_pct = peak_pct
 ```
 
 ## Validation
@@ -80,17 +57,18 @@ The feature rejects:
 ```text
 non-Peaks.Modern portfolio updates
 invalid month format
-missing MWh
-non-numeric MWh
-MWh less than 0
-missing Peak %
-non-numeric Peak %
-Peak % less than 0
-Peak % greater than 100
+missing Modern Base MWh
+non-numeric Modern Base MWh
+Modern Base MWh less than 0
+missing Modern Peak MWh
+non-numeric Modern Peak MWh
+total MWh less than 0
+peak level MWh less than 0
+zero or invalid calendar total_h, peak_h, or offpeak_h
 ```
 
 ## Known PoC Limitations
 
 - Forecast edits are in-memory only.
-- Forecast changes do not yet recalculate hedge positions.
+- Forecast changes do not automatically create hedge positions.
 - Forecast is currently a Peaks.Modern-specific feature.

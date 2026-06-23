@@ -9,6 +9,7 @@ import {
   updateForecastHedgeProfileRow,
 } from "../../src/hedging/forecastHedge.ts";
 import { getApplicationFeaturesForPortfolio } from "../../src/hedging/applicationConfig.ts";
+import { getModernProjectedTransactionsForPortfolioYear } from "../../src/hedging/dataViewer.ts";
 import { getMarketProjectionRows } from "../../src/hedging/marketProjection.ts";
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 
@@ -36,7 +37,7 @@ describe("Forecast hedge feature", () => {
     assert.match(html, /name="percentage"/);
   });
 
-  it("renders canonical peak allocation and peak columns", () => {
+  it("renders modern base and peak profile columns", () => {
     const html = renderHedgingTool(createPocSeedData(), {
       portfolio_id: "CUS02-0",
       feature_id: "forecast-hedge",
@@ -48,12 +49,13 @@ describe("Forecast hedge feature", () => {
       }),
     });
 
-    assert.match(html, /Peak %/);
+    assert.match(html, /Forecast Base MWh/);
+    assert.match(html, /Forecast Peak MWh/);
     assert.match(html, /Base MWh/);
     assert.match(html, /Base MW/);
-    assert.match(html, /Allocation Peak MW/);
     assert.match(html, /Peak MWh/);
     assert.match(html, /Peak MW/);
+    assert.doesNotMatch(html, /Allocation Peak MW/);
   });
 
   it("generates profile for a 3-month range", () => {
@@ -70,7 +72,7 @@ describe("Forecast hedge feature", () => {
     );
   });
 
-  it("hedge_mwh equals forecast_mwh times percentage", () => {
+  it("generated proposal scales modern base and peak MWh by percentage", () => {
     const row = buildForecastHedgeProfile(createPocSeedData(), {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
@@ -79,11 +81,15 @@ describe("Forecast hedge feature", () => {
     }).rows[0];
 
     assert.equal(row.forecast_mwh, 1230);
-    assert.equal(row.hedge_mwh, 615);
+    assert.equal(row.forecast_modern_base_mwh, 1121.470588);
+    assert.equal(row.forecast_modern_peak_mwh, 108.529412);
+    assert.equal(row.modern_base_mwh, 560.735294);
+    assert.equal(row.modern_peak_mwh, 54.264706);
+    assert.equal(row.total_mwh, 615);
     assert.equal(row.percentage, 0.5);
   });
 
-  it("hedge_mw equals hedge_mwh divided by calendar total_h", () => {
+  it("modern base and peak MW use calendar total and peak hours", () => {
     const row = buildForecastHedgeProfile(createPocSeedData(), {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
@@ -92,10 +98,12 @@ describe("Forecast hedge feature", () => {
     }).rows[0];
 
     assert.equal(row.calendar_total_h, 744);
-    assert.equal(row.hedge_mw, 0.826613);
+    assert.equal(row.calendar_peak_h, 336);
+    assert.equal(row.modern_base_mw, 0.753676);
+    assert.equal(row.modern_peak_mw, 0.161502);
   });
 
-  it("peak volume uses allocation peak above flat base and peak hours", () => {
+  it("canonical allocation/base/peak MW are derived from modern profile values", () => {
     const row = buildForecastHedgeProfile(createPocSeedData(), {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
@@ -105,28 +113,32 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(row.forecast_peak_pct, 0.5);
     assert.equal(row.calendar_peak_h, 336);
-    assert.equal(row.allocation_peak_mwh, 307.5);
     assert.equal(row.allocation_peak_mw, 0.915179);
-    assert.equal(row.modern_peak_mwh, 29.758);
-    assert.equal(row.modern_peak_mw, 0.088566);
+    assert.equal(row.canonical_base_mw, 0.826613);
+    assert.equal(row.canonical_peak_mw, 0.088566);
+    assert.equal(row.peak_level_mwh, 307.5);
   });
 
-  it("matches the P0028 numeric peak volume example", () => {
+  it("matches the P0033 modern to canonical worked example", () => {
     const row = updateForecastHedgeProfileRow({
       month: "2027-01",
       forecast_mwh: 100,
       forecast_peak_pct: 0.5,
+      forecast_modern_base_mwh: 87.735849,
+      forecast_modern_peak_mwh: 12.264151,
       calendar_total_h: 744,
       calendar_peak_h: 320,
-      hedge_mwh: "100",
+      modern_base_mwh: "87.7358491",
+      modern_peak_mwh: "12.264151",
     });
 
-    assert.equal(row.hedge_mwh, 100);
-    assert.equal(row.hedge_mw, 0.134409);
-    assert.equal(row.allocation_peak_mwh, 50);
+    assert.equal(row.modern_base_mwh, 87.735849);
+    assert.equal(row.modern_peak_mwh, 12.264151);
+    assert.equal(row.modern_base_mw, 0.117925);
+    assert.equal(row.modern_peak_mw, 0.038325);
     assert.equal(row.allocation_peak_mw, 0.15625);
-    assert.equal(row.modern_peak_mwh, 6.989);
-    assert.equal(row.modern_peak_mw, 0.021841);
+    assert.equal(row.canonical_base_mw, 0.134409);
+    assert.equal(row.canonical_peak_mw, 0.021841);
   });
 
   it("allows negative modern peak MWh and MW", () => {
@@ -134,15 +146,18 @@ describe("Forecast hedge feature", () => {
       month: "2027-01",
       forecast_mwh: 100,
       forecast_peak_pct: 0.35,
+      forecast_modern_base_mwh: 110,
+      forecast_modern_peak_mwh: -10,
       calendar_total_h: 744,
       calendar_peak_h: 320,
-      hedge_mwh: "100",
+      modern_base_mwh: "110",
+      modern_peak_mwh: "-10",
     });
 
-    assert.equal(row.hedge_mwh, 100);
-    assert.equal(row.allocation_peak_mw, 0.109375);
-    assert.equal(row.modern_peak_mwh, -8.011);
-    assert.equal(row.modern_peak_mw, -0.025034);
+    assert.equal(row.total_mwh, 100);
+    assert.equal(row.modern_peak_mwh, -10);
+    assert.equal(row.modern_peak_mw, -0.03125);
+    assert.ok(row.canonical_peak_mw < 0);
   });
 
   it("flat profile gives zero modern peak MWh", () => {
@@ -150,35 +165,47 @@ describe("Forecast hedge feature", () => {
       month: "2027-01",
       forecast_mwh: 100,
       forecast_peak_pct: 320 / 744,
+      forecast_modern_base_mwh: 100,
+      forecast_modern_peak_mwh: 0,
       calendar_total_h: 744,
       calendar_peak_h: 320,
-      hedge_mwh: "100",
+      modern_base_mwh: "100",
+      modern_peak_mwh: "0",
     });
 
     assert.equal(row.modern_peak_mwh, 0);
     assert.equal(row.modern_peak_mw, 0);
   });
 
-  it("editing Hedge MWh recalculates Hedge MW and Hedge %", () => {
+  it("editing modern Base MWh and Peak MWh recalculates MW and Hedge %", () => {
     const row = updateForecastHedgeProfileRow({
       month: "2027-01",
       forecast_mwh: 1000,
       forecast_peak_pct: 0.5,
+      forecast_modern_base_mwh: 500,
+      forecast_modern_peak_mwh: 500,
       calendar_total_h: 500,
       calendar_peak_h: 250,
-      hedge_mwh: "250",
+      modern_base_mwh: "200",
+      modern_peak_mwh: "50",
     });
 
-    assert.equal(row.hedge_mwh, 250);
-    assert.equal(row.hedge_mw, 0.5);
-    assert.equal(row.allocation_peak_mw, 0.5);
-    assert.equal(row.modern_peak_mwh, 0);
-    assert.equal(row.modern_peak_mw, 0);
+    assert.equal(row.modern_base_mwh, 200);
+    assert.equal(row.modern_peak_mwh, 50);
+    assert.equal(row.modern_base_mw, 0.4);
+    assert.equal(row.modern_peak_mw, 0.2);
+    assert.equal(row.total_mwh, 250);
     assert.equal(row.percentage, 0.25);
   });
 
   it("accept creates exactly one Calloff", () => {
     const database = createPocSeedData();
+    const rows = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+    }).rows.map(toAcceptRow);
 
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
@@ -186,7 +213,7 @@ describe("Forecast hedge feature", () => {
       end_month: "2027-01",
       percentage: "50",
       date: "2027-01-15",
-      rows: [{ month: "2027-01", hedge_mwh: "615" }],
+      rows,
     });
 
     assert.equal(result.calloff.calloff_id, "CAL00");
@@ -203,6 +230,12 @@ describe("Forecast hedge feature", () => {
 
   it("accept creates six transactions per month for allocation, base and peak components", () => {
     const database = createPocSeedData();
+    const rows = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-03",
+      percentage: "50",
+    }).rows.map(toAcceptRow);
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
@@ -210,11 +243,7 @@ describe("Forecast hedge feature", () => {
       percentage: "50",
       date: "2027-01-15",
       calloff_id: "CALLOFF_TEST",
-      rows: [
-        { month: "2027-01", hedge_mwh: "615" },
-        { month: "2027-02", hedge_mwh: "605" },
-        { month: "2027-03", hedge_mwh: "555" },
-      ],
+      rows,
     });
 
     assert.equal(result.transactions.length, 18);
@@ -233,6 +262,12 @@ describe("Forecast hedge feature", () => {
 
   it("base and peak transactions use separate MW formulas and q-factor values", () => {
     const database = createPocSeedData();
+    const rows = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+    }).rows.map(toAcceptRow);
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
@@ -240,7 +275,7 @@ describe("Forecast hedge feature", () => {
       percentage: "50",
       date: "2027-01-15",
       calloff_id: "CALLOFF_TEST",
-      rows: [{ month: "2027-01", hedge_mwh: "615" }],
+      rows,
     });
 
     const rowsByComponent = new Map(
@@ -262,10 +297,81 @@ describe("Forecast hedge feature", () => {
     assert.equal(rowsByComponent.get("base.epad")?.q_factor, 1);
     assert.equal(rowsByComponent.get("peak.sys")?.q_factor, 1.2);
     assert.equal(rowsByComponent.get("peak.epad")?.q_factor, 1.2);
+    assert.equal([...rowsByComponent.keys()].some((component) => String(component).startsWith("modern.")), false);
+  });
+
+  it("Modern Projected Transactions show modern rows after canonical accept", () => {
+    const database = createPocSeedData();
+    const rows = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+    }).rows.map(toAcceptRow);
+
+    acceptForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      date: "2027-01-15",
+      calloff_id: "CALLOFF_TEST",
+      rows,
+    });
+
+    const projected = getModernProjectedTransactionsForPortfolioYear(database, "CUS02-0", "2027");
+    assert.deepEqual(
+      projected.map((row) => row.component),
+      ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad"],
+    );
+    assert.equal(projected.find((row) => row.component === "modern.base.sys")?.mwh, 560.735163);
+    assert.equal(projected.find((row) => row.component === "modern.peak.sys")?.mwh, 54.264909);
+  });
+
+  it("rejects negative modern base MWh", () => {
+    assert.throws(
+      () =>
+        updateForecastHedgeProfileRow({
+          month: "2027-01",
+          forecast_mwh: 100,
+          forecast_peak_pct: 0.5,
+          forecast_modern_base_mwh: 80,
+          forecast_modern_peak_mwh: 20,
+          calendar_total_h: 744,
+          calendar_peak_h: 320,
+          modern_base_mwh: "-1",
+          modern_peak_mwh: "20",
+        }),
+      (error) => error instanceof ForecastHedgeError && /Modern Base MWh/.test(error.message),
+    );
+  });
+
+  it("rejects zero offpeak hours", () => {
+    assert.throws(
+      () =>
+        updateForecastHedgeProfileRow({
+          month: "2027-01",
+          forecast_mwh: 100,
+          forecast_peak_pct: 0.5,
+          forecast_modern_base_mwh: 80,
+          forecast_modern_peak_mwh: 20,
+          calendar_total_h: 320,
+          calendar_peak_h: 320,
+          modern_base_mwh: "80",
+          modern_peak_mwh: "20",
+        }),
+      (error) => error instanceof ForecastHedgeError && /offpeak_h/.test(error.message),
+    );
   });
 
   it("market projection excludes allocation and includes base and peak with q-factor", () => {
     const database = createPocSeedData();
+    const rows = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+    }).rows.map(toAcceptRow);
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
@@ -273,7 +379,7 @@ describe("Forecast hedge feature", () => {
       percentage: "50",
       date: "2027-01-15",
       calloff_id: "CALLOFF_TEST",
-      rows: [{ month: "2027-01", hedge_mwh: "615" }],
+      rows,
     });
 
     const projectionRows = getMarketProjectionRows(database, result.transactions);
@@ -300,7 +406,12 @@ describe("Forecast hedge feature", () => {
           percentage: "50",
           date: "2027-01-15",
           calloff_id: "CALLOFF_TEST",
-          rows: [{ month: "2027-01", hedge_mwh: "615" }],
+          rows: buildForecastHedgeProfile(database, {
+            portfolio_id: "CUS02-0",
+            start_month: "2027-01",
+            end_month: "2027-01",
+            percentage: "50",
+          }).rows.map(toAcceptRow),
         }),
       (error) => error instanceof ForecastHedgeError && /missing Q-factor value/.test(error.message),
     );
@@ -319,7 +430,12 @@ describe("Forecast hedge feature", () => {
           percentage: "50",
           date: "2027-01-15",
           calloff_id: "CALLOFF_TEST",
-          rows: [{ month: "2027-01", hedge_mwh: "615" }],
+          rows: buildForecastHedgeProfile(database, {
+            portfolio_id: "CUS02-0",
+            start_month: "2027-01",
+            end_month: "2027-01",
+            percentage: "50",
+          }).rows.map(toAcceptRow),
         }),
       (error) => error instanceof ForecastHedgeError && /missing Q-factor value/.test(error.message),
     );
@@ -387,3 +503,15 @@ describe("Forecast hedge feature", () => {
     assert.throws(() => getForecastHedgeMonthRange("2027-03", "2027-01"), /end_month/);
   });
 });
+
+function toAcceptRow(row: {
+  month: string;
+  modern_base_mwh: number;
+  modern_peak_mwh: number;
+}): { month: string; modern_base_mwh: string; modern_peak_mwh: string } {
+  return {
+    month: row.month,
+    modern_base_mwh: String(row.modern_base_mwh),
+    modern_peak_mwh: String(row.modern_peak_mwh),
+  };
+}

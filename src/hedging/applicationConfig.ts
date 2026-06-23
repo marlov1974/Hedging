@@ -64,7 +64,7 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
     return {
       variant_id: "peaks-modern",
       title: "Peaks.Modern application",
-      context: "Peaks.Modern forecast workspace for total monthly consumption and peak share.",
+      context: "Peaks.Modern workspace for modern base and peak forecast hedging.",
       accent: "peaks-modern",
       features: [
         feature("portfolio-details", "Portfolio Details"),

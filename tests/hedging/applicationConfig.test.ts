@@ -75,6 +75,6 @@ describe("application configuration", () => {
 
     assert.match(html, /variant-peaks-modern/);
     assert.match(html, /Peaks\.Modern application/);
-    assert.match(html, /Peaks\.Modern forecast workspace/);
+    assert.match(html, /Peaks\.Modern workspace for modern base and peak forecast hedging/);
   });
 });

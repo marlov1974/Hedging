@@ -21,6 +21,8 @@ Durable design and function documentation lives here.
 - [Product packages and feature sets](hedging/product_packages_and_feature_sets.md)
 - [Component categories and projection listeners](hedging/component_categories_and_projection_listeners.md)
 - [Peaks.Modern Forecast](hedging/peaks_modern_forecast_feature.md)
+- [Peaks.Modern Hedge Forecast Flow](hedging/peaks_modern_hedge_forecast_flow.md)
+- [Modern to canonical conversion](hedging/modern_to_canonical_conversion.md)
 - [Peaks.Classic Calloff Transaction List](hedging/peaks_classic_calloff_transaction_list.md)
 - [Peaks.Modern Calloff Transaction List](hedging/peaks_modern_calloff_transaction_list.md)
 - [Projection MWh and price rules](hedging/projection_mw_and_price_rules.md)

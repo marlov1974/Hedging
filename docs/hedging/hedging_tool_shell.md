@@ -127,11 +127,11 @@ The feature uses monthly average spot actuals from the static spot actual list. 
 
 ```text
 Month
-MWh
-Peak %
+Base MWh
+Peak MWh
 ```
 
-The feature displays `Peak %` as percent and stores `peak_pct` as decimal. Details are documented in `peaks_modern_forecast_feature.md`.
+The customer-facing fields are Modern Projection values. The feature still stores existing internal forecast fields after conversion. Details are documented in `peaks_modern_forecast_feature.md`.
 
 ## UI Entry Point
 

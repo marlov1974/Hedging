@@ -1,6 +1,7 @@
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { CustomerForecast } from "../database/types.ts";
 import { isPeaksModernPortfolio } from "./applicationConfig.ts";
+import { convertModernForecastToStored, deriveModernFromForecast, ModernProjectionError } from "./modernProjection.ts";
 
 export class ForecastFeatureError extends Error {
   readonly code: "invalid_input" | "not_found";
@@ -18,13 +19,16 @@ export type ForecastDisplayRow = {
   mwh: number;
   peak_pct: number;
   peak_percent: number;
+  modern_base_mwh: number;
+  modern_peak_mwh: number;
+  peak_level_mwh: number;
 };
 
 export type ForecastUpdateInput = {
   portfolio_id: string;
   month: string;
-  mwh: string | number | undefined;
-  peak_percent: string | number | undefined;
+  modern_base_mwh: string | number | undefined;
+  modern_peak_mwh: string | number | undefined;
 };
 
 export type ForecastRowsUpdateInput = {
@@ -37,6 +41,8 @@ export type NormalizedForecastUpdate = {
   month: string;
   mwh: number;
   peak_pct: number;
+  modern_base_mwh: number;
+  modern_peak_mwh: number;
 };
 
 export function getForecastYears(database: PrototypeDatabase, portfolioId: string): string[] {
@@ -47,13 +53,25 @@ export function getForecastRowsForYear(database: PrototypeDatabase, portfolioId:
   return getPortfolioForecasts(database, portfolioId)
     .filter((forecast) => forecast.month.startsWith(`${year}-`))
     .sort((left, right) => left.month.localeCompare(right.month))
-    .map((forecast) => ({
-      forecast_id: forecast.forecast_id,
-      month: forecast.month,
-      mwh: forecast.mwh,
-      peak_pct: forecast.peak_pct,
-      peak_percent: roundPercent(forecast.peak_pct * 100),
-    }));
+    .map((forecast) => {
+      const calendar = getCalendar(database, forecast.month);
+      const modern = deriveModernFromForecast({
+        total_mwh: forecast.mwh,
+        peak_pct: forecast.peak_pct,
+        total_h: calendar.total_h,
+        peak_h: calendar.peak_h,
+      });
+      return {
+        forecast_id: forecast.forecast_id,
+        month: forecast.month,
+        mwh: forecast.mwh,
+        peak_pct: forecast.peak_pct,
+        peak_percent: roundPercent(forecast.peak_pct * 100),
+        modern_base_mwh: modern.modern_base_mwh,
+        modern_peak_mwh: modern.modern_peak_mwh,
+        peak_level_mwh: modern.peak_level_mwh,
+      };
+    });
 }
 
 export function updateForecastRows(database: PrototypeDatabase, input: ForecastRowsUpdateInput): CustomerForecast[] {
@@ -61,7 +79,7 @@ export function updateForecastRows(database: PrototypeDatabase, input: ForecastR
 }
 
 export function updateForecastRow(database: PrototypeDatabase, input: ForecastUpdateInput): CustomerForecast {
-  const update = validateForecastUpdate(input);
+  const update = validateForecastUpdate(database, input);
   if (!isPeaksModernPortfolio(database, update.portfolio_id)) {
     throw new ForecastFeatureError("invalid_input", "Forecast is only available for Peaks.Modern portfolios");
   }
@@ -76,7 +94,7 @@ export function updateForecastRow(database: PrototypeDatabase, input: ForecastUp
   return forecast;
 }
 
-export function validateForecastUpdate(input: ForecastUpdateInput): NormalizedForecastUpdate {
+export function validateForecastUpdate(database: PrototypeDatabase, input: ForecastUpdateInput): NormalizedForecastUpdate {
   const portfolioId = String(input.portfolio_id ?? "").trim();
   if (!portfolioId) {
     throw new ForecastFeatureError("invalid_input", "portfolio_id is required");
@@ -87,26 +105,44 @@ export function validateForecastUpdate(input: ForecastUpdateInput): NormalizedFo
     throw new ForecastFeatureError("invalid_input", "month must use YYYY-MM format");
   }
 
-  const mwh = parseRequiredNumber(input.mwh, "MWh");
-  if (mwh < 0) {
-    throw new ForecastFeatureError("invalid_input", "MWh must be greater than or equal to 0");
-  }
-
-  const peakPercent = parseRequiredNumber(input.peak_percent, "Peak %");
-  if (peakPercent < 0 || peakPercent > 100) {
-    throw new ForecastFeatureError("invalid_input", "Peak % must be between 0 and 100");
+  const modernBaseMwh = parseRequiredNumber(input.modern_base_mwh, "Modern Base MWh");
+  const modernPeakMwh = parseRequiredNumber(input.modern_peak_mwh, "Modern Peak MWh");
+  const calendar = getCalendar(database, month);
+  let stored;
+  try {
+    stored = convertModernForecastToStored({
+      modern_base_mwh: modernBaseMwh,
+      modern_peak_mwh: modernPeakMwh,
+      total_h: calendar.total_h,
+      peak_h: calendar.peak_h,
+    });
+  } catch (error) {
+    if (error instanceof ModernProjectionError) {
+      throw new ForecastFeatureError("invalid_input", error.message);
+    }
+    throw error;
   }
 
   return {
     portfolio_id: portfolioId,
     month,
-    mwh,
-    peak_pct: roundDecimal(peakPercent / 100),
+    mwh: stored.mwh,
+    peak_pct: stored.peak_pct,
+    modern_base_mwh: roundMwh(modernBaseMwh),
+    modern_peak_mwh: roundMwh(modernPeakMwh),
   };
 }
 
 function getPortfolioForecasts(database: PrototypeDatabase, portfolioId: string): CustomerForecast[] {
   return [...database.forecasts.values()].filter((forecast) => forecast.portfolio_id === portfolioId);
+}
+
+function getCalendar(database: PrototypeDatabase, month: string) {
+  const calendar = [...database.calendars.values()].find((candidate) => candidate.month === month);
+  if (!calendar) {
+    throw new ForecastFeatureError("not_found", `missing calendar row for ${month}`);
+  }
+  return calendar;
 }
 
 function parseRequiredNumber(value: string | number | undefined, label: string): number {
@@ -125,6 +161,6 @@ function roundPercent(value: number): number {
   return Math.round(Number(value.toFixed(6)));
 }
 
-function roundDecimal(value: number): number {
+function roundMwh(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
 }

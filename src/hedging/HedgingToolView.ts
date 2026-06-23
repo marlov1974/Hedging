@@ -231,8 +231,9 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
       margin-top: 6px;
     }
     .forecast-table col.month { width: 78px; }
-    .forecast-table col.mwh { width: 112px; }
-    .forecast-table col.peak { width: 88px; }
+    .forecast-table col.base { width: 122px; }
+    .forecast-table col.peak { width: 122px; }
+    .forecast-table col.total { width: 92px; }
     .forecast-table th,
     .forecast-table td {
       padding: 4px 6px;
@@ -659,7 +660,7 @@ function renderForecastFeature(database: PrototypeDatabase, selectedPortfolio: P
   return `<div class="stack">
     <div>
       <h2>Forecast</h2>
-      <p>Monthly forecast values. Peak % is displayed as percent and stored as a decimal peak_pct.</p>
+      <p>Monthly forecast values in modern base and peak terms.</p>
     </div>
     ${state.error ? `<div class="notice error">${escapeHtml(state.error)}</div>` : ""}
     ${state.forecast_message ? `<div class="notice success">${escapeHtml(state.forecast_message)}</div>` : ""}
@@ -690,14 +691,16 @@ function renderForecastTable(rows: ForecastDisplayRow[]): string {
   return `<table class="forecast-table">
     <colgroup>
       <col class="month">
-      <col class="mwh">
+      <col class="base">
       <col class="peak">
+      <col class="total">
     </colgroup>
     <thead>
       <tr>
         <th>Month</th>
-        <th>MWh</th>
-        <th>Peak %</th>
+        <th>Base MWh</th>
+        <th>Peak MWh</th>
+        <th>Total</th>
       </tr>
     </thead>
     <tbody>
@@ -708,8 +711,9 @@ function renderForecastTable(rows: ForecastDisplayRow[]): string {
               ${escapeHtml(row.month)}
               <input type="hidden" name="month" value="${escapeHtml(row.month)}">
             </td>
-            <td><input name="mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(String(row.mwh))}"></td>
-            <td><input name="peak_percent_${escapeHtml(row.month)}" type="number" min="0" max="100" step="1" value="${escapeHtml(String(row.peak_percent))}"></td>
+            <td><input name="modern_base_mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(String(row.modern_base_mwh))}"></td>
+            <td><input name="modern_peak_mwh_${escapeHtml(row.month)}" type="number" step="0.001" value="${escapeHtml(String(row.modern_peak_mwh))}"></td>
+            <td class="number">${formatNumber(row.mwh)}</td>
           </tr>`,
         )
         .join("")}
@@ -769,32 +773,32 @@ function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile:
       <thead>
         <tr>
           <th>Month</th>
-          <th>Forecast MWh</th>
-          <th>Peak %</th>
+          <th>Forecast Base MWh</th>
+          <th>Forecast Peak MWh</th>
           <th>Hedge %</th>
           <th>Base MWh</th>
           <th>Base MW</th>
-          <th>Allocation Peak MW</th>
           <th>Peak MWh</th>
           <th>Peak MW</th>
+          <th>Total MWh</th>
         </tr>
       </thead>
       <tbody>
         ${profile.rows
           .map(
-            (row) => `<tr data-forecast-mwh="${escapeHtml(String(row.forecast_mwh))}" data-forecast-peak-pct="${escapeHtml(String(row.forecast_peak_pct))}" data-calendar-total-h="${escapeHtml(String(row.calendar_total_h))}" data-calendar-peak-h="${escapeHtml(String(row.calendar_peak_h))}">
+            (row) => `<tr data-forecast-mwh="${escapeHtml(String(row.forecast_mwh))}" data-calendar-total-h="${escapeHtml(String(row.calendar_total_h))}" data-calendar-peak-h="${escapeHtml(String(row.calendar_peak_h))}">
               <td>
                 ${escapeHtml(row.month)}
                 <input type="hidden" name="month" value="${escapeHtml(row.month)}">
               </td>
-              <td class="number">${formatNumber(row.forecast_mwh)}</td>
-              <td class="number">${formatNumber(row.forecast_peak_pct * 100)}</td>
+              <td class="number">${formatNumber(row.forecast_modern_base_mwh)}</td>
+              <td class="number">${formatNumber(row.forecast_modern_peak_mwh)}</td>
               <td><output data-role="hedge-percent">${formatNumber(row.percentage * 100)}</output></td>
-              <td><input name="hedge_mwh_${escapeHtml(row.month)}" data-role="hedge-mwh" type="number" min="0" step="0.001" value="${escapeHtml(String(row.hedge_mwh))}"></td>
-              <td><output data-role="hedge-mw">${formatNumber(row.hedge_mw)}</output></td>
-              <td><output data-role="allocation-peak-mw">${formatNumber(row.allocation_peak_mw)}</output></td>
-              <td><output data-role="modern-peak-mwh">${formatNumber(row.modern_peak_mwh)}</output></td>
+              <td><input name="modern_base_mwh_${escapeHtml(row.month)}" data-role="modern-base-mwh" type="number" min="0" step="0.001" value="${escapeHtml(String(row.modern_base_mwh))}"></td>
+              <td><output data-role="modern-base-mw">${formatNumber(row.modern_base_mw)}</output></td>
+              <td><input name="modern_peak_mwh_${escapeHtml(row.month)}" data-role="modern-peak-mwh-input" type="number" step="0.001" value="${escapeHtml(String(row.modern_peak_mwh))}"></td>
               <td><output data-role="modern-peak-mw">${formatNumber(row.modern_peak_mw)}</output></td>
+              <td><output data-role="total-mwh">${formatNumber(row.total_mwh)}</output></td>
             </tr>`,
           )
           .join("")}
@@ -802,23 +806,21 @@ function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile:
     </table>
     <button class="primary" type="submit">Accept hedge profile</button>
     <script>
-      document.querySelectorAll('[data-role="hedge-mwh"]').forEach((input) => {
+      document.querySelectorAll('[data-role="modern-base-mwh"], [data-role="modern-peak-mwh-input"]').forEach((input) => {
         input.addEventListener('input', () => {
           const row = input.closest('tr');
           const forecastMwh = Number(row.dataset.forecastMwh);
-          const forecastPeakPct = Number(row.dataset.forecastPeakPct);
           const calendarTotalH = Number(row.dataset.calendarTotalH);
           const calendarPeakH = Number(row.dataset.calendarPeakH);
-          const hedgeMwh = Number(input.value);
-          const hedgeMw = Number.isFinite(hedgeMwh) && calendarTotalH > 0 ? hedgeMwh / calendarTotalH : 0;
-          const allocationPeakMw = Number.isFinite(hedgeMwh) && calendarPeakH > 0 ? (hedgeMwh * forecastPeakPct) / calendarPeakH : 0;
-          const modernPeakMw = allocationPeakMw - hedgeMw;
-          const modernPeakMwh = modernPeakMw * calendarPeakH;
-          const hedgePercent = Number.isFinite(hedgeMwh) && forecastMwh > 0 ? (hedgeMwh / forecastMwh) * 100 : 0;
-          row.querySelector('[data-role="hedge-mw"]').value = hedgeMw.toLocaleString('en-US', { maximumFractionDigits: 6 });
-          row.querySelector('[data-role="allocation-peak-mw"]').value = allocationPeakMw.toLocaleString('en-US', { maximumFractionDigits: 6 });
-          row.querySelector('[data-role="modern-peak-mwh"]').value = modernPeakMwh.toLocaleString('en-US', { maximumFractionDigits: 3 });
+          const modernBaseMwh = Number(row.querySelector('[data-role="modern-base-mwh"]').value);
+          const modernPeakMwh = Number(row.querySelector('[data-role="modern-peak-mwh-input"]').value);
+          const modernBaseMw = Number.isFinite(modernBaseMwh) && calendarTotalH > 0 ? modernBaseMwh / calendarTotalH : 0;
+          const modernPeakMw = Number.isFinite(modernPeakMwh) && calendarPeakH > 0 ? modernPeakMwh / calendarPeakH : 0;
+          const totalMwh = (Number.isFinite(modernBaseMwh) ? modernBaseMwh : 0) + (Number.isFinite(modernPeakMwh) ? modernPeakMwh : 0);
+          const hedgePercent = forecastMwh > 0 ? (totalMwh / forecastMwh) * 100 : 0;
+          row.querySelector('[data-role="modern-base-mw"]').value = modernBaseMw.toLocaleString('en-US', { maximumFractionDigits: 6 });
           row.querySelector('[data-role="modern-peak-mw"]').value = modernPeakMw.toLocaleString('en-US', { maximumFractionDigits: 6 });
+          row.querySelector('[data-role="total-mwh"]').value = totalMwh.toLocaleString('en-US', { maximumFractionDigits: 3 });
           row.querySelector('[data-role="hedge-percent"]').value = hedgePercent.toLocaleString('en-US', { maximumFractionDigits: 2 });
         });
       });

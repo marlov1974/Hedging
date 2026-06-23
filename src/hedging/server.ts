@@ -70,8 +70,8 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           rows: months.map((month) => ({
             portfolio_id,
             month,
-            mwh: String(body.get(`mwh_${month}`) ?? ""),
-            peak_percent: String(body.get(`peak_percent_${month}`) ?? ""),
+            modern_base_mwh: String(body.get(`modern_base_mwh_${month}`) ?? ""),
+            modern_peak_mwh: String(body.get(`modern_peak_mwh_${month}`) ?? ""),
           })),
         });
 
@@ -156,7 +156,8 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           percentage,
           rows: months.map((month) => ({
             month,
-            hedge_mwh: String(body.get(`hedge_mwh_${month}`) ?? ""),
+            modern_base_mwh: String(body.get(`modern_base_mwh_${month}`) ?? ""),
+            modern_peak_mwh: String(body.get(`modern_peak_mwh_${month}`) ?? ""),
           })),
         });
         writeHtml(
