@@ -80,7 +80,14 @@ describe("Forecast feature", () => {
 
     const row = getForecastRowsForYear(database, "PORT_PEAKS_MODERN", "2027")[0];
     assert.equal(row.peak_pct, 0.575);
-    assert.equal(row.peak_percent, 57.5);
+    assert.equal(row.peak_percent, 58);
+  });
+
+  it("renders Peak % values as whole numbers", () => {
+    const row = getForecastRowsForYear(createPocSeedData(), "PORT_PEAKS_MODERN", "2027")[0];
+
+    assert.equal(Number.isInteger(row.peak_percent), true);
+    assert.equal(row.peak_percent, 50);
   });
 
   it("rejects invalid MWh", () => {

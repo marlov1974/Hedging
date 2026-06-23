@@ -575,7 +575,7 @@ function renderForecastTable(rows: ForecastDisplayRow[]): string {
               <input type="hidden" name="month" value="${escapeHtml(row.month)}">
             </td>
             <td><input name="mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(String(row.mwh))}"></td>
-            <td><input name="peak_percent_${escapeHtml(row.month)}" type="number" min="0" max="100" step="0.001" value="${escapeHtml(String(row.peak_percent))}"></td>
+            <td><input name="peak_percent_${escapeHtml(row.month)}" type="number" min="0" max="100" step="1" value="${escapeHtml(String(row.peak_percent))}"></td>
           </tr>`,
         )
         .join("")}

@@ -75,6 +75,22 @@ describe("P0015 PoC seed data", () => {
     }
   });
 
+  it("uses realistic small-industry seasonal forecast profile", () => {
+    const database = createPocSeedData();
+    const forecasts = [...database.forecasts.values()].filter((forecast) => forecast.portfolio_id === "PORT_PEAKS_MODERN");
+    const byMonth = new Map(forecasts.map((forecast) => [forecast.month, forecast]));
+
+    assert.equal(byMonth.get("2027-01")?.mwh, 1230);
+    assert.equal(byMonth.get("2027-07")?.mwh, 760);
+    assert.equal(byMonth.get("2027-12")?.mwh, 840);
+    assert.ok(forecasts.every((forecast) => forecast.mwh >= 750 && forecast.mwh <= 1250));
+
+    assert.equal(byMonth.get("2027-06")?.peak_pct, 0.6);
+    assert.equal(byMonth.get("2027-07")?.peak_pct, 0.52);
+    assert.equal(byMonth.get("2027-12")?.peak_pct, 0.42);
+    assert.ok(forecasts.every((forecast) => forecast.peak_pct >= 0.4 && forecast.peak_pct <= 0.6));
+  });
+
   it("creates one portfolio product component with qfactor_set_id for every product component", () => {
     const database = createPocSeedData();
 

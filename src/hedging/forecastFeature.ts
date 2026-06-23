@@ -122,7 +122,7 @@ function parseRequiredNumber(value: string | number | undefined, label: string):
 }
 
 function roundPercent(value: number): number {
-  return Math.round(value * 1000) / 1000;
+  return Math.round(Number(value.toFixed(6)));
 }
 
 function roundDecimal(value: number): number {

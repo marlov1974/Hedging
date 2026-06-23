@@ -50,6 +50,19 @@ offpeak_h = total_h - peak_h
 
 Each portfolio has 36 monthly forecast rows. Forecast `mwh` represents total customer consumption. `peak_pct` is profile information and is not treated as energy ownership by a peak component.
 
+Forecast rows use a deterministic small-industry seasonal profile:
+
+```text
+mwh is around 1000 with about +/-250 variation
+winter consumption is higher because the customer has own heating
+summer vacation and Christmas consumption are lower
+peak_pct is around 50%
+summer half peak_pct is higher outside vacation
+vacation peak_pct is medium
+winter peak_pct is medium
+Christmas peak_pct is low
+```
+
 ## Component Vocabulary
 
 The PoC uses:

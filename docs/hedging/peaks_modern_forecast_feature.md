@@ -31,7 +31,7 @@ The UI displays:
 Peak %
 ```
 
-as a percent value between `0` and `100`.
+as a whole percent value between `0` and `100`.
 
 The database stores:
 
@@ -44,8 +44,10 @@ as a decimal value between `0` and `1`.
 Example:
 
 ```text
-57.5% in the UI -> 0.575 in storage
+58% in the UI -> 0.58 in storage
 ```
+
+Seeded forecast values model a small industrial customer with own heating. MWh is around `1000` with seasonal variation of about `+/-250`: higher in winter, lower around summer vacation and Christmas. Peak % is around `50%` with higher values in the non-vacation summer half, medium values in winter and vacation months, and lower values around Christmas.
 
 ## Year Filter
 

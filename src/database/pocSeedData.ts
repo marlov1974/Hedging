@@ -61,7 +61,7 @@ const PRODUCT_SEEDS = [
     customer_number: "CN_BASELOADS",
     portfolio_id: "PORT_BASELOADS",
     forecast_mwh: 1000,
-    peak_pct: 0.42,
+    peak_pct: 0.5,
   },
   {
     product_id: "PRODUCT_PEAKS_CLASSIC",
@@ -69,8 +69,8 @@ const PRODUCT_SEEDS = [
     customer_id: "CUST_PEAKS_CLASSIC",
     customer_number: "CN_PEAKS_CLASSIC",
     portfolio_id: "PORT_PEAKS_CLASSIC",
-    forecast_mwh: 900,
-    peak_pct: 0.58,
+    forecast_mwh: 1000,
+    peak_pct: 0.5,
   },
   {
     product_id: "PRODUCT_PEAKS_MODERN",
@@ -78,8 +78,8 @@ const PRODUCT_SEEDS = [
     customer_id: "CUST_PEAKS_MODERN",
     customer_number: "CN_PEAKS_MODERN",
     portfolio_id: "PORT_PEAKS_MODERN",
-    forecast_mwh: 950,
-    peak_pct: 0.56,
+    forecast_mwh: 1000,
+    peak_pct: 0.5,
   },
   {
     product_id: "PRODUCT_PROFILES_CLASSIC",
@@ -87,7 +87,7 @@ const PRODUCT_SEEDS = [
     customer_id: "CUST_PROFILES_CLASSIC",
     customer_number: "CN_PROFILES_CLASSIC",
     portfolio_id: "PORT_PROFILES_CLASSIC",
-    forecast_mwh: 1100,
+    forecast_mwh: 1000,
     peak_pct: 0.5,
   },
   {
@@ -96,8 +96,8 @@ const PRODUCT_SEEDS = [
     customer_id: "CUST_PROFILES_MODERN",
     customer_number: "CN_PROFILES_MODERN",
     portfolio_id: "PORT_PROFILES_MODERN",
-    forecast_mwh: 1150,
-    peak_pct: 0.48,
+    forecast_mwh: 1000,
+    peak_pct: 0.5,
   },
 ];
 
@@ -278,12 +278,14 @@ function qFactorValueFor(componentCode: string, monthIndex: number): number {
 }
 
 function forecastMwhFor(baseMwh: number, monthIndex: number): number {
-  const yearOffset = Math.floor(monthIndex / 12) * 24;
-  const seasonalOffset = ((monthIndex % 12) - 5) * 5;
-  return baseMwh + yearOffset + seasonalOffset;
+  const seasonalProfile = [1230, 1210, 1110, 995, 930, 900, 760, 820, 960, 1040, 1150, 840];
+  const yearOffset = Math.floor(monthIndex / 12) * 8;
+  const month = monthIndex % 12;
+  return baseMwh + seasonalProfile[month] - 1000 + yearOffset;
 }
 
 function forecastPeakPctFor(basePeakPct: number, monthIndex: number): number {
-  const profileOffset = ((monthIndex % 6) - 2) * 0.005;
-  return Number((basePeakPct + profileOffset).toFixed(3));
+  const seasonalPercentProfile = [50, 51, 53, 56, 59, 60, 52, 52, 58, 55, 52, 42];
+  const month = monthIndex % 12;
+  return Number((basePeakPct + seasonalPercentProfile[month] / 100 - 0.5).toFixed(2));
 }
