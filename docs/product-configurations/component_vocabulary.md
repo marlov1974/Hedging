@@ -3,10 +3,12 @@
 ## Standard configuration families
 
 ```text
+Portfolio Hedging Products
 Baseloads
-Peaks
-Profiles
-Fixed
+Peaks.Classic
+Peaks.Modern
+Profiles.Classic
+Profiles.Modern
 ```
 
 ## Role names
@@ -27,10 +29,11 @@ base.classic.sys
 base.classic.epad
 peak
 offpeak
+allocation.peak
 peak.classic.sys
 peak.classic.epad
-peak.modern.sys
-peak.modern.epad
+peak.premium.sys
+peak.premium.epad
 profile.peak
 profile.15m
 profile.sys
@@ -38,6 +41,15 @@ profile.epad
 volume
 volume.flex
 fixed
+currency.sek
+adjustment.*
+```
+
+Deprecated aliases retained for compatibility:
+
+```text
+peak.modern.sys -> peak.premium.sys
+peak.modern.epad -> peak.premium.epad
 ```
 
 ## PoC component families
@@ -51,14 +63,46 @@ peak.classic.sys
 peak.classic.epad
 ```
 
-Modern exposure components:
+Modern canonical exposure components:
 
 ```text
-peak.modern.sys
-peak.modern.epad
+allocation.peak
+base.sys
+base.epad
+peak.premium.sys
+peak.premium.epad
 profile.sys
 profile.epad
 volume
+```
+
+## Component categories
+
+```text
+allocation
+base
+peak
+profile
+volume
+currency
+adjustment
+```
+
+Market projection listens to `base`, `peak` and `profile`.
+
+Customer projection listens to customer-relevant components except `adjustment`.
+
+Internal projection listens to all components.
+
+## Compatibility aliases
+
+```text
+PeaksModern -> Peaks.Modern
+PeaksClassic -> Peaks.Classic
+ProfilesModern -> Profiles.Modern
+ProfilesClassic -> Profiles.Classic
+peak.modern.sys -> peak.premium.sys
+peak.modern.epad -> peak.premium.epad
 ```
 
 ## Model objects

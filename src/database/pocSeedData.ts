@@ -11,27 +11,34 @@ import {
   insertQFactorSet,
   insertQFactorValue,
 } from "./repository.ts";
+import { getComponentMetadata } from "./canonicalComponents.ts";
 
 export const CALENDAR_SET_ID = "CAL_SE_TRADING";
 
 export const COMPONENTS_BY_PRODUCT = new Map([
   ["Baseloads", ["base.sys", "base.epad"]],
-  ["PeaksClassic", ["base.classic.sys", "base.classic.epad", "peak.classic.sys", "peak.classic.epad"]],
-  ["PeaksModern", ["base.sys", "base.epad", "peak.modern.sys", "peak.modern.epad"]],
+  ["Peaks.Classic", ["base.classic.sys", "base.classic.epad", "peak.classic.sys", "peak.classic.epad"]],
+  ["Peaks.Modern", ["allocation.peak", "base.sys", "base.epad", "peak.premium.sys", "peak.premium.epad"]],
   [
-    "ProfilesClassic",
+    "Profiles.Classic",
     ["base.classic.sys", "base.classic.epad", "peak.classic.sys", "peak.classic.epad", "profile.sys", "profile.epad", "volume"],
   ],
-  ["ProfilesModern", ["base.sys", "base.epad", "peak.modern.sys", "peak.modern.epad", "profile.sys", "profile.epad", "volume"]],
+  [
+    "Profiles.Modern",
+    ["allocation.peak", "base.sys", "base.epad", "peak.premium.sys", "peak.premium.epad", "profile.sys", "profile.epad", "volume"],
+  ],
 ]);
 
 export const Q_FACTOR_RANGES = new Map([
+  ["allocation.peak", [0, 0]],
   ["base.sys", [1, 1]],
   ["base.epad", [1, 1]],
   ["base.classic.sys", [1, 1]],
   ["base.classic.epad", [1, 1]],
   ["peak.modern.sys", [1.2, 1.5]],
   ["peak.modern.epad", [1.2, 1.5]],
+  ["peak.premium.sys", [1.2, 1.5]],
+  ["peak.premium.epad", [1.2, 1.5]],
   ["peak.classic.sys", [2.2, 2.5]],
   ["peak.classic.epad", [2.2, 2.5]],
   ["profile.sys", [1.03, 1.09]],
@@ -40,6 +47,7 @@ export const Q_FACTOR_RANGES = new Map([
 ]);
 
 const PRICE_BY_COMPONENT = new Map([
+  ["allocation.peak", 0],
   ["base.sys", 80],
   ["base.epad", 5],
   ["base.classic.sys", 80],
@@ -48,6 +56,8 @@ const PRICE_BY_COMPONENT = new Map([
   ["peak.classic.epad", 3],
   ["peak.modern.sys", 12],
   ["peak.modern.epad", 2],
+  ["peak.premium.sys", 12],
+  ["peak.premium.epad", 2],
   ["profile.sys", 7],
   ["profile.epad", 2],
   ["volume", 4],
@@ -67,7 +77,7 @@ const PRODUCT_SEEDS = [
   {
     seed_index: 1,
     product_id: "PRO01",
-    product_name: "PeaksClassic",
+    product_name: "Peaks.Classic",
     customer_id: "CUS01",
     customer_number: "CUS01",
     portfolio_id: "CUS01-0",
@@ -77,7 +87,7 @@ const PRODUCT_SEEDS = [
   {
     seed_index: 2,
     product_id: "PRO02",
-    product_name: "PeaksModern",
+    product_name: "Peaks.Modern",
     customer_id: "CUS02",
     customer_number: "CUS02",
     portfolio_id: "CUS02-0",
@@ -87,7 +97,7 @@ const PRODUCT_SEEDS = [
   {
     seed_index: 3,
     product_id: "PRO03",
-    product_name: "ProfilesClassic",
+    product_name: "Profiles.Classic",
     customer_id: "CUS03",
     customer_number: "CUS03",
     portfolio_id: "CUS03-0",
@@ -97,7 +107,7 @@ const PRODUCT_SEEDS = [
   {
     seed_index: 4,
     product_id: "PRO04",
-    product_name: "ProfilesModern",
+    product_name: "Profiles.Modern",
     customer_id: "CUS04",
     customer_number: "CUS04",
     portfolio_id: "CUS04-0",
@@ -150,6 +160,7 @@ export function createPocSeedData(): PrototypeDatabase {
         name: componentDisplayName(product.product_name, componentCode),
         component: componentCode,
         productitem: productItemFor(componentCode),
+        ...getComponentMetadata(componentCode),
       });
 
       insertPriceComponent(database, {
@@ -260,6 +271,12 @@ function componentDisplayName(productName: string, componentCode: string): strin
 }
 
 function productItemFor(componentCode: string): string {
+  if (componentCode === "allocation.peak") {
+    return "allocation";
+  }
+  if (componentCode.startsWith("peak.premium.")) {
+    return "peak";
+  }
   return componentCode.split(".")[0];
 }
 

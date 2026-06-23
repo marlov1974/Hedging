@@ -27,7 +27,7 @@ The selected portfolio's product configuration determines the application varian
 
 ```text
 Baseloads portfolio -> Baseloads application appearance and features
-PeaksModern portfolio -> PeaksModern application appearance and features
+Peaks.Modern portfolio -> Peaks.Modern application appearance and features
 ```
 
 If the selected active feature does not exist in the new application variant, the shell resets it to the first available feature in that variant.
@@ -44,11 +44,13 @@ Position Report
 Financial Settlement
 ```
 
-The current PeaksModern features are:
+The current Peaks.Modern features are:
 
 ```text
 Portfolio Details
 Forecast
+Hedge Forecast
+Data Viewer
 ```
 
 Feature availability is evaluated from the active portfolio application configuration.
@@ -111,7 +113,7 @@ The feature uses monthly average spot actuals from the static spot actual list. 
 
 ## Forecast Feature
 
-`Forecast` is available in the PeaksModern application. It shows monthly forecast rows with:
+`Forecast` is available in the Peaks.Modern application. It shows monthly forecast rows with:
 
 ```text
 Month

@@ -57,7 +57,7 @@ describe("hedging tool shell", () => {
     assert.equal(features.find((feature) => feature.feature_id === "buy-baseloads")?.available, true);
   });
 
-  it("Buy Baseloads feature is not part of PeaksModern application", () => {
+  it("Buy Baseloads feature is not part of Peaks.Modern application", () => {
     const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "CUS02-0");
 
     const feature = features.find((candidate) => candidate.feature_id === "buy-baseloads");

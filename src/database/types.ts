@@ -33,12 +33,18 @@ export type ProductConfiguration = {
   name: string;
 };
 
+export type ComponentCategory = "allocation" | "base" | "peak" | "profile" | "volume" | "currency" | "adjustment";
+
+export type ComponentHourBasis = "total_h" | "peak_h" | "offpeak_h" | "none";
+
 export type ProductConfigurationComponent = {
   productcomponent_id: string;
   product_id: string;
   name: string;
   component: string;
   productitem: string;
+  component_category?: ComponentCategory;
+  hour_basis?: ComponentHourBasis;
 };
 
 export type PriceComponent = {

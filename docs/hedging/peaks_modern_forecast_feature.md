@@ -1,10 +1,10 @@
-# PeaksModern Forecast feature
+# Peaks.Modern Forecast feature
 
-P0021 adds the Forecast feature for PeaksModern portfolios.
+P0021 adds the Forecast feature for Peaks.Modern portfolios.
 
 ## Purpose
 
-The feature lets the user view and edit monthly forecast values for the selected PeaksModern portfolio.
+The feature lets the user view and edit monthly forecast values for the selected Peaks.Modern portfolio.
 
 ## Data Source
 
@@ -21,7 +21,7 @@ peak_pct
 
 `mwh` is total monthly customer consumption forecast.
 
-`peak_pct` is the share of monthly volume/profile allocated to peak information for later PeaksModern exposure logic.
+`peak_pct` is the share of monthly volume/profile allocated to peak information for later Peaks.Modern exposure logic.
 
 ## Display And Storage Convention
 
@@ -78,7 +78,7 @@ in-memory forecast rows are updated
 The feature rejects:
 
 ```text
-non-PeaksModern portfolio updates
+non-Peaks.Modern portfolio updates
 invalid month format
 missing MWh
 non-numeric MWh
@@ -93,4 +93,4 @@ Peak % greater than 100
 
 - Forecast edits are in-memory only.
 - Forecast changes do not yet recalculate hedge positions.
-- Forecast is currently a PeaksModern-specific feature.
+- Forecast is currently a Peaks.Modern-specific feature.

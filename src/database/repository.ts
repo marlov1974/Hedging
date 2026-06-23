@@ -18,6 +18,7 @@ import {
   type QFactorValue,
 } from "./types.ts";
 import { assertDate, assertFiniteNumber, assertKnownComponentCode, assertMonth, assertRequiredString } from "./validation.ts";
+import { getComponentMetadata } from "./canonicalComponents.ts";
 
 export function insertCustomer(database: PrototypeDatabase, input: Customer): Customer {
   assertUniqueKey(database.customers, input.customer_id, "customer_id");
@@ -105,13 +106,21 @@ export function insertProductConfigurationComponent(
   assertRequiredString(input.name, "name");
   assertRequiredString(input.productitem, "productitem");
   assertKnownComponentCode(input.component);
+  const metadata = getComponentMetadata(input.component);
+  const component: ProductConfigurationComponent = {
+    ...input,
+    component_category: input.component_category ?? metadata.component_category,
+    hour_basis: input.hour_basis ?? metadata.hour_basis,
+  };
+  assertRequiredString(component.component_category, "component_category");
+  assertRequiredString(component.hour_basis, "hour_basis");
 
-  if (!database.productConfigurations.has(input.product_id)) {
-    throw new DatabaseError("not_found", `product_id ${input.product_id} does not exist`);
+  if (!database.productConfigurations.has(component.product_id)) {
+    throw new DatabaseError("not_found", `product_id ${component.product_id} does not exist`);
   }
 
-  database.productConfigurationComponents.set(input.productcomponent_id, input);
-  return input;
+  database.productConfigurationComponents.set(component.productcomponent_id, component);
+  return component;
 }
 
 export function insertPriceComponent(database: PrototypeDatabase, input: PriceComponent): PriceComponent {

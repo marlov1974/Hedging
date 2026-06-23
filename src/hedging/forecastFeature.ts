@@ -63,7 +63,7 @@ export function updateForecastRows(database: PrototypeDatabase, input: ForecastR
 export function updateForecastRow(database: PrototypeDatabase, input: ForecastUpdateInput): CustomerForecast {
   const update = validateForecastUpdate(input);
   if (!isPeaksModernPortfolio(database, update.portfolio_id)) {
-    throw new ForecastFeatureError("invalid_input", "Forecast is only available for PeaksModern portfolios");
+    throw new ForecastFeatureError("invalid_input", "Forecast is only available for Peaks.Modern portfolios");
   }
 
   const forecast = getPortfolioForecasts(database, update.portfolio_id).find((candidate) => candidate.month === update.month);

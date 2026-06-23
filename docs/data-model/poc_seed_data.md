@@ -8,10 +8,10 @@ The seed contains five customers, five portfolios and five product configuration
 
 ```text
 CUS00         -> CUS00-0         -> Baseloads
-CUS01         -> CUS01-0         -> PeaksClassic
-CUS02         -> CUS02-0         -> PeaksModern
-CUS03         -> CUS03-0         -> ProfilesClassic
-CUS04         -> CUS04-0         -> ProfilesModern
+CUS01         -> CUS01-0         -> Peaks.Classic
+CUS02         -> CUS02-0         -> Peaks.Modern
+CUS03         -> CUS03-0         -> Profiles.Classic
+CUS04         -> CUS04-0         -> Profiles.Modern
 ```
 
 All examples are public-safe PoC examples. Price area is `SE3`.
@@ -84,10 +84,11 @@ base.sys
 base.epad
 base.classic.sys
 base.classic.epad
+allocation.peak
 peak.classic.sys
 peak.classic.epad
-peak.modern.sys
-peak.modern.epad
+peak.premium.sys
+peak.premium.epad
 profile.sys
 profile.epad
 volume
@@ -107,13 +108,23 @@ peak.classic.epad
 Modern structures use total-consumption base components and separate exposure/risk layers:
 
 ```text
+allocation.peak
 base.sys
 base.epad
-peak.modern.sys
-peak.modern.epad
+peak.premium.sys
+peak.premium.epad
 profile.sys
 profile.epad
 volume
+```
+
+Deprecated aliases are accepted only for compatibility:
+
+```text
+PeaksModern -> Peaks.Modern
+PeaksClassic -> Peaks.Classic
+peak.modern.sys -> peak.premium.sys
+peak.modern.epad -> peak.premium.epad
 ```
 
 ## PortfolioProductComponent
@@ -159,7 +170,8 @@ Deterministic values stay inside these ranges:
 ```text
 base.sys / base.epad = 1.0
 base.classic.sys / base.classic.epad = 1.0
-peak.modern.sys / peak.modern.epad = 1.2-1.5
+allocation.peak = 0
+peak.premium.sys / peak.premium.epad = 1.2-1.5
 peak.classic.sys / peak.classic.epad = 2.2-2.5
 profile.sys / profile.epad = 1.03-1.09
 volume = 0

@@ -1,10 +1,10 @@
-# PeaksModern Forecast Hedge
+# Peaks.Modern Forecast Hedge
 
 ## Purpose
 
-`Hedge Forecast` is a PeaksModern feature for creating a component hedge profile from a percentage of monthly forecast.
+`Hedge Forecast` is a Peaks.Modern feature for creating a component hedge profile from a percentage of monthly forecast.
 
-The feature is only available for PeaksModern portfolios in this PoC.
+The feature is only available for Peaks.Modern portfolios in this PoC.
 
 ## Input Fields
 
@@ -24,9 +24,10 @@ For every month in the selected range:
 
 ```text
 hedge_mwh = forecast_mwh * percentage
-hedge_mw = hedge_mwh / calendar.total_h
-modern_peak_mwh = hedge_mwh * (forecast_peak_pct - calendar.peak_h / calendar.total_h)
-modern_peak_mw = modern_peak_mwh / calendar.peak_h
+base_mw = hedge_mwh / calendar.total_h
+allocation_peak_mw = hedge_mwh * forecast_peak_pct / calendar.peak_h
+peak_premium_mw = allocation_peak_mw - base_mw
+peak_premium_mwh = peak_premium_mw * calendar.peak_h
 ```
 
 The percentage input is converted from percent to decimal before calculation.
@@ -48,41 +49,48 @@ Peak %
 Hedge %
 Base MWh
 Base MW
-Modern Peak MWh
-Modern Peak MW
+Allocation Peak MW
+Peak Premium MWh
+Peak Premium MW
 ```
 
-`Base MWh` is editable. `Base MW`, `Hedge %` and modern peak values are derived values:
+`Base MWh` is editable. `Base MW`, `Hedge %` and peak allocation/premium values are derived values:
 
 ```text
 Base MW = Base MWh / calendar.total_h
 Hedge % = Base MWh / Forecast MWh
-Modern Peak MWh = Base MWh * (Forecast Peak % - calendar.peak_h / calendar.total_h)
-Modern Peak MW = Modern Peak MWh / calendar.peak_h
+Allocation Peak MW = Base MWh * Forecast Peak % / calendar.peak_h
+Peak Premium MW = Allocation Peak MW - Base MW
+Peak Premium MWh = Peak Premium MW * calendar.peak_h
 ```
 
 The browser view recalculates the displayed derived values while editing. The server recalculates the same values again when the profile is accepted.
 
 ## Accept Behavior
 
-Accepting the profile creates exactly one call-off for the selected PeaksModern portfolio.
+Accepting the profile creates exactly one call-off for the selected Peaks.Modern portfolio.
 
-The call-off uses the PeaksModern product configuration and the selected portfolio.
+The call-off uses the Peaks.Modern product configuration and the selected portfolio.
 
 ## Transaction Creation
 
-For each profile month, the PoC creates one transaction for each PeaksModern component:
+For each profile month, the PoC creates one transaction for each Peaks.Modern component:
 
 ```text
+allocation.peak
 base.sys
 base.epad
-peak.modern.sys
-peak.modern.epad
+peak.premium.sys
+peak.premium.epad
 ```
 
-Base transactions use `hedge_mwh / calendar.total_h`. Peak transactions use corrected premium/shape MW: `hedge_mwh * (forecast_peak_pct - calendar.peak_h / calendar.total_h) / calendar.peak_h`.
+Base transactions use `hedge_mwh / calendar.total_h`.
 
-Modern peak MWh and MW may be negative. Negative values mean the forecast peak share is lower than the flat base share implied by the calendar.
+`allocation.peak` uses `hedge_mwh * forecast_peak_pct / calendar.peak_h`, price `0`, and q-factor `0`.
+
+Peak premium transactions use `allocation_peak_mw - base_mw`.
+
+Peak premium MWh and MW may be negative. Negative values mean the forecast peak share is lower than the flat base share implied by the calendar.
 
 ## Q-Factor Usage
 
@@ -92,7 +100,7 @@ For every transaction, `q_factor` is read from the selected portfolio's linked p
 PortfolioProductComponent -> QFactorSet -> QFactorValue month
 ```
 
-For seeded base components, the expected q-factor is `1.0`. Peak components use separate seeded q-factor sets with non-base values.
+For seeded base components, the expected q-factor is `1.0`. Peak premium components use separate seeded q-factor sets with non-base values.
 
 ## Known PoC Limitations
 

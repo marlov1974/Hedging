@@ -679,8 +679,9 @@ function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile:
           <th>Hedge %</th>
           <th>Base MWh</th>
           <th>Base MW</th>
-          <th>Modern Peak MWh</th>
-          <th>Modern Peak MW</th>
+          <th>Allocation Peak MW</th>
+          <th>Peak Premium MWh</th>
+          <th>Peak Premium MW</th>
         </tr>
       </thead>
       <tbody>
@@ -696,6 +697,7 @@ function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile:
               <td><output data-role="hedge-percent">${formatNumber(row.percentage * 100)}</output></td>
               <td><input name="hedge_mwh_${escapeHtml(row.month)}" data-role="hedge-mwh" type="number" min="0" step="0.001" value="${escapeHtml(String(row.hedge_mwh))}"></td>
               <td><output data-role="hedge-mw">${formatNumber(row.hedge_mw)}</output></td>
+              <td><output data-role="allocation-peak-mw">${formatNumber(row.allocation_peak_mw)}</output></td>
               <td><output data-role="modern-peak-mwh">${formatNumber(row.modern_peak_mwh)}</output></td>
               <td><output data-role="modern-peak-mw">${formatNumber(row.modern_peak_mw)}</output></td>
             </tr>`,
@@ -714,11 +716,12 @@ function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile:
           const calendarPeakH = Number(row.dataset.calendarPeakH);
           const hedgeMwh = Number(input.value);
           const hedgeMw = Number.isFinite(hedgeMwh) && calendarTotalH > 0 ? hedgeMwh / calendarTotalH : 0;
-          const flatPeakShare = calendarTotalH > 0 ? calendarPeakH / calendarTotalH : 0;
-          const modernPeakMwh = Number.isFinite(hedgeMwh) ? hedgeMwh * (forecastPeakPct - flatPeakShare) : 0;
-          const modernPeakMw = calendarPeakH > 0 ? modernPeakMwh / calendarPeakH : 0;
+          const allocationPeakMw = Number.isFinite(hedgeMwh) && calendarPeakH > 0 ? (hedgeMwh * forecastPeakPct) / calendarPeakH : 0;
+          const modernPeakMw = allocationPeakMw - hedgeMw;
+          const modernPeakMwh = modernPeakMw * calendarPeakH;
           const hedgePercent = Number.isFinite(hedgeMwh) && forecastMwh > 0 ? (hedgeMwh / forecastMwh) * 100 : 0;
           row.querySelector('[data-role="hedge-mw"]').value = hedgeMw.toLocaleString('en-US', { maximumFractionDigits: 6 });
+          row.querySelector('[data-role="allocation-peak-mw"]').value = allocationPeakMw.toLocaleString('en-US', { maximumFractionDigits: 6 });
           row.querySelector('[data-role="modern-peak-mwh"]').value = modernPeakMwh.toLocaleString('en-US', { maximumFractionDigits: 3 });
           row.querySelector('[data-role="modern-peak-mw"]').value = modernPeakMw.toLocaleString('en-US', { maximumFractionDigits: 6 });
           row.querySelector('[data-role="hedge-percent"]').value = hedgePercent.toLocaleString('en-US', { maximumFractionDigits: 2 });

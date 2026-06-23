@@ -1,4 +1,5 @@
 import { DatabaseError } from "./types.ts";
+import { isKnownComponentCode } from "./canonicalComponents.ts";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -15,8 +16,11 @@ const KNOWN_COMPONENT_CODES = new Set([
   "offpeak",
   "peak.classic.sys",
   "peak.classic.epad",
+  "allocation.peak",
   "peak.modern.sys",
   "peak.modern.epad",
+  "peak.premium.sys",
+  "peak.premium.epad",
   "profile.peak",
   "profile.15m",
   "profile.sys",
@@ -53,7 +57,7 @@ export function assertFiniteNumber(value: number, fieldName: string): void {
 }
 
 export function assertKnownComponentCode(component: string): void {
-  if (!KNOWN_COMPONENT_CODES.has(component)) {
+  if (!KNOWN_COMPONENT_CODES.has(component) && !isKnownComponentCode(component)) {
     throw new DatabaseError("invalid_input", `unknown component code ${component}`);
   }
 }

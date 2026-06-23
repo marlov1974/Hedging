@@ -17,13 +17,17 @@ docs/data-model/poc_seed_data.md
 docs/data-model/transaction_model.md
 docs/hedging/application_configurations.md
 docs/hedging/baseloads_calloff_list.md
+docs/hedging/canonical_component_model.md
+docs/hedging/component_categories_and_projection_listeners.md
 docs/hedging/data_viewer.md
 docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
 docs/hedging/peaks_modern_forecast_feature.md
 docs/hedging/peaks_modern_forecast_hedge.md
 docs/hedging/peaks_modern_volume_semantics.md
+docs/hedging/portfolio_hedging_product_family.md
 docs/hedging/position_report.md
+docs/hedging/product_packages_and_feature_sets.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
 docs/market-derivation/runtime_derivation_policy.md
@@ -103,6 +107,10 @@ requirements/package-runs/P0023/review.md
 requirements/package-runs/P0024/design.md
 requirements/package-runs/P0024/functions.md
 requirements/package-runs/P0024/review.md
+requirements/package-runs/P0025/design.md
+requirements/package-runs/P0025/findings.md
+requirements/package-runs/P0025/functions.md
+requirements/package-runs/P0025/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -129,7 +137,9 @@ requirements/packages/P0021-peaks-modern-application-and-forecast-feature.md
 requirements/packages/P0022-peaks-modern-forecast-hedge-purchase.md
 requirements/packages/P0023-raw-data-viewer-feature.md
 requirements/packages/P0024-correct-peaks-modern-premium-volume.md
+requirements/packages/P0025-canonical-product-model-realignment.md
 src/README.md
+src/database/canonicalComponents.ts
 src/database/fixtures.ts
 src/database/pocSeedData.ts
 src/database/repository.ts
@@ -145,6 +155,7 @@ src/hedging/features.ts
 src/hedging/financialSettlement.ts
 src/hedging/forecastFeature.ts
 src/hedging/forecastHedge.ts
+src/hedging/marketProjection.ts
 src/hedging/portfolioDetails.ts
 src/hedging/positionReport.ts
 src/hedging/server.ts

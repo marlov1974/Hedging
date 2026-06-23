@@ -1,5 +1,6 @@
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { CustomerPortfolio } from "../database/types.ts";
+import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
 
 export type HedgingFeatureId =
   | "buy-baseloads"
@@ -60,8 +61,8 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
   if (isPeaksModernPortfolio(database, selectedPortfolio.portfolio_id)) {
     return {
       variant_id: "peaks-modern",
-      title: "PeaksModern application",
-      context: "PeaksModern forecast workspace for total monthly consumption and peak share.",
+      title: "Peaks.Modern application",
+      context: "Peaks.Modern forecast workspace for total monthly consumption and peak share.",
       accent: "peaks-modern",
       features: [
         feature("portfolio-details", "Portfolio Details"),
@@ -103,7 +104,7 @@ export function isBaseloadsPortfolio(database: PrototypeDatabase, portfolioId: s
 }
 
 export function isPeaksModernPortfolio(database: PrototypeDatabase, portfolioId: string): boolean {
-  return getProductConfigurationNameForPortfolio(database, database.portfolios.get(portfolioId)) === "PeaksModern";
+  return canonicalProductPackageName(getProductConfigurationNameForPortfolio(database, database.portfolios.get(portfolioId)) ?? "") === "Peaks.Modern";
 }
 
 export function getProductConfigurationNameForPortfolio(

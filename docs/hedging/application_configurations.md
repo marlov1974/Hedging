@@ -32,16 +32,18 @@ Financial Settlement
 
 Baseloads-specific features are hidden when a non-Baseloads application variant is selected.
 
-## PeaksModern Application
+## Peaks.Modern Application
 
-PeaksModern portfolios use the PeaksModern application appearance and feature set:
+Peaks.Modern portfolios use the Peaks.Modern application appearance and feature set:
 
 ```text
 Portfolio Details
 Forecast
+Hedge Forecast
+Data Viewer
 ```
 
-Baseloads-specific features are not shown for PeaksModern portfolios.
+Baseloads-specific features are not shown for Peaks.Modern portfolios.
 
 ## Appearance
 
@@ -49,7 +51,7 @@ The current PoC uses a minimal shared shell with product-specific variant stylin
 
 ```text
 Baseloads application
-PeaksModern application
+Peaks.Modern application
 ```
 
 The styling change is intentionally restrained. The primary behavior is that the product configuration changes the application variant, not just the feature list.
@@ -57,5 +59,6 @@ The styling change is intentionally restrained. The primary behavior is that the
 ## Known PoC Limitations
 
 - Application variants are resolved from synthetic seed product configurations.
+- `PeaksModern` remains a deprecated compatibility alias for `Peaks.Modern`.
 - Unsupported product configurations currently fall back to a minimal unsupported application with Portfolio Details.
 - Feature authorization is product-context based, not user based.

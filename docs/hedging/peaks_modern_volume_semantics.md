@@ -1,8 +1,8 @@
-# PeaksModern Volume Semantics
+# Peaks.Modern Volume Semantics
 
 ## Purpose
 
-PeaksModern separates total monthly hedge volume from the premium/shape volume above a flat base profile.
+Peaks.Modern separates total monthly hedge volume from the premium/shape volume above a flat base profile.
 
 ## Base Components
 
@@ -20,37 +20,48 @@ base.sys
 base.epad
 ```
 
-## Modern Peak Components
+## Allocation Peak
 
-The `peak.modern` components carry only the premium/shape volume above the flat base level. They must not store full peak-hour consumption, because base already carries the total monthly hedge.
-
-```text
-modern_peak_mwh = forecast_mwh * hedge_pct * (peak_pct - peak_h / total_h)
-modern_peak_mw = modern_peak_mwh / peak_h
-```
-
-The same modern peak MW is stored on:
+`allocation.peak` stores the customer's forecast peak-hour effect in MW.
 
 ```text
-peak.modern.sys
-peak.modern.epad
+allocation_peak_mw = forecast_mwh * hedge_pct * peak_pct / peak_h
 ```
 
-## Negative Modern Peak
+It has price `0`, q-factor `0`, and is excluded from market projection.
 
-`modern_peak_mwh` and `modern_peak_mw` may be negative.
+## Peak Premium Components
+
+The `peak.premium` components carry only the premium/shape MW above the flat base level. They must not store full peak-hour consumption, because base already carries the total monthly hedge.
+
+```text
+peak_premium_mw = allocation_peak_mw - base_mw
+peak_premium_mwh = peak_premium_mw * peak_h
+```
+
+The same peak premium MW is stored on:
+
+```text
+peak.premium.sys
+peak.premium.epad
+```
+
+## Negative Peak Premium
+
+`peak_premium_mwh` and `peak_premium_mw` may be negative.
 
 A negative value means the forecast peak share is lower than the flat base share implied by the calendar. The value is kept as-is in the PoC instead of being floored to zero.
 
 ## Transaction Count
 
-Accepting a PeaksModern forecast hedge creates four transactions per month:
+Accepting a Peaks.Modern forecast hedge creates five transactions per month:
 
 ```text
+allocation.peak
 base.sys
 base.epad
-peak.modern.sys
-peak.modern.epad
+peak.premium.sys
+peak.premium.epad
 ```
 
 Each transaction still reads its own q-factor from the selected portfolio product component and month.

@@ -9,10 +9,11 @@ import {
   updateForecastHedgeProfileRow,
 } from "../../src/hedging/forecastHedge.ts";
 import { getApplicationFeaturesForPortfolio } from "../../src/hedging/applicationConfig.ts";
+import { getMarketProjectionRows } from "../../src/hedging/marketProjection.ts";
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 
 describe("Forecast hedge feature", () => {
-  it("PeaksModern feature list includes Hedge Forecast", () => {
+  it("Peaks.Modern feature list includes Hedge Forecast", () => {
     const features = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS02-0").features;
 
     assert.equal(features.some((feature) => feature.feature_id === "forecast-hedge" && feature.available), true);
@@ -35,7 +36,7 @@ describe("Forecast hedge feature", () => {
     assert.match(html, /name="percentage"/);
   });
 
-  it("renders corrected modern peak premium columns", () => {
+  it("renders canonical peak allocation and premium columns", () => {
     const html = renderHedgingTool(createPocSeedData(), {
       portfolio_id: "CUS02-0",
       feature_id: "forecast-hedge",
@@ -50,8 +51,9 @@ describe("Forecast hedge feature", () => {
     assert.match(html, /Peak %/);
     assert.match(html, /Base MWh/);
     assert.match(html, /Base MW/);
-    assert.match(html, /Modern Peak MWh/);
-    assert.match(html, /Modern Peak MW/);
+    assert.match(html, /Allocation Peak MW/);
+    assert.match(html, /Peak Premium MWh/);
+    assert.match(html, /Peak Premium MW/);
   });
 
   it("generates profile for a 3-month range", () => {
@@ -93,7 +95,7 @@ describe("Forecast hedge feature", () => {
     assert.equal(row.hedge_mw, 0.826613);
   });
 
-  it("modern peak volume uses premium above flat base and peak hours", () => {
+  it("peak premium volume uses allocation peak above flat base and peak hours", () => {
     const row = buildForecastHedgeProfile(createPocSeedData(), {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
@@ -103,11 +105,13 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(row.forecast_peak_pct, 0.5);
     assert.equal(row.calendar_peak_h, 336);
+    assert.equal(row.allocation_peak_mwh, 307.5);
+    assert.equal(row.allocation_peak_mw, 0.915179);
     assert.equal(row.modern_peak_mwh, 29.758);
-    assert.equal(row.modern_peak_mw, 0.088565);
+    assert.equal(row.modern_peak_mw, 0.088566);
   });
 
-  it("matches the P0024 numeric premium volume example", () => {
+  it("matches the P0025 numeric premium volume example", () => {
     const row = updateForecastHedgeProfileRow({
       month: "2027-01",
       forecast_mwh: 100,
@@ -119,6 +123,8 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(row.hedge_mwh, 100);
     assert.equal(row.hedge_mw, 0.134409);
+    assert.equal(row.allocation_peak_mwh, 50);
+    assert.equal(row.allocation_peak_mw, 0.15625);
     assert.equal(row.modern_peak_mwh, 6.989);
     assert.equal(row.modern_peak_mw, 0.021841);
   });
@@ -134,6 +140,7 @@ describe("Forecast hedge feature", () => {
     });
 
     assert.equal(row.hedge_mwh, 100);
+    assert.equal(row.allocation_peak_mw, 0.109375);
     assert.equal(row.modern_peak_mwh, -8.011);
     assert.equal(row.modern_peak_mw, -0.025034);
   });
@@ -164,6 +171,7 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(row.hedge_mwh, 250);
     assert.equal(row.hedge_mw, 0.5);
+    assert.equal(row.allocation_peak_mw, 0.5);
     assert.equal(row.modern_peak_mwh, 0);
     assert.equal(row.modern_peak_mw, 0);
     assert.equal(row.percentage, 0.25);
@@ -189,11 +197,11 @@ describe("Forecast hedge feature", () => {
     assert.equal(result.calloff.delivery_end_month, "2027-01");
     assert.deepEqual(
       result.transactions.map((transaction) => transaction.transaction_id),
-      ["CAL00-000", "CAL00-001", "CAL00-002", "CAL00-003"],
+      ["CAL00-000", "CAL00-001", "CAL00-002", "CAL00-003", "CAL00-004"],
     );
   });
 
-  it("accept creates four transactions per month for base and peak components", () => {
+  it("accept creates five transactions per month for allocation, base and peak premium components", () => {
     const database = createPocSeedData();
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
@@ -209,7 +217,7 @@ describe("Forecast hedge feature", () => {
       ],
     });
 
-    assert.equal(result.transactions.length, 12);
+    assert.equal(result.transactions.length, 15);
     assert.equal(result.calloff.delivery_start_month, "2027-01");
     assert.equal(result.calloff.delivery_end_month, "2027-03");
     assert.deepEqual(
@@ -218,8 +226,9 @@ describe("Forecast hedge feature", () => {
     );
     assert.deepEqual(
       result.transactions.slice(0, 4).map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component),
-      ["base.sys", "base.epad", "peak.modern.sys", "peak.modern.epad"],
+      ["allocation.peak", "base.sys", "base.epad", "peak.premium.sys"],
     );
+    assert.equal(database.productConfigurationComponents.get(result.transactions[4].productcomponent_id)?.component, "peak.premium.epad");
   });
 
   it("base and peak transactions use separate premium MW formulas and q-factor values", () => {
@@ -243,12 +252,36 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(rowsByComponent.get("base.sys")?.mw, 0.826613);
     assert.equal(rowsByComponent.get("base.epad")?.mw, 0.826613);
-    assert.equal(rowsByComponent.get("peak.modern.sys")?.mw, 0.088565);
-    assert.equal(rowsByComponent.get("peak.modern.epad")?.mw, 0.088565);
+    assert.equal(rowsByComponent.get("allocation.peak")?.mw, 0.915179);
+    assert.equal(rowsByComponent.get("peak.premium.sys")?.mw, 0.088566);
+    assert.equal(rowsByComponent.get("peak.premium.epad")?.mw, 0.088566);
+    assert.equal(rowsByComponent.get("allocation.peak")?.q_factor, 0);
     assert.equal(rowsByComponent.get("base.sys")?.q_factor, 1);
     assert.equal(rowsByComponent.get("base.epad")?.q_factor, 1);
-    assert.equal(rowsByComponent.get("peak.modern.sys")?.q_factor, 1.2);
-    assert.equal(rowsByComponent.get("peak.modern.epad")?.q_factor, 1.2);
+    assert.equal(rowsByComponent.get("peak.premium.sys")?.q_factor, 1.2);
+    assert.equal(rowsByComponent.get("peak.premium.epad")?.q_factor, 1.2);
+  });
+
+  it("market projection excludes allocation and includes base and peak premium with q-factor", () => {
+    const database = createPocSeedData();
+    const result = acceptForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      date: "2027-01-15",
+      calloff_id: "CALLOFF_TEST",
+      rows: [{ month: "2027-01", hedge_mwh: "615" }],
+    });
+
+    const projectionRows = getMarketProjectionRows(database, result.transactions);
+    assert.deepEqual(
+      projectionRows.map((row) => row.component),
+      ["base.sys", "base.epad", "peak.premium.sys", "peak.premium.epad"],
+    );
+    assert.equal(projectionRows.some((row) => row.component === "allocation.peak"), false);
+    assert.equal(projectionRows.find((row) => row.component === "base.sys")?.market_mw, 0.826613);
+    assert.equal(projectionRows.find((row) => row.component === "peak.premium.sys")?.market_mw, 0.106279);
   });
 
   it("missing q-factor value is rejected", () => {
@@ -272,7 +305,7 @@ describe("Forecast hedge feature", () => {
 
   it("missing peak q-factor value is rejected", () => {
     const database = createPocSeedData();
-    database.qFactorValues.delete("Q22-00");
+    database.qFactorValues.delete("Q23-00");
 
     assert.throws(
       () =>
@@ -334,7 +367,7 @@ describe("Forecast hedge feature", () => {
     );
   });
 
-  it("non-PeaksModern portfolio is rejected", () => {
+  it("non-Peaks.Modern portfolio is rejected", () => {
     assert.throws(
       () =>
         buildForecastHedgeProfile(createPocSeedData(), {
@@ -343,7 +376,7 @@ describe("Forecast hedge feature", () => {
           end_month: "2027-01",
           percentage: "50",
         }),
-      (error) => error instanceof ForecastHedgeError && /PeaksModern/.test(error.message),
+      (error) => error instanceof ForecastHedgeError && /Peaks.Modern/.test(error.message),
     );
   });
 

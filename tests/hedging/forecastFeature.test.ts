@@ -116,7 +116,7 @@ describe("Forecast feature", () => {
     );
   });
 
-  it("rejects non-PeaksModern portfolio updates", () => {
+  it("rejects non-Peaks.Modern portfolio updates", () => {
     assert.throws(
       () =>
         updateForecastRow(createPocSeedData(), {
@@ -125,7 +125,7 @@ describe("Forecast feature", () => {
           mwh: "10",
           peak_percent: "50",
         }),
-      /Forecast is only available for PeaksModern portfolios/,
+      /Forecast is only available for Peaks\.Modern portfolios/,
     );
   });
 });

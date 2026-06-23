@@ -9,6 +9,7 @@ import {
   listSeedMonths,
 } from "../../src/database/pocSeedData.ts";
 import { getPortfolioProductComponents, getQFactorValuesBySet } from "../../src/database/repository.ts";
+import { canonicalProductPackageName, isCustomerProjectionComponent, isInternalProjectionComponent, isMarketProjectionComponent } from "../../src/database/canonicalComponents.ts";
 
 describe("P0015 PoC seed data", () => {
   it("creates five customers, five portfolios and five product configurations", () => {
@@ -167,23 +168,71 @@ describe("P0015 PoC seed data", () => {
     }
   });
 
+  it("uses qfactor 0 and price 0 for allocation peak components", () => {
+    const database = createPocSeedData();
+    const allocationComponents = [...database.productConfigurationComponents.values()].filter(
+      (component) => component.component === "allocation.peak",
+    );
+
+    assert.ok(allocationComponents.length > 0);
+    for (const component of allocationComponents) {
+      assert.equal(component.component_category, "allocation");
+      assert.equal(component.hour_basis, "peak_h");
+      assert.equal(isMarketProjectionComponent(component), false);
+      assert.equal(isCustomerProjectionComponent(component), true);
+      assert.equal(isInternalProjectionComponent(component), true);
+
+      const price = [...database.priceComponents.values()].find(
+        (candidate) => candidate.productcomponent_id === component.productcomponent_id,
+      );
+      assert.equal(price?.price, 0);
+
+      const portfolioComponent = [...database.portfolioProductComponents.values()].find(
+        (candidate) => candidate.productcomponent_id === component.productcomponent_id,
+      );
+      assert.ok(portfolioComponent);
+      assert.ok(
+        getQFactorValuesBySet(database, portfolioComponent.qfactor_set_id).every((value) => value.value === 0),
+      );
+    }
+  });
+
+  it("stores canonical component categories and hour basis", () => {
+    const database = createPocSeedData();
+    const byComponent = new Map([...database.productConfigurationComponents.values()].map((component) => [component.component, component]));
+
+    assert.equal(byComponent.get("base.sys")?.component_category, "base");
+    assert.equal(byComponent.get("base.sys")?.hour_basis, "total_h");
+    assert.equal(byComponent.get("peak.premium.sys")?.component_category, "peak");
+    assert.equal(byComponent.get("peak.premium.sys")?.hour_basis, "peak_h");
+    assert.equal(byComponent.get("profile.sys")?.component_category, "profile");
+    assert.equal(byComponent.get("volume")?.component_category, "volume");
+  });
+
   it("distinguishes classic and modern peak component structures", () => {
     const database = createPocSeedData();
-    const peaksClassic = productComponentsByProductName(database, "PeaksClassic");
-    const peaksModern = productComponentsByProductName(database, "PeaksModern");
-    const profilesClassic = productComponentsByProductName(database, "ProfilesClassic");
-    const profilesModern = productComponentsByProductName(database, "ProfilesModern");
+    const peaksClassic = productComponentsByProductName(database, "Peaks.Classic");
+    const peaksModern = productComponentsByProductName(database, "Peaks.Modern");
+    const profilesClassic = productComponentsByProductName(database, "Profiles.Classic");
+    const profilesModern = productComponentsByProductName(database, "Profiles.Modern");
 
     assert.ok(peaksClassic.has("peak.classic.sys"));
     assert.ok(peaksClassic.has("peak.classic.epad"));
     assert.ok(!peaksClassic.has("peak.modern.sys"));
-    assert.ok(peaksModern.has("peak.modern.sys"));
-    assert.ok(peaksModern.has("peak.modern.epad"));
+    assert.ok(peaksModern.has("allocation.peak"));
+    assert.ok(peaksModern.has("peak.premium.sys"));
+    assert.ok(peaksModern.has("peak.premium.epad"));
+    assert.ok(!peaksModern.has("peak.modern.sys"));
     assert.ok(!peaksModern.has("peak.classic.sys"));
     assert.ok(profilesClassic.has("profile.sys"));
     assert.ok(profilesClassic.has("profile.epad"));
     assert.ok(profilesModern.has("profile.sys"));
     assert.ok(profilesModern.has("profile.epad"));
+  });
+
+  it("normalizes deprecated product package aliases", () => {
+    assert.equal(canonicalProductPackageName("PeaksModern"), "Peaks.Modern");
+    assert.equal(canonicalProductPackageName("PeaksClassic"), "Peaks.Classic");
   });
 
   it("creates deterministic price components for all product components", () => {

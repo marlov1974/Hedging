@@ -8,9 +8,10 @@ import {
 } from "../database/types.ts";
 import { getPortfolioProductComponents, getQFactorValuesBySet, insertCalloff, insertTransaction } from "../database/repository.ts";
 import { isPeaksModernPortfolio } from "./applicationConfig.ts";
+import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
 
-const PEAKS_MODERN_PRODUCT_NAME = "PeaksModern";
-const FORECAST_HEDGE_COMPONENTS = ["base.sys", "base.epad", "peak.modern.sys", "peak.modern.epad"];
+const PEAKS_MODERN_PRODUCT_NAME = "Peaks.Modern";
+const FORECAST_HEDGE_COMPONENTS = ["allocation.peak", "base.sys", "base.epad", "peak.premium.sys", "peak.premium.epad"];
 
 export class ForecastHedgeError extends Error {
   readonly code: "invalid_input" | "not_found";
@@ -47,6 +48,8 @@ export type ForecastHedgeProfileRow = {
   percentage: number;
   hedge_mwh: number;
   hedge_mw: number;
+  allocation_peak_mwh: number;
+  allocation_peak_mw: number;
   modern_peak_mwh: number;
   modern_peak_mw: number;
   calendar_total_h: number;
@@ -147,7 +150,11 @@ export function updateForecastHedgeProfileRow(input: {
   }
 
   const hedgeMwhRounded = roundMwh(hedgeMwh);
-  const modernPeakMwh = calculateModernPeakMwh(hedgeMwh, input.forecast_peak_pct, input.calendar_total_h, input.calendar_peak_h);
+  const baseMw = roundMw(hedgeMwh / input.calendar_total_h);
+  const allocationPeakMwh = roundMwh(hedgeMwh * input.forecast_peak_pct);
+  const allocationPeakMw = roundMw((hedgeMwh * input.forecast_peak_pct) / input.calendar_peak_h);
+  const modernPeakMw = roundMw(allocationPeakMw - baseMw);
+  const modernPeakMwh = roundMwh(modernPeakMw * input.calendar_peak_h);
 
   return {
     month: input.month,
@@ -156,9 +163,11 @@ export function updateForecastHedgeProfileRow(input: {
     calendar_total_h: input.calendar_total_h,
     calendar_peak_h: input.calendar_peak_h,
     hedge_mwh: hedgeMwhRounded,
-    hedge_mw: roundMw(hedgeMwh / input.calendar_total_h),
+    hedge_mw: baseMw,
+    allocation_peak_mwh: allocationPeakMwh,
+    allocation_peak_mw: allocationPeakMw,
     modern_peak_mwh: modernPeakMwh,
-    modern_peak_mw: roundMw(modernPeakMwh / input.calendar_peak_h),
+    modern_peak_mw: modernPeakMw,
     percentage: input.forecast_mwh === 0 ? 0 : roundDecimal(hedgeMwh / input.forecast_mwh),
   };
 }
@@ -211,7 +220,7 @@ export function createForecastHedgeCalloff(
   input: { portfolio_id: string; date: string; delivery_start_month: string; delivery_end_month: string; calloff_id?: string },
 ): Calloff {
   if (!isPeaksModernPortfolio(database, input.portfolio_id)) {
-    throw new ForecastHedgeError("invalid_input", "Hedge Forecast is only available for PeaksModern portfolios");
+    throw new ForecastHedgeError("invalid_input", "Hedge Forecast is only available for Peaks.Modern portfolios");
   }
 
   const product = getPeaksModernProduct(database);
@@ -261,7 +270,7 @@ function validateProfileInput(database: PrototypeDatabase, input: ForecastHedgeP
     throw new ForecastHedgeError("invalid_input", "portfolio_id is required");
   }
   if (!isPeaksModernPortfolio(database, portfolioId)) {
-    throw new ForecastHedgeError("invalid_input", "Hedge Forecast is only available for PeaksModern portfolios");
+    throw new ForecastHedgeError("invalid_input", "Hedge Forecast is only available for Peaks.Modern portfolios");
   }
 
   const startMonth = String(input.start_month ?? "").trim();
@@ -300,9 +309,11 @@ function getCalendar(database: PrototypeDatabase, month: string) {
 }
 
 function getPeaksModernProduct(database: PrototypeDatabase): ProductConfiguration {
-  const product = [...database.productConfigurations.values()].find((candidate) => candidate.name === PEAKS_MODERN_PRODUCT_NAME);
+  const product = [...database.productConfigurations.values()].find(
+    (candidate) => canonicalProductPackageName(candidate.name) === PEAKS_MODERN_PRODUCT_NAME,
+  );
   if (!product) {
-    throw new ForecastHedgeError("not_found", "missing PeaksModern product configuration");
+    throw new ForecastHedgeError("not_found", "missing Peaks.Modern product configuration");
   }
   return product;
 }
@@ -320,18 +331,18 @@ function getForecastHedgeComponents(database: PrototypeDatabase, productId: stri
 }
 
 function transactionMwForComponent(row: ForecastHedgeProfileRow, componentCode: string): number {
-  if (componentCode === "peak.modern.sys" || componentCode === "peak.modern.epad") {
+  if (componentCode === "allocation.peak") {
+    return row.allocation_peak_mw;
+  }
+  if (
+    componentCode === "peak.premium.sys" ||
+    componentCode === "peak.premium.epad" ||
+    componentCode === "peak.modern.sys" ||
+    componentCode === "peak.modern.epad"
+  ) {
     return row.modern_peak_mw;
   }
   return row.hedge_mw;
-}
-
-function calculateModernPeakMwh(baseMwh: number, forecastPeakPct: number, totalHours: number, peakHours: number): number {
-  return roundMwh(baseMwh * (forecastPeakPct - flatPeakShare(totalHours, peakHours)));
-}
-
-function flatPeakShare(totalHours: number, peakHours: number): number {
-  return peakHours / totalHours;
 }
 
 function getQFactorForComponentMonth(

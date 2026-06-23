@@ -19,7 +19,7 @@ describe("application configuration", () => {
     );
   });
 
-  it("returns PeaksModern features for PeaksModern portfolio", () => {
+  it("returns Peaks.Modern features for Peaks.Modern portfolio", () => {
     const config = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS02-0");
 
     assert.equal(config.variant_id, "peaks-modern");
@@ -29,11 +29,11 @@ describe("application configuration", () => {
     );
   });
 
-  it("detects PeaksModern portfolio", () => {
+  it("detects Peaks.Modern portfolio", () => {
     assert.equal(isPeaksModernPortfolio(createPocSeedData(), "CUS02-0"), true);
   });
 
-  it("PeaksModern does not show Baseloads-only features", () => {
+  it("Peaks.Modern does not show Baseloads-only features", () => {
     const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS02-0" });
 
     assert.doesNotMatch(html, /Buy Baseloads/);
@@ -42,7 +42,7 @@ describe("application configuration", () => {
     assert.match(html, /Forecast/);
   });
 
-  it("switching from Baseloads to PeaksModern resets unavailable active feature", () => {
+  it("switching from Baseloads to Peaks.Modern resets unavailable active feature", () => {
     const database = createPocSeedData();
 
     assert.equal(resolveActiveFeature(database, "CUS02-0", "buy-baseloads"), "portfolio-details");
@@ -55,11 +55,11 @@ describe("application configuration", () => {
     assert.equal(resolveActiveFeature(createPocSeedData(), "CUS02-0", "portfolio-details"), "portfolio-details");
   });
 
-  it("changes visible application context text and appearance for PeaksModern", () => {
+  it("changes visible application context text and appearance for Peaks.Modern", () => {
     const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS02-0" });
 
     assert.match(html, /variant-peaks-modern/);
-    assert.match(html, /PeaksModern application/);
-    assert.match(html, /PeaksModern forecast workspace/);
+    assert.match(html, /Peaks\.Modern application/);
+    assert.match(html, /Peaks\.Modern forecast workspace/);
   });
 });
