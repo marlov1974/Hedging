@@ -10,6 +10,8 @@ import {
   getDataViewerYears,
   parseDataViewerTableId,
   type DataViewerTableId,
+  type ModernCalloffRow,
+  type ModernTransactionRow,
   type RawCalloffRow,
   type RawTransactionRow,
 } from "./dataViewer.ts";
@@ -874,13 +876,24 @@ function renderDataViewer(database: PrototypeDatabase, selectedPortfolio: Portfo
   </div>`;
 }
 
-function renderDataViewerRows(tableId: DataViewerTableId, rows: RawCalloffRow[] | RawTransactionRow[]): string {
+function renderDataViewerRows(
+  tableId: DataViewerTableId,
+  rows: RawCalloffRow[] | RawTransactionRow[] | ModernCalloffRow[] | ModernTransactionRow[],
+): string {
   if (rows.length === 0) {
     return `<div class="notice"><p>No rows for selected portfolio and year.</p></div>`;
   }
 
   if (tableId === "calloffs") {
     return renderRawCalloffsTable(rows as RawCalloffRow[]);
+  }
+
+  if (tableId === "modern-calloffs") {
+    return renderModernCalloffsTable(rows as ModernCalloffRow[]);
+  }
+
+  if (tableId === "modern-transactions") {
+    return renderModernTransactionsTable(rows as ModernTransactionRow[]);
   }
 
   return renderRawTransactionsTable(rows as RawTransactionRow[]);
@@ -937,6 +950,72 @@ function renderRawTransactionsTable(rows: RawTransactionRow[]): string {
             <td>${escapeHtml(row.productcomponent_id)}</td>
             <td class="number">${formatNumber(row.mw)}</td>
             <td class="number">${formatNumber(row.q_factor)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
+}
+
+function renderModernCalloffsTable(rows: ModernCalloffRow[]): string {
+  return `<table>
+    <thead>
+      <tr>
+        <th>calloff_id</th>
+        <th>source_product_id</th>
+        <th>projected_product_package</th>
+        <th>portfolio_id</th>
+        <th>date</th>
+        <th>delivery_start_month</th>
+        <th>delivery_end_month</th>
+        <th>canonical_total_value</th>
+        <th>projected_total_value</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeHtml(row.calloff_id)}</td>
+            <td>${escapeHtml(row.source_product_id)}</td>
+            <td>${escapeHtml(row.projected_product_package)}</td>
+            <td>${escapeHtml(row.portfolio_id)}</td>
+            <td>${escapeHtml(row.date)}</td>
+            <td>${escapeHtml(row.delivery_start_month)}</td>
+            <td>${escapeHtml(row.delivery_end_month)}</td>
+            <td class="number">${formatNumber(row.canonical_total_value)}</td>
+            <td class="number">${formatNumber(row.projected_total_value)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
+}
+
+function renderModernTransactionsTable(rows: ModernTransactionRow[]): string {
+  return `<table>
+    <thead>
+      <tr>
+        <th>projected_transaction_id</th>
+        <th>calloff_id</th>
+        <th>period</th>
+        <th>component</th>
+        <th>mwh</th>
+        <th>price</th>
+        <th>value</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeHtml(row.projected_transaction_id)}</td>
+            <td>${escapeHtml(row.calloff_id)}</td>
+            <td>${escapeHtml(row.period)}</td>
+            <td>${escapeHtml(row.component)}</td>
+            <td class="number">${formatNumber(row.mwh)}</td>
+            <td class="number">${formatOptionalNumber(row.price)}</td>
+            <td class="number">${formatNumber(row.value)}</td>
           </tr>`,
         )
         .join("")}

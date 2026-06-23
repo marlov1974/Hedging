@@ -6,6 +6,8 @@ import {
   getDataViewerRows,
   getDataViewerTables,
   getDataViewerYears,
+  getModernCalloffsForPortfolioYear,
+  getModernTransactionsForPortfolioYear,
   getRawCalloffsForPortfolioYear,
   getRawTransactionsForPortfolioYear,
 } from "../../src/hedging/dataViewer.ts";
@@ -30,6 +32,8 @@ describe("Data Viewer", () => {
     assert.match(html, /name="selected_table"/);
     assert.match(html, /Calloffs/);
     assert.match(html, /Transactions/);
+    assert.match(html, /Modern Calloffs/);
+    assert.match(html, /Modern Transactions/);
   });
 
   it("renders year selector", () => {
@@ -47,7 +51,7 @@ describe("Data Viewer", () => {
   it("returns supported tables", () => {
     assert.deepEqual(
       getDataViewerTables().map((table) => table.table_id),
-      ["calloffs", "transactions"],
+      ["calloffs", "transactions", "modern-calloffs", "modern-transactions"],
     );
   });
 
@@ -102,6 +106,55 @@ describe("Data Viewer", () => {
     assert.equal(row?.q_factor, 1);
   });
 
+  it("Modern Calloffs projects Peaks.Classic calloffs as Peaks.Modern compatible rows", () => {
+    const rows = getModernCalloffsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
+
+    assert.deepEqual(
+      rows.map((row) => row.calloff_id),
+      ["CAL30"],
+    );
+    assert.equal(rows[0].source_product_id, "PRO01");
+    assert.equal(rows[0].projected_product_package, "Peaks.Modern");
+    assert.equal(rows[0].canonical_total_value, rows[0].projected_total_value);
+  });
+
+  it("Modern Transactions projects canonical rows into Base and Peak rows", () => {
+    const rows = getModernTransactionsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
+
+    assert.deepEqual(
+      rows.map((row) => row.component),
+      ["base", "peak"],
+    );
+    assert.deepEqual(
+      rows.map((row) => row.projected_transaction_id),
+      ["CAL30:modern.base", "CAL30:modern.peak"],
+    );
+    assert.equal(rows.every((row) => row.calloff_id === "CAL30"), true);
+    assert.equal(rows.some((row) => row.component === "allocation.peak.sys" as never), false);
+    assert.equal(rows.reduce((sum, row) => sum + row.value, 0), getModernCalloffsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027")[0].canonical_total_value);
+  });
+
+  it("renders Modern projection tables", () => {
+    const calloffsHtml = renderHedgingTool(createDataViewerDatabase(), {
+      portfolio_id: "CUS01-0",
+      feature_id: "data-viewer",
+      selected_table: "modern-calloffs",
+      selected_year: "2027",
+    });
+    const transactionsHtml = renderHedgingTool(createDataViewerDatabase(), {
+      portfolio_id: "CUS01-0",
+      feature_id: "data-viewer",
+      selected_table: "modern-transactions",
+      selected_year: "2027",
+    });
+
+    assert.match(calloffsHtml, /projected_product_package/);
+    assert.match(calloffsHtml, /Peaks.Modern/);
+    assert.match(transactionsHtml, /projected_transaction_id/);
+    assert.match(transactionsHtml, /CAL30:modern.base/);
+    assert.doesNotMatch(transactionsHtml, /allocation\.peak\.sys/);
+  });
+
   it("Calloffs table includes raw calloff columns", () => {
     const row = getRawCalloffsForPortfolioYear(createDataViewerDatabase(), "CUS00-0", "2027")[0];
 
@@ -154,6 +207,7 @@ describe("Data Viewer", () => {
 
   it("returns data-derived years plus seed years", () => {
     assert.deepEqual(getDataViewerYears(createDataViewerDatabase(), "CUS00-0", "calloffs"), ["2027", "2028", "2029"]);
+    assert.deepEqual(getDataViewerYears(createDataViewerDatabase(), "CUS01-0", "modern-transactions"), ["2027", "2028", "2029"]);
   });
 });
 
@@ -165,6 +219,14 @@ function createDataViewerDatabase() {
     product_id: "PRO00",
     portfolio_id: "CUS00-0",
     date: "2027-01-15",
+    delivery_start_month: "2027-01",
+    delivery_end_month: "2027-01",
+  });
+  insertCalloff(database, {
+    calloff_id: "CAL30",
+    product_id: "PRO01",
+    portfolio_id: "CUS01-0",
+    date: "2027-01-20",
     delivery_start_month: "2027-01",
     delivery_end_month: "2027-01",
   });
@@ -217,6 +279,23 @@ function createDataViewerDatabase() {
     mw: 12,
     q_factor: 1,
   });
+  for (const [index, component, mw, qFactor] of [
+    [0, "allocation.peak.sys", 0.15625, 0],
+    [1, "allocation.peak.epad", 0.15625, 0],
+    [2, "base.sys", 100 / 744, 1],
+    [3, "base.epad", 100 / 744, 1],
+    [4, "peak.sys", 0.15625 - 100 / 744, 1],
+    [5, "peak.epad", 0.15625 - 100 / 744, 1],
+  ] as const) {
+    insertTransaction(database, {
+      transaction_id: `CAL30-${String(index).padStart(3, "0")}`,
+      calloff_id: "CAL30",
+      month: "2027-01",
+      productcomponent_id: `PRO01:${component}`,
+      mw,
+      q_factor: qFactor,
+    });
+  }
 
   return database;
 }
