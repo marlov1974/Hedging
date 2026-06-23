@@ -193,6 +193,31 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
       text-transform: uppercase;
     }
     td.number { text-align: right; font-variant-numeric: tabular-nums; }
+    .forecast-feature { gap: 8px; }
+    .forecast-feature .compact-selector { margin-bottom: 0; }
+    .forecast-feature p { font-size: 12px; }
+    .forecast-table {
+      table-layout: fixed;
+      margin-top: 6px;
+    }
+    .forecast-table col.month { width: 78px; }
+    .forecast-table col.mwh { width: 112px; }
+    .forecast-table col.peak { width: 88px; }
+    .forecast-table th,
+    .forecast-table td {
+      padding: 4px 6px;
+      vertical-align: middle;
+    }
+    .forecast-table th { font-size: 11px; }
+    .forecast-table .month-cell {
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .forecast-table input {
+      min-height: 30px;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
     @media (max-width: 780px) {
       main { width: min(100% - 18px, 1180px); }
       .topbar { display: block; }
@@ -363,7 +388,7 @@ function renderPortfolioDetails(database: PrototypeDatabase, selectedPortfolio: 
     return `<div class="notice"><h2>Portfolio Details</h2><p>Portfolio details are not available.</p></div>`;
   }
 
-  return `<div class="stack">
+  return `<div class="stack forecast-feature">
     <h2>Portfolio Details</h2>
     <div class="details-grid">
       <div class="kv"><span>Portfolio</span><strong>${escapeHtml(details.portfolio_name)}</strong></div>
@@ -528,7 +553,12 @@ function renderForecastFeature(database: PrototypeDatabase, selectedPortfolio: P
 }
 
 function renderForecastTable(rows: ForecastDisplayRow[]): string {
-  return `<table>
+  return `<table class="forecast-table">
+    <colgroup>
+      <col class="month">
+      <col class="mwh">
+      <col class="peak">
+    </colgroup>
     <thead>
       <tr>
         <th>Month</th>
@@ -540,7 +570,7 @@ function renderForecastTable(rows: ForecastDisplayRow[]): string {
       ${rows
         .map(
           (row) => `<tr>
-            <td>
+            <td class="month-cell">
               ${escapeHtml(row.month)}
               <input type="hidden" name="month" value="${escapeHtml(row.month)}">
             </td>

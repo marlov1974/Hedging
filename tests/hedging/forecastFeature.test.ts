@@ -32,6 +32,17 @@ describe("Forecast feature", () => {
     assert.match(html, /<th>Peak %<\/th>/);
   });
 
+  it("uses compact forecast table columns without wrapping month cells", () => {
+    const html = renderHedgingTool(createPocSeedData(), {
+      portfolio_id: "PORT_PEAKS_MODERN",
+      feature_id: "forecast",
+    });
+
+    assert.match(html, /class="forecast-table"/);
+    assert.match(html, /<col class="mwh">/);
+    assert.match(html, /class="month-cell"/);
+  });
+
   it("shows 12 rows for a populated year", () => {
     const rows = getForecastRowsForYear(createPocSeedData(), "PORT_PEAKS_MODERN", "2028");
 
