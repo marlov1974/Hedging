@@ -12,7 +12,7 @@ Tests: range generation and invalid month/end-before-start through profile tests
 
 ### `buildForecastHedgeProfile`
 
-Purpose: Build monthly hedge rows from forecast MWh, selected percentage and calendar total hours.
+Purpose: Build monthly hedge rows from forecast MWh, forecast peak percentage, selected percentage, calendar total hours and calendar peak hours.
 Inputs: database, portfolio id, start month, end month, percentage.
 Outputs: profile input summary and rows.
 Side effects: none.
@@ -21,18 +21,18 @@ Tests: row count, hedge MWh formula, hedge MW formula, missing forecast/calendar
 ### `updateForecastHedgeProfileRow`
 
 Purpose: Recalculate a single row after Hedge MWh editing.
-Inputs: month, forecast MWh, calendar total hours, Hedge MWh.
-Outputs: derived Hedge MW and Hedge % values.
+Inputs: month, forecast MWh, forecast peak percentage, calendar total hours, calendar peak hours, Hedge MWh.
+Outputs: derived base Hedge MW, peak Hedge MWh, peak Hedge MW and Hedge % values.
 Side effects: none.
 Tests: editing Hedge MWh recalculates Hedge MW and Hedge %.
 
 ### `acceptForecastHedgeProfile`
 
-Purpose: Validate posted profile rows and create one calloff plus base transactions.
+Purpose: Validate posted profile rows and create one calloff plus base and peak transactions.
 Inputs: database, portfolio id, start month, end month, percentage, rows and optional deterministic date/calloff id.
 Outputs: calloff and transactions.
 Side effects: inserts calloff and transactions.
-Tests: creates exactly one calloff, two transactions per month, q_factor values, validation failures.
+Tests: creates exactly one calloff, four transactions per month, q_factor values, validation failures.
 
 ### `createForecastHedgeCalloff`
 
@@ -44,7 +44,7 @@ Tests: covered by accept behavior.
 
 ### `createForecastHedgeTransactions`
 
-Purpose: Insert base.sys and base.epad transactions for each profile row.
+Purpose: Insert base.sys, base.epad, peak.modern.sys and peak.modern.epad transactions for each profile row.
 Inputs: database, calloff and profile rows.
 Outputs: transactions.
 Side effects: inserts transactions.

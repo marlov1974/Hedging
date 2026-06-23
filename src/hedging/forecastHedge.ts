@@ -10,7 +10,7 @@ import { getPortfolioProductComponents, getQFactorValuesBySet, insertCalloff, in
 import { isPeaksModernPortfolio } from "./applicationConfig.ts";
 
 const PEAKS_MODERN_PRODUCT_NAME = "PeaksModern";
-const BASE_COMPONENTS = ["base.sys", "base.epad"];
+const FORECAST_HEDGE_COMPONENTS = ["base.sys", "base.epad", "peak.modern.sys", "peak.modern.epad"];
 
 export class ForecastHedgeError extends Error {
   readonly code: "invalid_input" | "not_found";
@@ -43,10 +43,14 @@ export type ForecastHedgeAcceptInput = ForecastHedgeProfileInput & {
 export type ForecastHedgeProfileRow = {
   month: string;
   forecast_mwh: number;
+  forecast_peak_pct: number;
   percentage: number;
   hedge_mwh: number;
   hedge_mw: number;
+  peak_hedge_mwh: number;
+  peak_hedge_mw: number;
   calendar_total_h: number;
+  calendar_peak_h: number;
 };
 
 export type ForecastHedgeProfile = {
@@ -108,7 +112,9 @@ export function buildForecastHedgeProfile(
       return updateForecastHedgeProfileRow({
         month,
         forecast_mwh: forecast.mwh,
+        forecast_peak_pct: forecast.peak_pct,
         calendar_total_h: calendar.total_h,
+        calendar_peak_h: calendar.peak_h,
         hedge_mwh: forecast.mwh * normalized.percentage,
       });
     }),
@@ -118,7 +124,9 @@ export function buildForecastHedgeProfile(
 export function updateForecastHedgeProfileRow(input: {
   month: string;
   forecast_mwh: number;
+  forecast_peak_pct: number;
   calendar_total_h: number;
+  calendar_peak_h: number;
   hedge_mwh: string | number | undefined;
 }): ForecastHedgeProfileRow {
   const hedgeMwh = parseRequiredNumber(input.hedge_mwh, "Hedge MWh");
@@ -131,13 +139,26 @@ export function updateForecastHedgeProfileRow(input: {
   if (input.calendar_total_h <= 0) {
     throw new ForecastHedgeError("invalid_input", "calendar total_h must be greater than zero");
   }
+  if (input.calendar_peak_h <= 0) {
+    throw new ForecastHedgeError("invalid_input", "calendar peak_h must be greater than zero");
+  }
+  if (input.forecast_peak_pct < 0) {
+    throw new ForecastHedgeError("invalid_input", "forecast_peak_pct must be greater than or equal to 0");
+  }
+
+  const hedgeMwhRounded = roundMwh(hedgeMwh);
+  const peakHedgeMwh = roundMwh(hedgeMwh * input.forecast_peak_pct);
 
   return {
     month: input.month,
     forecast_mwh: input.forecast_mwh,
+    forecast_peak_pct: input.forecast_peak_pct,
     calendar_total_h: input.calendar_total_h,
-    hedge_mwh: roundMwh(hedgeMwh),
+    calendar_peak_h: input.calendar_peak_h,
+    hedge_mwh: hedgeMwhRounded,
     hedge_mw: roundMw(hedgeMwh / input.calendar_total_h),
+    peak_hedge_mwh: peakHedgeMwh,
+    peak_hedge_mw: roundMw(peakHedgeMwh / input.calendar_peak_h),
     percentage: input.forecast_mwh === 0 ? 0 : roundDecimal(hedgeMwh / input.forecast_mwh),
   };
 }
@@ -165,7 +186,9 @@ export function acceptForecastHedgeProfile(
       return updateForecastHedgeProfileRow({
         month,
         forecast_mwh: forecast.mwh,
+        forecast_peak_pct: forecast.peak_pct,
         calendar_total_h: calendar.total_h,
+        calendar_peak_h: calendar.peak_h,
         hedge_mwh: postedRow.hedge_mwh,
       });
     }),
@@ -208,7 +231,7 @@ export function createForecastHedgeTransactions(
   database: PrototypeDatabase,
   input: { calloff: Calloff; rows: ForecastHedgeProfileRow[] },
 ): CustomerTransaction[] {
-  const components = getBaseComponents(database, input.calloff.product_id);
+  const components = getForecastHedgeComponents(database, input.calloff.product_id);
   const transactions: CustomerTransaction[] = [];
 
   for (const row of input.rows) {
@@ -221,7 +244,7 @@ export function createForecastHedgeTransactions(
             calloff_id: input.calloff.calloff_id,
             month: row.month,
             productcomponent_id: component.productcomponent_id,
-            mw: row.hedge_mw,
+            mw: transactionMwForComponent(row, component.component),
             q_factor: qFactor,
           }),
         ),
@@ -284,8 +307,8 @@ function getPeaksModernProduct(database: PrototypeDatabase): ProductConfiguratio
   return product;
 }
 
-function getBaseComponents(database: PrototypeDatabase, productId: string): ProductConfigurationComponent[] {
-  return BASE_COMPONENTS.map((componentCode) => {
+function getForecastHedgeComponents(database: PrototypeDatabase, productId: string): ProductConfigurationComponent[] {
+  return FORECAST_HEDGE_COMPONENTS.map((componentCode) => {
     const component = [...database.productConfigurationComponents.values()].find(
       (candidate) => candidate.product_id === productId && candidate.component === componentCode,
     );
@@ -294,6 +317,13 @@ function getBaseComponents(database: PrototypeDatabase, productId: string): Prod
     }
     return component;
   });
+}
+
+function transactionMwForComponent(row: ForecastHedgeProfileRow, componentCode: string): number {
+  if (componentCode === "peak.modern.sys" || componentCode === "peak.modern.epad") {
+    return row.peak_hedge_mw;
+  }
+  return row.hedge_mw;
 }
 
 function getQFactorForComponentMonth(

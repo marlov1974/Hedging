@@ -164,16 +164,16 @@ peak.modern.sys
 peak.modern.epad
 ```
 
-This feature should create hedge transactions for the base components first:
+Follow-up correction: this feature must create hedge transactions for all PeaksModern components:
 
 ```text
 base.sys
 base.epad
+peak.modern.sys
+peak.modern.epad
 ```
 
-If the existing design can also derive peak.modern component transactions from peak_pct and q-factor, include them only if this is already clear and tested. Otherwise leave peak.modern transactions for a later package.
-
-For this package, prioritize a correct base hedge profile from forecast percentage.
+Base component volume is `forecast_mwh * percentage`. Peak component volume is `forecast_mwh * percentage * forecast_peak_pct`.
 
 ## Transaction creation
 
@@ -188,7 +188,9 @@ mw
 q_factor
 ```
 
-`mw` should be the edited hedge MW for that month.
+For base components, `mw` should be the edited hedge MWh divided by calendar total hours.
+
+For peak components, `mw` should be the edited hedge MWh times forecast peak percentage divided by calendar peak hours.
 
 `q_factor` should be read from the PortfolioProductComponent/QFactorSet/QFactorValue for the selected portfolio, product component and month.
 
@@ -258,8 +260,8 @@ Add tests for:
 6. hedge_mw equals hedge_mwh / calendar.total_h,
 7. editing Hedge MWh recalculates Hedge MW and Hedge %,
 8. accept creates exactly one Calloff,
-9. accept creates two transactions per month for base.sys and base.epad,
-10. q_factor is read from q-factor values,
+9. accept creates four transactions per month for base.sys, base.epad, peak.modern.sys and peak.modern.epad,
+10. q_factor is read from separate component q-factor values,
 11. missing forecast row is rejected,
 12. missing calendar row is rejected,
 13. invalid percentage is rejected,
