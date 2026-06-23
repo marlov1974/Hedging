@@ -25,19 +25,42 @@ describe("Data Viewer", () => {
     assert.equal(peaksModern.some((feature) => feature.feature_id === "data-viewer" && feature.available), true);
   });
 
-  it("renders table selector", () => {
+  it("renders Canonical table selector by default", () => {
     const html = renderHedgingTool(createDataViewerDatabase(), {
       portfolio_id: "CUS00-0",
       feature_id: "data-viewer",
     });
 
+    assert.match(html, /Data Viewer perspective/);
     assert.match(html, /name="selected_table"/);
     assert.match(html, /Canonical Raw Calloffs/);
     assert.match(html, /Canonical Raw Transactions/);
-    assert.match(html, /Baseloads Projected Transactions/);
-    assert.match(html, /Classic Projected Calloffs/);
-    assert.match(html, /Modern Projected Calloffs/);
-    assert.match(html, /Modern Projected Transactions/);
+    assert.doesNotMatch(html, /Baseloads Projected Transactions/);
+    assert.doesNotMatch(html, /Classic Projected Calloffs/);
+    assert.doesNotMatch(html, /Modern Projected Calloffs/);
+  });
+
+  it("renders projected table selector options for selected perspective views", () => {
+    const baseloadsHtml = renderHedgingTool(createDataViewerDatabase(), {
+      portfolio_id: "CUS00-0",
+      feature_id: "data-viewer",
+      selected_view: "baseloads",
+    });
+    const classicHtml = renderHedgingTool(createDataViewerDatabase(), {
+      portfolio_id: "CUS00-0",
+      feature_id: "data-viewer",
+      selected_view: "classic",
+    });
+    const modernHtml = renderHedgingTool(createDataViewerDatabase(), {
+      portfolio_id: "CUS00-0",
+      feature_id: "data-viewer",
+      selected_view: "modern",
+    });
+
+    assert.match(baseloadsHtml, /Baseloads Projected Transactions/);
+    assert.match(classicHtml, /Classic Projected Calloffs/);
+    assert.match(modernHtml, /Modern Projected Calloffs/);
+    assert.match(modernHtml, /Modern Projected Transactions/);
   });
 
   it("renders year selector", () => {
@@ -216,15 +239,19 @@ describe("Data Viewer", () => {
   });
 
   it("renders Modern projection tables", () => {
-    const calloffsHtml = renderHedgingTool(createDataViewerDatabase(), {
-      portfolio_id: "CUS01-0",
+    const database = createDataViewerDatabase();
+    database.calloffs.get("CAL30")!.portfolio_id = "CUS00-0";
+    const calloffsHtml = renderHedgingTool(database, {
+      portfolio_id: "CUS00-0",
       feature_id: "data-viewer",
+      selected_view: "modern",
       selected_table: "modern-projected-calloffs",
       selected_year: "2027",
     });
-    const transactionsHtml = renderHedgingTool(createDataViewerDatabase(), {
-      portfolio_id: "CUS01-0",
+    const transactionsHtml = renderHedgingTool(database, {
+      portfolio_id: "CUS00-0",
       feature_id: "data-viewer",
+      selected_view: "modern",
       selected_table: "modern-projected-transactions",
       selected_year: "2027",
     });
@@ -237,15 +264,19 @@ describe("Data Viewer", () => {
   });
 
   it("renders Baseloads and Classic projection tables", () => {
+    const database = createDataViewerDatabase();
+    database.calloffs.get("CAL30")!.portfolio_id = "CUS00-0";
     const baseloadsHtml = renderHedgingTool(createDataViewerDatabase(), {
       portfolio_id: "CUS00-0",
       feature_id: "data-viewer",
+      selected_view: "baseloads",
       selected_table: "baseloads-projected-transactions",
       selected_year: "2027",
     });
-    const classicHtml = renderHedgingTool(createDataViewerDatabase(), {
-      portfolio_id: "CUS01-0",
+    const classicHtml = renderHedgingTool(database, {
+      portfolio_id: "CUS00-0",
       feature_id: "data-viewer",
+      selected_view: "classic",
       selected_table: "classic-projected-calloffs",
       selected_year: "2027",
     });
@@ -277,25 +308,17 @@ describe("Data Viewer", () => {
     assert.match(html, /No rows for selected portfolio and year/);
   });
 
-  it("switching selected portfolio changes visible rows", () => {
+  it("requested portfolio does not switch the visible Data Viewer dataset", () => {
     const database = createDataViewerDatabase();
-    const baseloadsHtml = renderHedgingTool(database, {
-      portfolio_id: "CUS00-0",
-      feature_id: "data-viewer",
-      selected_table: "calloffs",
-      selected_year: "2027",
-    });
-    const peaksHtml = renderHedgingTool(database, {
+    const html = renderHedgingTool(database, {
       portfolio_id: "CUS02-0",
       feature_id: "data-viewer",
       selected_table: "calloffs",
       selected_year: "2027",
     });
 
-    assert.match(baseloadsHtml, /CAL10/);
-    assert.doesNotMatch(baseloadsHtml, /CAL20/);
-    assert.match(peaksHtml, /CAL20/);
-    assert.doesNotMatch(peaksHtml, /CAL10/);
+    assert.match(html, /CAL10/);
+    assert.doesNotMatch(html, /CAL20/);
   });
 
   it("no rows from other portfolios leak into the table", () => {

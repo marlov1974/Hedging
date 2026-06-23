@@ -4,10 +4,12 @@ import { canonicalProductPackageName } from "../database/canonicalComponents.ts"
 
 export type HedgingFeatureId =
   | "buy-baseloads"
+  | "calloff-list"
   | "baseloads-calloff-list"
   | "legacy-calloff-list"
   | "modern-calloff-transaction-list"
   | "portfolio-details"
+  | "position"
   | "position-report"
   | "financial-settlement"
   | "forecast"
@@ -21,6 +23,8 @@ export type PerspectiveOption = {
   perspective_id: PerspectiveId;
   label: string;
 };
+
+export type DataViewerPerspectiveId = PerspectiveId | "canonical";
 
 export type HedgingFeature = {
   feature_id: HedgingFeatureId;
@@ -46,6 +50,10 @@ export function getPerspectiveOptions(): PerspectiveOption[] {
   ];
 }
 
+export function getDataViewerPerspectiveOptions(): Array<{ perspective_id: DataViewerPerspectiveId; label: string }> {
+  return [{ perspective_id: "canonical", label: "Canonical" }, ...getPerspectiveOptions()];
+}
+
 export function parsePerspectiveId(value: string | undefined, fallback: PerspectiveId = "baseloads"): PerspectiveId {
   const normalized = String(value ?? "").trim();
   return getPerspectiveOptions().some((option) => option.perspective_id === normalized)
@@ -69,7 +77,7 @@ export function defaultPerspectiveForPortfolio(database: PrototypeDatabase, port
 export function getApplicationFeaturesForPortfolio(
   database: PrototypeDatabase,
   portfolioId?: string,
-  requestedPerspectiveId?: string,
+  _requestedPerspectiveId?: string,
 ): ApplicationConfig {
   const selectedPortfolio = portfolioId ? database.portfolios.get(portfolioId) : undefined;
   if (!selectedPortfolio) {
@@ -83,58 +91,22 @@ export function getApplicationFeaturesForPortfolio(
     };
   }
 
-  const perspectiveId = parsePerspectiveId(requestedPerspectiveId, defaultPerspectiveForPortfolio(database, selectedPortfolio.portfolio_id));
-  if (perspectiveId === "baseloads") {
-    return {
-      variant_id: "baseloads",
-      perspective_id: perspectiveId,
-      title: "Baseloads perspective",
-      context:
-        "Demo perspective over the selected portfolio. In production, product package contracts would control customer-visible features.",
-      accent: "baseloads",
-      features: [
-        feature("portfolio-details", "Portfolio Details"),
-        feature("forecast", "Forecast - Baseloads"),
-        feature("buy-baseloads", "Hedge Baseload"),
-        feature("baseloads-calloff-list", "Calloff List - Baseloads"),
-        feature("position-report", "Position Report - Baseloads"),
-        feature("financial-settlement", "Financial Settlement"),
-        feature("data-viewer", "Data Viewer"),
-      ],
-    };
-  }
-
-  if (perspectiveId === "modern") {
-    return {
-      variant_id: "peaks-modern",
-      perspective_id: perspectiveId,
-      title: "Modern perspective",
-      context: "Modern projection over the selected portfolio with base and peak views from canonical rows.",
-      accent: "peaks-modern",
-      features: [
-        feature("portfolio-details", "Portfolio Details"),
-        feature("forecast", "Forecast - Modern"),
-        feature("forecast-hedge", "Hedge Forecast - Modern"),
-        feature("modern-calloff-transaction-list", "Calloff List - Modern"),
-        feature("position-report", "Position Report - Modern"),
-        feature("data-viewer", "Data Viewer"),
-      ],
-    };
-  }
-
   return {
-    variant_id: "peaks-classic",
-    perspective_id: perspectiveId,
-    title: "Classic perspective",
-    context: "Classic Peak/Offpeak projection over the selected portfolio from canonical rows.",
-    accent: "peaks-classic",
+    variant_id: "baseloads",
+    perspective_id: "baseloads",
+    title: "Universal model demo",
+    context:
+      "This demo uses one canonical portfolio. Each feature can show the same data from different perspectives: Baseloads, Classic and Modern.",
+    accent: "neutral",
     features: [
       feature("portfolio-details", "Portfolio Details"),
-      feature("forecast", "Forecast - Classic"),
-      feature("forecast-hedge", "Hedge Forecast - Classic"),
-      feature("legacy-calloff-list", "Calloff List - Classic"),
-      feature("position-report", "Position Report - Classic"),
+      feature("forecast", "Forecast"),
+      feature("forecast-hedge", "Hedge Forecast"),
+      feature("calloff-list", "Calloff List"),
+      feature("position-report", "Position Report"),
+      feature("position", "Position"),
       feature("data-viewer", "Data Viewer"),
+      feature("buy-baseloads", "Hedge Baseload"),
     ],
   };
 }

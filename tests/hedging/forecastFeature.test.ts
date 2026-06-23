@@ -65,6 +65,20 @@ describe("Forecast feature", () => {
     assert.equal(row.modern_peak_mwh, 108.529412);
   });
 
+  it("renders editable forecast input values with at most three decimals", () => {
+    const html = renderHedgingTool(createPocSeedData(), {
+      portfolio_id: "CUS02-0",
+      feature_id: "forecast",
+    });
+
+    const values = [...html.matchAll(/name="modern_(?:base|peak)_mwh_[^"]+"[^>]*value="([^"]+)"/g)].map((match) => match[1]);
+
+    assert.ok(values.length > 0);
+    assert.equal(values.every((value) => decimalPlaces(value) <= 3), true);
+    assert.match(html, /value="1121\.471"/);
+    assert.doesNotMatch(html, /value="1121\.470588"/);
+  });
+
   it("editing Modern Base MWh and Modern Peak MWh updates stored forecast data", () => {
     const database = createPocSeedData();
     const calendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
@@ -151,3 +165,7 @@ describe("Forecast feature", () => {
     assert.ok(Math.abs(row.modern_peak_mwh) < 0.00001);
   });
 });
+
+function decimalPlaces(value: string): number {
+  return value.includes(".") ? value.split(".")[1].length : 0;
+}

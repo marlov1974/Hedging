@@ -14,13 +14,13 @@ import { getLegacyCalloffListRows, projectLegacyCalloffMonth } from "../../src/h
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 
 describe("Peaks.Classic Legacy Calloff List", () => {
-  it("is available for Peaks.Classic", () => {
+  it("is available through the generic Calloff List feature", () => {
     const features = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS01-0").features;
 
-    assert.equal(features.some((feature) => feature.feature_id === "legacy-calloff-list" && feature.available), true);
+    assert.equal(features.some((feature) => feature.feature_id === "calloff-list" && feature.available), true);
   });
 
-  it("is not shown for Peaks.Modern", () => {
+  it("does not expose the legacy feature id in the main feature list", () => {
     const features = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS02-0").features;
 
     assert.equal(features.some((feature) => feature.feature_id === "legacy-calloff-list"), false);

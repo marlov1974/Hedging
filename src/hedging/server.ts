@@ -235,6 +235,7 @@ function readStateFromUrl(url: URL) {
     selected_year: url.searchParams.get("selected_year") ?? undefined,
     selected_month: url.searchParams.get("selected_month") ?? undefined,
     selected_table: url.searchParams.get("selected_table") ?? undefined,
+    selected_view: url.searchParams.get("selected_view") ?? undefined,
   };
 }
 

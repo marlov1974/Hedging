@@ -15,6 +15,7 @@ docs/data-model/customer_product_database_structure.md
 docs/data-model/customer_transaction_list.md
 docs/data-model/poc_seed_data.md
 docs/data-model/transaction_model.md
+docs/functions/hedging_tool_view.md
 docs/hedging/application_configurations.md
 docs/hedging/baseloads_calloff_list.md
 docs/hedging/canonical_component_model.md
@@ -22,6 +23,7 @@ docs/hedging/classic_projection_peak_offpeak_rules.md
 docs/hedging/classic_projection_price_rules.md
 docs/hedging/component_categories_and_projection_listeners.md
 docs/hedging/data_viewer.md
+docs/hedging/feature_level_perspective_switching.md
 docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
 docs/hedging/modern_projected_calloffs.md
@@ -42,6 +44,7 @@ docs/hedging/portfolio_hedging_product_family.md
 docs/hedging/position_report.md
 docs/hedging/product_packages_and_feature_sets.md
 docs/hedging/projection_mw_and_price_rules.md
+docs/hedging/single_demo_portfolio.md
 docs/hedging/universal_model_demo_tool.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
@@ -162,6 +165,10 @@ requirements/package-runs/P0034/design.md
 requirements/package-runs/P0034/findings.md
 requirements/package-runs/P0034/functions.md
 requirements/package-runs/P0034/review.md
+requirements/package-runs/P0035/design.md
+requirements/package-runs/P0035/findings.md
+requirements/package-runs/P0035/functions.md
+requirements/package-runs/P0035/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -198,6 +205,7 @@ requirements/packages/P0031-data-viewer-modern-projection-views.md
 requirements/packages/P0032-modern-projected-transaction-model.md
 requirements/packages/P0033-peaks-modern-forecast-and-hedge-flow-use-modern-projection.md
 requirements/packages/P0034-universal-model-perspective-features.md
+requirements/packages/P0035-single-portfolio-feature-perspective-tabs.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts

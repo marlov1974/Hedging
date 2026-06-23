@@ -2,9 +2,11 @@ import type { PrototypeDatabase } from "../database/schema.ts";
 import type { BaseloadsPurchaseResult } from "../purchase/baseloadsPurchase.ts";
 import { getBaseloadsPurchasePeriods } from "../purchase/periodOptions.ts";
 import {
+  getDataViewerPerspectiveOptions,
   getApplicationFeaturesForPortfolio,
   getPerspectiveOptions,
   resolveActiveFeature,
+  type DataViewerPerspectiveId,
   type PerspectiveId,
 } from "./applicationConfig.ts";
 import { getBaseloadsCalloffListRows } from "./calloffList.ts";
@@ -36,6 +38,7 @@ import { getPortfolioOptions, type HedgingFeatureId, type PortfolioOption } from
 export type HedgingToolState = {
   portfolio_id?: string;
   perspective_id?: PerspectiveId;
+  selected_view?: string;
   feature_id?: HedgingFeatureId;
   mw?: string;
   selected_period_id?: string;
@@ -54,13 +57,19 @@ export type HedgingToolState = {
   purchase_result?: BaseloadsPurchaseResult;
 };
 
+const DEMO_PORTFOLIO_ID = "CUS00-0";
+
 export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToolState = {}): string {
   const portfolios = getPortfolioOptions(database);
-  const selectedPortfolio = portfolios.find((portfolio) => portfolio.portfolio_id === state.portfolio_id);
-  const applicationConfig = getApplicationFeaturesForPortfolio(database, selectedPortfolio?.portfolio_id, state.perspective_id);
-  const activePerspective = applicationConfig.perspective_id === "none" ? undefined : applicationConfig.perspective_id;
+  const selectedPortfolio = portfolios.find((portfolio) => portfolio.portfolio_id === getDemoPortfolioId(database));
+  const applicationConfig = getApplicationFeaturesForPortfolio(database, selectedPortfolio?.portfolio_id);
   const features = applicationConfig.features;
-  const activeFeature = resolveActiveFeature(database, selectedPortfolio?.portfolio_id, state.feature_id, activePerspective);
+  const requestedFeature = normalizeFeatureId(state.feature_id);
+  const activeFeature =
+    requestedFeature === "financial-settlement"
+      ? "financial-settlement"
+      : resolveActiveFeature(database, selectedPortfolio?.portfolio_id, requestedFeature);
+  const featurePerspective = state.perspective_id ?? perspectiveForFeatureAlias(state.feature_id);
 
   return `<!doctype html>
 <html lang="en">
@@ -182,6 +191,32 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
       gap: 10px;
       align-items: end;
     }
+    .demo-summary {
+      display: grid;
+      gap: 4px;
+      max-width: 760px;
+    }
+    .demo-summary strong { font-size: 15px; }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tab {
+      min-height: 34px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      padding: 7px 12px;
+      text-decoration: none;
+      font-weight: 700;
+      color: var(--text);
+      background: #fff;
+    }
+    .tab.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
     .details-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -284,16 +319,14 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
 <body class="variant-${escapeHtml(applicationConfig.accent)}">
   <main>
     <section class="topbar">
-      ${renderPortfolioSelector(portfolios, selectedPortfolio, activeFeature, activePerspective)}
-      ${renderPerspectiveSelector(selectedPortfolio, activeFeature, activePerspective)}
-      <div class="app-context"><strong>${escapeHtml(applicationConfig.title)}</strong><span>${escapeHtml(applicationConfig.context)}</span></div>
+      ${renderDemoSummary(selectedPortfolio, applicationConfig.context)}
     </section>
     <section class="layout">
       <aside class="panel stack">
-        ${renderFeatureNav(features, selectedPortfolio, activeFeature, activePerspective)}
+        ${renderFeatureNav(features, selectedPortfolio, activeFeature)}
       </aside>
       <section class="panel stack">
-        ${renderActiveFeature(database, selectedPortfolio, activeFeature, state, activePerspective)}
+        ${renderActiveFeature(database, selectedPortfolio, activeFeature, { ...state, perspective_id: featurePerspective })}
       </section>
     </section>
   </main>
@@ -301,58 +334,21 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
 </html>`;
 }
 
-function renderPortfolioSelector(
-  portfolios: PortfolioOption[],
-  selectedPortfolio: PortfolioOption | undefined,
-  activeFeature: HedgingFeatureId,
-  perspectiveId: PerspectiveId | undefined,
-): string {
-  return `<form method="get" action="/hedging" class="compact-selector">
-    <input type="hidden" name="feature_id" value="${escapeHtml(activeFeature)}">
-    ${renderPerspectiveHidden(perspectiveId)}
-    <label>
-      Portfolio
-      <select name="portfolio_id" onchange="this.form.submit()">
-        <option value="">Select portfolio</option>
-        ${portfolios
-          .map((portfolio) => `<option value="${escapeHtml(portfolio.portfolio_id)}"${portfolio.portfolio_id === selectedPortfolio?.portfolio_id ? " selected" : ""}>${escapeHtml(portfolio.portfolio_name)}</option>`)
-          .join("")}
-      </select>
-    </label>
-  </form>`;
+export function getDemoPortfolioId(database: PrototypeDatabase): string {
+  return database.portfolios.has(DEMO_PORTFOLIO_ID) ? DEMO_PORTFOLIO_ID : [...database.portfolios.keys()].sort()[0] ?? "";
 }
 
-function renderPerspectiveSelector(
-  selectedPortfolio: PortfolioOption | undefined,
-  activeFeature: HedgingFeatureId,
-  perspectiveId: PerspectiveId | undefined,
-): string {
-  if (!selectedPortfolio || !perspectiveId) {
-    return "";
-  }
-
-  return `<form method="get" action="/hedging" class="compact-selector">
-    <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
-    <input type="hidden" name="feature_id" value="${escapeHtml(activeFeature)}">
-    <label>
-      Perspective
-      <select name="perspective_id" onchange="this.form.submit()">
-        ${getPerspectiveOptions()
-          .map(
-            (perspective) =>
-              `<option value="${escapeHtml(perspective.perspective_id)}"${perspective.perspective_id === perspectiveId ? " selected" : ""}>${escapeHtml(perspective.label)}</option>`,
-          )
-          .join("")}
-      </select>
-    </label>
-  </form>`;
+function renderDemoSummary(selectedPortfolio: PortfolioOption | undefined, context: string): string {
+  return `<div class="demo-summary">
+    <strong>${escapeHtml(selectedPortfolio?.portfolio_name ?? "Demo portfolio")}</strong>
+    <p>${escapeHtml(context)}</p>
+  </div>`;
 }
 
 function renderFeatureNav(
   features: ReturnType<typeof getAvailableFeaturesForPortfolio>,
   selectedPortfolio: PortfolioOption | undefined,
   activeFeature: HedgingFeatureId,
-  perspectiveId: PerspectiveId | undefined,
 ): string {
   if (!selectedPortfolio) {
     return "";
@@ -361,7 +357,7 @@ function renderFeatureNav(
   return `<nav class="nav" aria-label="Feature navigation">
     ${features
       .map((feature) => {
-        const href = `/hedging?portfolio_id=${encodeURIComponent(selectedPortfolio.portfolio_id)}&perspective_id=${encodeURIComponent(perspectiveId ?? "")}&feature_id=${encodeURIComponent(feature.feature_id)}`;
+        const href = `/hedging?portfolio_id=${encodeURIComponent(selectedPortfolio.portfolio_id)}&feature_id=${encodeURIComponent(feature.feature_id)}`;
         const state = feature.feature_id === activeFeature ? " active" : "";
         return `<a class="nav-link${state}" href="${href}">${escapeHtml(feature.label)}</a>`;
       })
@@ -374,21 +370,20 @@ function renderActiveFeature(
   selectedPortfolio: PortfolioOption | undefined,
   activeFeature: HedgingFeatureId,
   state: HedgingToolState,
-  perspectiveId: PerspectiveId | undefined,
 ): string {
   if (!selectedPortfolio) {
     return `<div class="notice"><h2>Select a portfolio</h2><p>Select a portfolio first to open hedging features.</p></div>`;
   }
 
-  const feature = getApplicationFeaturesForPortfolio(database, selectedPortfolio.portfolio_id, perspectiveId).features.find(
+  const feature = getApplicationFeaturesForPortfolio(database, selectedPortfolio.portfolio_id).features.find(
     (candidate) => candidate.feature_id === activeFeature,
   );
-  if (!feature?.available) {
+  if (!feature?.available && activeFeature !== "financial-settlement") {
     return `<div class="notice"><h2>${escapeHtml(feature?.label ?? "Feature")}</h2><p>${escapeHtml(feature?.unavailable_reason ?? "Feature is not available.")}</p></div>`;
   }
 
-  if (activeFeature === "baseloads-calloff-list") {
-    return renderCalloffList(database, selectedPortfolio);
+  if (activeFeature === "calloff-list" || activeFeature === "baseloads-calloff-list") {
+    return renderCalloffList(database, selectedPortfolio, state.perspective_id);
   }
 
   if (activeFeature === "legacy-calloff-list") {
@@ -404,29 +399,33 @@ function renderActiveFeature(
   }
 
   if (activeFeature === "position-report") {
-    return renderPositionReport(database, selectedPortfolio, state, perspectiveId);
+    return renderPositionReport(database, selectedPortfolio, state, state.perspective_id);
+  }
+
+  if (activeFeature === "position") {
+    return renderPosition(database, selectedPortfolio, state, state.perspective_id);
   }
 
   if (activeFeature === "financial-settlement") {
-    return renderFinancialSettlement(database, selectedPortfolio, state, perspectiveId);
+    return renderFinancialSettlement(database, selectedPortfolio, state);
   }
 
   if (activeFeature === "forecast") {
-    return renderForecastFeature(database, selectedPortfolio, state, perspectiveId);
+    return renderForecastFeature(database, selectedPortfolio, state, state.perspective_id);
   }
 
   if (activeFeature === "forecast-hedge") {
-    return renderForecastHedgeFeature(database, selectedPortfolio, state, perspectiveId);
+    return renderForecastHedgeFeature(database, selectedPortfolio, state, state.perspective_id);
   }
 
   if (activeFeature === "data-viewer") {
-    return renderDataViewer(database, selectedPortfolio, state, perspectiveId);
+    return renderDataViewer(database, selectedPortfolio, state);
   }
 
-  return renderBuyBaseloads(selectedPortfolio, state, perspectiveId);
+  return renderBuyBaseloads(selectedPortfolio, state);
 }
 
-function renderBuyBaseloads(selectedPortfolio: PortfolioOption, state: HedgingToolState, perspectiveId: PerspectiveId | undefined): string {
+function renderBuyBaseloads(selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
   const periods = getBaseloadsPurchasePeriods();
   const selectedPeriodId = state.selected_period_id ?? periods[0]?.period_id ?? "";
 
@@ -439,7 +438,6 @@ function renderBuyBaseloads(selectedPortfolio: PortfolioOption, state: HedgingTo
     ${state.purchase_result ? `<div class="notice success">Calloff ${escapeHtml(state.purchase_result.calloff.calloff_id)} created with ${state.purchase_result.transactions.length} transactions.</div>` : ""}
     <form method="post" action="/hedging/buy-baseloads" class="stack">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
-      ${renderPerspectiveHidden(perspectiveId)}
       <div class="form-grid">
         <label>
           MW quantity
@@ -457,14 +455,37 @@ function renderBuyBaseloads(selectedPortfolio: PortfolioOption, state: HedgingTo
   </div>`;
 }
 
-function renderCalloffList(database: PrototypeDatabase, selectedPortfolio: PortfolioOption): string {
-  const rows = getBaseloadsCalloffListRows(database, selectedPortfolio.portfolio_id);
-  if (rows.length === 0) {
-    return `<div class="notice"><h2>Baseloads Calloff List</h2><p>No Baseloads calloffs for the selected portfolio.</p></div>`;
+function renderCalloffList(
+  database: PrototypeDatabase,
+  selectedPortfolio: PortfolioOption,
+  perspectiveId: PerspectiveId | undefined,
+): string {
+  const selectedPerspective = perspectiveId ?? "baseloads";
+  if (selectedPerspective === "classic") {
+    return `<div class="stack">
+      ${renderFeaturePerspectiveTabs(selectedPortfolio, "calloff-list", selectedPerspective, getPerspectiveOptions())}
+      ${renderClassicCalloffTransactionList(database, selectedPortfolio)}
+    </div>`;
+  }
+  if (selectedPerspective === "modern") {
+    return `<div class="stack">
+      ${renderFeaturePerspectiveTabs(selectedPortfolio, "calloff-list", selectedPerspective, getPerspectiveOptions())}
+      ${renderModernCalloffTransactionList(database, selectedPortfolio)}
+    </div>`;
   }
 
-  return `<div>
-    <h2>Baseloads Calloff List</h2>
+  const rows = getBaseloadsCalloffListRows(database, selectedPortfolio.portfolio_id);
+  if (rows.length === 0) {
+    return `<div class="stack">
+      ${renderFeaturePerspectiveTabs(selectedPortfolio, "calloff-list", selectedPerspective, getPerspectiveOptions())}
+      <div class="notice"><h2>Calloff List</h2><p>No Baseloads calloffs for the selected portfolio.</p></div>
+    </div>`;
+  }
+
+  return `<div class="stack">
+    ${renderFeaturePerspectiveTabs(selectedPortfolio, "calloff-list", selectedPerspective, getPerspectiveOptions())}
+    <div>
+    <h2>Calloff List</h2>
     <table>
       <thead>
         <tr>
@@ -487,17 +508,18 @@ function renderCalloffList(database: PrototypeDatabase, selectedPortfolio: Portf
           .join("")}
       </tbody>
     </table>
+    </div>
   </div>`;
 }
 
 function renderClassicCalloffTransactionList(database: PrototypeDatabase, selectedPortfolio: PortfolioOption): string {
   const rows = getPeaksClassicCalloffTransactionRows(database, selectedPortfolio.portfolio_id);
   if (rows.length === 0) {
-    return `<div class="notice"><h2>Calloff Transaction List</h2><p>No Peaks.Classic calloffs for the selected portfolio.</p></div>`;
+    return `<div class="notice"><h2>Calloff List</h2><p>No Classic-compatible calloffs for the selected portfolio.</p></div>`;
   }
 
   return `<div>
-    <h2>Calloff Transaction List</h2>
+    <h2>Calloff List</h2>
     <p>Projected Peak/Offpeak values from canonical component transactions.</p>
     <table>
       <thead>
@@ -531,11 +553,11 @@ function renderClassicCalloffTransactionList(database: PrototypeDatabase, select
 function renderModernCalloffTransactionList(database: PrototypeDatabase, selectedPortfolio: PortfolioOption): string {
   const rows = getPeaksModernCalloffTransactionRows(database, selectedPortfolio.portfolio_id);
   if (rows.length === 0) {
-    return `<div class="notice"><h2>Calloff Transaction List</h2><p>No Peaks.Modern calloffs for the selected portfolio.</p></div>`;
+    return `<div class="notice"><h2>Calloff List</h2><p>No Modern-compatible calloffs for the selected portfolio.</p></div>`;
   }
 
   return `<div>
-    <h2>Calloff Transaction List</h2>
+    <h2>Calloff List</h2>
     <p>Projected Base/Peak values from canonical component transactions.</p>
     <table>
       <thead>
@@ -594,16 +616,18 @@ function renderPositionReport(
   const years = getPositionReportYears(database, selectedPortfolio.portfolio_id);
   const selectedYear = state.selected_year ?? years[0] ?? "";
   const rows = selectedYear ? getPositionReportRows(database, selectedPortfolio.portfolio_id, selectedYear) : [];
-  const perspectiveLabel = labelForPerspective(perspectiveId);
+  const selectedPerspective = perspectiveId ?? "baseloads";
+  const perspectiveLabel = labelForPerspective(selectedPerspective);
 
   return `<div class="stack">
+    ${renderFeaturePerspectiveTabs(selectedPortfolio, "position-report", selectedPerspective, getPerspectiveOptions(), { selected_year: selectedYear })}
     <div>
-      <h2>Position Report - ${escapeHtml(perspectiveLabel)}</h2>
+      <h2>Position Report</h2>
       <p>Monthly aggregated canonical positions viewed through the selected perspective.</p>
     </div>
     <form method="get" action="/hedging" class="compact-selector">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
-      ${renderPerspectiveHidden(perspectiveId)}
+      ${renderPerspectiveHidden(selectedPerspective)}
       <input type="hidden" name="feature_id" value="position-report">
       <label>
         Year
@@ -642,11 +666,66 @@ function renderPositionReport(
   </div>`;
 }
 
-function renderFinancialSettlement(
+function renderPosition(
   database: PrototypeDatabase,
   selectedPortfolio: PortfolioOption,
   state: HedgingToolState,
   perspectiveId: PerspectiveId | undefined,
+): string {
+  const selectedPerspective = perspectiveId ?? "baseloads";
+  const years = getPositionReportYears(database, selectedPortfolio.portfolio_id);
+  const selectedYear = state.selected_year ?? years[0] ?? "";
+  const rows = selectedYear ? getPositionReportRows(database, selectedPortfolio.portfolio_id, selectedYear) : [];
+  return `<div class="stack">
+    ${renderFeaturePerspectiveTabs(selectedPortfolio, "position", selectedPerspective, getPerspectiveOptions(), { selected_year: state.selected_year })}
+    <div>
+      <h2>Position</h2>
+      <p>${escapeHtml(labelForPerspective(selectedPerspective))} position view over the same canonical portfolio data.</p>
+    </div>
+    <form method="get" action="/hedging" class="compact-selector">
+      <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      ${renderPerspectiveHidden(selectedPerspective)}
+      <input type="hidden" name="feature_id" value="position">
+      <label>
+        Year
+        <select name="selected_year" onchange="this.form.submit()">
+          ${years.map((year) => `<option value="${escapeHtml(year)}"${year === selectedYear ? " selected" : ""}>${escapeHtml(year)}</option>`).join("")}
+        </select>
+      </label>
+    </form>
+    ${
+      rows.length === 0
+        ? `<div class="notice"><p>No positions for ${escapeHtml(selectedYear)}.</p></div>`
+        : `<table>
+            <thead>
+              <tr>
+                <th>Månad</th>
+                <th>Volym</th>
+                <th>Pris</th>
+                <th>Component</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map(
+                  (row) => `<tr>
+                    <td>${escapeHtml(row.month)}</td>
+                    <td class="number">${formatNumber(row.volume_mwh)}</td>
+                    <td class="number">${formatNumber(row.price)}</td>
+                    <td>${escapeHtml(row.component)}</td>
+                  </tr>`,
+                )
+                .join("")}
+            </tbody>
+          </table>`
+    }
+  </div>`;
+}
+
+function renderFinancialSettlement(
+  database: PrototypeDatabase,
+  selectedPortfolio: PortfolioOption,
+  state: HedgingToolState,
 ): string {
   const months = getFinancialSettlementMonths(database, selectedPortfolio.portfolio_id);
   const selectedMonth = state.selected_month ?? months[0] ?? "";
@@ -701,7 +780,6 @@ function renderFinancialSettlement(
     </div>
     <form method="get" action="/hedging" class="compact-selector">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
-      ${renderPerspectiveHidden(perspectiveId)}
       <input type="hidden" name="feature_id" value="financial-settlement">
       <label>
         Month
@@ -723,18 +801,20 @@ function renderForecastFeature(
   const years = getForecastYears(database, selectedPortfolio.portfolio_id);
   const selectedYear = state.selected_year ?? years[0] ?? "";
   const rows = selectedYear ? getForecastRowsForYear(database, selectedPortfolio.portfolio_id, selectedYear) : [];
-  const perspectiveLabel = labelForPerspective(perspectiveId);
+  const selectedPerspective = perspectiveId ?? "modern";
+  const perspectiveLabel = labelForPerspective(selectedPerspective);
 
   return `<div class="stack">
+    ${renderFeaturePerspectiveTabs(selectedPortfolio, "forecast", selectedPerspective, getPerspectiveOptions(), { selected_year: selectedYear })}
     <div>
-      <h2>Forecast - ${escapeHtml(perspectiveLabel)}</h2>
+      <h2>Forecast</h2>
       <p>Forecast is edited against the canonical model. Modern perspective uses base and peak terms per P0033.</p>
     </div>
     ${state.error ? `<div class="notice error">${escapeHtml(state.error)}</div>` : ""}
     ${state.forecast_message ? `<div class="notice success">${escapeHtml(state.forecast_message)}</div>` : ""}
     <form method="get" action="/hedging" class="compact-selector">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
-      ${renderPerspectiveHidden(perspectiveId)}
+      ${renderPerspectiveHidden(selectedPerspective)}
       <input type="hidden" name="feature_id" value="forecast">
       <label>
         Year
@@ -748,7 +828,7 @@ function renderForecastFeature(
         ? `<div class="notice"><p>No forecast rows for ${escapeHtml(selectedYear)}.</p></div>`
         : `<form method="post" action="/hedging/forecast" class="stack">
             <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
-            ${renderPerspectiveHidden(perspectiveId)}
+            ${renderPerspectiveHidden(selectedPerspective)}
             <input type="hidden" name="selected_year" value="${escapeHtml(selectedYear)}">
             ${renderForecastTable(rows)}
             <button class="primary" type="submit">Save forecast</button>
@@ -781,8 +861,8 @@ function renderForecastTable(rows: ForecastDisplayRow[]): string {
               ${escapeHtml(row.month)}
               <input type="hidden" name="month" value="${escapeHtml(row.month)}">
             </td>
-            <td><input name="modern_base_mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(String(row.modern_base_mwh))}"></td>
-            <td><input name="modern_peak_mwh_${escapeHtml(row.month)}" type="number" step="0.001" value="${escapeHtml(String(row.modern_peak_mwh))}"></td>
+            <td><input name="modern_base_mwh_${escapeHtml(row.month)}" type="number" min="0" step="0.001" value="${escapeHtml(formatInputNumber(row.modern_base_mwh))}"></td>
+            <td><input name="modern_peak_mwh_${escapeHtml(row.month)}" type="number" step="0.001" value="${escapeHtml(formatInputNumber(row.modern_peak_mwh))}"></td>
             <td class="number">${formatNumber(row.mwh)}</td>
           </tr>`,
         )
@@ -804,11 +884,13 @@ function renderForecastHedgeFeature(
     state.forecast_hedge_profile?.end_month ?? state.forecast_hedge_input?.end_month ?? months[Math.min(2, months.length - 1)] ?? "";
   const percentage =
     state.forecast_hedge_profile ? String(formatPercentInput(state.forecast_hedge_profile.percentage)) : state.forecast_hedge_input?.percentage ?? "50";
-  const perspectiveLabel = labelForPerspective(perspectiveId);
+  const selectedPerspective = perspectiveId === "classic" ? "classic" : "modern";
+  const perspectiveLabel = labelForPerspective(selectedPerspective);
 
   return `<div class="stack">
+    ${renderFeaturePerspectiveTabs(selectedPortfolio, "forecast-hedge", selectedPerspective, getPerspectiveOptions().filter((option) => option.perspective_id !== "baseloads"))}
     <div>
-      <h2>Hedge Forecast - ${escapeHtml(perspectiveLabel)}</h2>
+      <h2>Hedge Forecast</h2>
       <p>Create a monthly hedge profile from a percentage of forecast. Accepted rows are written as canonical transactions.</p>
     </div>
     ${state.error ? `<div class="notice error">${escapeHtml(state.error)}</div>` : ""}
@@ -819,7 +901,7 @@ function renderForecastHedgeFeature(
     }
     <form method="post" action="/hedging/forecast-hedge/generate" class="stack">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
-      ${renderPerspectiveHidden(perspectiveId)}
+      ${renderPerspectiveHidden(selectedPerspective)}
       <div class="form-grid">
         <label>
           Start month
@@ -836,7 +918,7 @@ function renderForecastHedgeFeature(
       </div>
       <button type="submit">Build hedge profile</button>
     </form>
-    ${state.forecast_hedge_profile ? renderForecastHedgeProfile(selectedPortfolio, state.forecast_hedge_profile, perspectiveId) : ""}
+    ${state.forecast_hedge_profile ? renderForecastHedgeProfile(selectedPortfolio, state.forecast_hedge_profile, selectedPerspective) : ""}
   </div>`;
 }
 
@@ -876,9 +958,9 @@ function renderForecastHedgeProfile(
               <td class="number">${formatNumber(row.forecast_modern_base_mwh)}</td>
               <td class="number">${formatNumber(row.forecast_modern_peak_mwh)}</td>
               <td><output data-role="hedge-percent">${formatNumber(row.percentage * 100)}</output></td>
-              <td><input name="modern_base_mwh_${escapeHtml(row.month)}" data-role="modern-base-mwh" type="number" min="0" step="0.001" value="${escapeHtml(String(row.modern_base_mwh))}"></td>
+              <td><input name="modern_base_mwh_${escapeHtml(row.month)}" data-role="modern-base-mwh" type="number" min="0" step="0.001" value="${escapeHtml(formatInputNumber(row.modern_base_mwh))}"></td>
               <td><output data-role="modern-base-mw">${formatNumber(row.modern_base_mw)}</output></td>
-              <td><input name="modern_peak_mwh_${escapeHtml(row.month)}" data-role="modern-peak-mwh-input" type="number" step="0.001" value="${escapeHtml(String(row.modern_peak_mwh))}"></td>
+              <td><input name="modern_peak_mwh_${escapeHtml(row.month)}" data-role="modern-peak-mwh-input" type="number" step="0.001" value="${escapeHtml(formatInputNumber(row.modern_peak_mwh))}"></td>
               <td><output data-role="modern-peak-mw">${formatNumber(row.modern_peak_mw)}</output></td>
               <td><output data-role="total-mwh">${formatNumber(row.total_mwh)}</output></td>
             </tr>`,
@@ -914,17 +996,21 @@ function renderDataViewer(
   database: PrototypeDatabase,
   selectedPortfolio: PortfolioOption,
   state: HedgingToolState,
-  perspectiveId: PerspectiveId | undefined,
 ): string {
-  let selectedTable: DataViewerTableId = "calloffs";
+  const selectedView = parseDataViewerPerspectiveId(state.selected_view);
+  let selectedTable: DataViewerTableId = defaultTableForDataViewerPerspective(selectedView);
   let error = state.error;
   try {
-    selectedTable = parseDataViewerTableId(state.selected_table);
+    selectedTable = parseDataViewerTableId(state.selected_table ?? selectedTable);
   } catch (caught) {
     error = caught instanceof DataViewerError ? caught.message : "Data Viewer failed";
   }
 
-  const tables = getDataViewerTables();
+  if (!tableBelongsToDataViewerPerspective(selectedTable, selectedView)) {
+    selectedTable = defaultTableForDataViewerPerspective(selectedView);
+  }
+
+  const tables = getDataViewerTables().filter((table) => tableBelongsToDataViewerPerspective(table.table_id, selectedView));
   const years = getDataViewerYears(database, selectedPortfolio.portfolio_id, selectedTable);
   const selectedYear = state.selected_year ?? years[0] ?? "";
   let content = `<div class="notice"><p>No rows for selected portfolio and year.</p></div>`;
@@ -940,6 +1026,7 @@ function renderDataViewer(
   }
 
   return `<div class="stack">
+    ${renderDataViewerPerspectiveTabs(selectedPortfolio, selectedView, selectedYear)}
     <div>
       <h2>Data Viewer</h2>
       <p>Canonical raw rows and projected perspective views for the selected portfolio.</p>
@@ -947,7 +1034,7 @@ function renderDataViewer(
     ${error ? `<div class="notice error">${escapeHtml(error)}</div>` : ""}
     <form method="get" action="/hedging" class="form-grid">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
-      ${renderPerspectiveHidden(perspectiveId)}
+      <input type="hidden" name="selected_view" value="${escapeHtml(selectedView)}">
       <input type="hidden" name="feature_id" value="data-viewer">
       <label>
         Table
@@ -1209,6 +1296,113 @@ function renderMonthSelect(name: string, months: string[], selectedMonth: string
   </select>`;
 }
 
+function renderFeaturePerspectiveTabs(
+  selectedPortfolio: PortfolioOption,
+  featureId: HedgingFeatureId,
+  selectedPerspective: PerspectiveId,
+  options: Array<{ perspective_id: PerspectiveId; label: string }>,
+  extraParams: Record<string, string | undefined> = {},
+): string {
+  return `<nav class="tabs" aria-label="Feature perspective">
+    ${options
+      .map((option) => {
+        const params = new URLSearchParams({
+          portfolio_id: selectedPortfolio.portfolio_id,
+          feature_id: featureId,
+          perspective_id: option.perspective_id,
+        });
+        for (const [key, value] of Object.entries(extraParams)) {
+          if (value) {
+            params.set(key, value);
+          }
+        }
+        const active = option.perspective_id === selectedPerspective ? " active" : "";
+        return `<a class="tab${active}" href="/hedging?${escapeHtml(params.toString())}">${escapeHtml(option.label)}</a>`;
+      })
+      .join("")}
+  </nav>`;
+}
+
+function renderDataViewerPerspectiveTabs(
+  selectedPortfolio: PortfolioOption,
+  selectedView: DataViewerPerspectiveId,
+  selectedYear: string,
+): string {
+  return `<nav class="tabs" aria-label="Data Viewer perspective">
+    ${getDataViewerPerspectiveOptions()
+      .map((option) => {
+        const params = new URLSearchParams({
+          portfolio_id: selectedPortfolio.portfolio_id,
+          feature_id: "data-viewer",
+          selected_view: option.perspective_id,
+          selected_table: defaultTableForDataViewerPerspective(option.perspective_id),
+        });
+        if (selectedYear) {
+          params.set("selected_year", selectedYear);
+        }
+        const active = option.perspective_id === selectedView ? " active" : "";
+        return `<a class="tab${active}" href="/hedging?${escapeHtml(params.toString())}">${escapeHtml(option.label)}</a>`;
+      })
+      .join("")}
+  </nav>`;
+}
+
+function parseDataViewerPerspectiveId(value: string | undefined): DataViewerPerspectiveId {
+  return getDataViewerPerspectiveOptions().some((option) => option.perspective_id === value)
+    ? (value as DataViewerPerspectiveId)
+    : "canonical";
+}
+
+function normalizeFeatureId(featureId: HedgingFeatureId | undefined): HedgingFeatureId | undefined {
+  if (
+    featureId === "baseloads-calloff-list" ||
+    featureId === "legacy-calloff-list" ||
+    featureId === "modern-calloff-transaction-list"
+  ) {
+    return "calloff-list";
+  }
+  return featureId;
+}
+
+function perspectiveForFeatureAlias(featureId: HedgingFeatureId | undefined): PerspectiveId | undefined {
+  if (featureId === "legacy-calloff-list") {
+    return "classic";
+  }
+  if (featureId === "modern-calloff-transaction-list") {
+    return "modern";
+  }
+  if (featureId === "baseloads-calloff-list") {
+    return "baseloads";
+  }
+  return undefined;
+}
+
+function defaultTableForDataViewerPerspective(view: DataViewerPerspectiveId): DataViewerTableId {
+  if (view === "baseloads") {
+    return "baseloads-projected-transactions";
+  }
+  if (view === "classic") {
+    return "classic-projected-calloffs";
+  }
+  if (view === "modern") {
+    return "modern-projected-transactions";
+  }
+  return "calloffs";
+}
+
+function tableBelongsToDataViewerPerspective(tableId: DataViewerTableId, view: DataViewerPerspectiveId): boolean {
+  if (view === "canonical") {
+    return tableId === "calloffs" || tableId === "transactions";
+  }
+  if (view === "baseloads") {
+    return tableId === "baseloads-projected-transactions";
+  }
+  if (view === "classic") {
+    return tableId === "classic-projected-calloffs";
+  }
+  return tableId === "modern-projected-calloffs" || tableId === "modern-projected-transactions";
+}
+
 function renderPerspectiveHidden(perspectiveId: PerspectiveId | undefined): string {
   return perspectiveId ? `<input type="hidden" name="perspective_id" value="${escapeHtml(perspectiveId)}">` : "";
 }
@@ -1225,6 +1419,10 @@ function labelForPerspective(perspectiveId: PerspectiveId | undefined): string {
 
 function formatPercentInput(value: number): number {
   return Math.round(value * 100_000) / 1_000;
+}
+
+function formatInputNumber(value: number): string {
+  return String(Math.round(value * 1_000) / 1_000);
 }
 
 function formatNumber(value: number): string {

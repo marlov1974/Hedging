@@ -17,18 +17,19 @@ import {
 } from "../../src/hedging/peaksCalloffTransactionList.ts";
 
 describe("Peaks calloff transaction lists", () => {
-  it("Classic and Modern list features are available for their product packages", () => {
+  it("Classic and Modern lists are available through the generic Calloff List feature", () => {
     const database = createPocSeedData();
     const classicFeatures = getApplicationFeaturesForPortfolio(database, "CUS01-0").features;
     const modernFeatures = getApplicationFeaturesForPortfolio(database, "CUS02-0").features;
 
-    assert.equal(classicFeatures.some((feature) => feature.feature_id === "legacy-calloff-list" && feature.available), true);
-    assert.equal(modernFeatures.some((feature) => feature.feature_id === "modern-calloff-transaction-list" && feature.available), true);
+    assert.equal(classicFeatures.some((feature) => feature.feature_id === "calloff-list" && feature.available), true);
+    assert.equal(modernFeatures.some((feature) => feature.feature_id === "calloff-list" && feature.available), true);
   });
 
   it("renders Classic required columns in order", () => {
     const database = createWorkedExampleDatabase("classic");
-    const html = renderHedgingTool(database, { portfolio_id: "CUS01-0", feature_id: "legacy-calloff-list" });
+    moveCalloffToDemoPortfolio(database, "CAL20");
+    const html = renderHedgingTool(database, { portfolio_id: "CUS00-0", feature_id: "calloff-list", perspective_id: "classic" });
 
     assert.match(html, /Date[\s\S]*OffpeakMWh[\s\S]*PeakMWh[\s\S]*OffpeakPrice[\s\S]*PeakPrice/);
     assert.doesNotMatch(html, /<th>OffpeakMW<\/th>/);
@@ -37,7 +38,8 @@ describe("Peaks calloff transaction lists", () => {
 
   it("renders Modern required columns in order", () => {
     const database = createWorkedExampleDatabase("modern");
-    const html = renderHedgingTool(database, { portfolio_id: "CUS02-0", feature_id: "modern-calloff-transaction-list" });
+    moveCalloffToDemoPortfolio(database, "CAL20");
+    const html = renderHedgingTool(database, { portfolio_id: "CUS00-0", feature_id: "calloff-list", perspective_id: "modern" });
 
     assert.match(html, /Date[\s\S]*BaseMWh[\s\S]*PeakMWh[\s\S]*BasePrice[\s\S]*PeakPrice/);
     assert.doesNotMatch(html, /<th>BaseMW<\/th>/);
@@ -86,7 +88,8 @@ describe("Peaks calloff transaction lists", () => {
   it("does not display allocation rows or adjustment rows in customer-facing lists", () => {
     const database = createWorkedExampleDatabase("modern");
     addAdjustmentTransaction(database, "PRO02", "CAL20");
-    const html = renderHedgingTool(database, { portfolio_id: "CUS02-0", feature_id: "modern-calloff-transaction-list" });
+    moveCalloffToDemoPortfolio(database, "CAL20");
+    const html = renderHedgingTool(database, { portfolio_id: "CUS00-0", feature_id: "calloff-list", perspective_id: "modern" });
 
     assert.doesNotMatch(html, /allocation\.peak\.sys/);
     assert.doesNotMatch(html, /allocation\.peak\.epad/);
@@ -361,6 +364,12 @@ function productIdFor(kind: ProductKind): string {
 
 function portfolioIdFor(kind: ProductKind): string {
   return kind === "classic" ? "CUS01-0" : "CUS02-0";
+}
+
+function moveCalloffToDemoPortfolio(database: PrototypeDatabase, calloffId: string): void {
+  const calloff = database.calloffs.get(calloffId);
+  assert.ok(calloff);
+  calloff.portfolio_id = "CUS00-0";
 }
 
 function round(value: number): number {

@@ -20,10 +20,22 @@ describe("Forecast hedge feature", () => {
     assert.equal(features.some((feature) => feature.feature_id === "forecast-hedge" && feature.available), true);
   });
 
-  it("Baseloads feature list does not include Hedge Forecast", () => {
+  it("single demo feature list includes Hedge Forecast for all perspectives", () => {
     const features = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS00-0").features;
 
-    assert.equal(features.some((feature) => feature.feature_id === "forecast-hedge"), false);
+    assert.equal(features.some((feature) => feature.feature_id === "forecast-hedge" && feature.available), true);
+  });
+
+  it("Hedge Forecast feature exposes Classic and Modern tabs only", () => {
+    const html = renderHedgingTool(createPocSeedData(), {
+      portfolio_id: "CUS00-0",
+      feature_id: "forecast-hedge",
+    });
+
+    assert.match(html, /Feature perspective/);
+    assert.match(html, /Classic/);
+    assert.match(html, /Modern/);
+    assert.doesNotMatch(html, /perspective_id=baseloads/);
   });
 
   it("renders start/end/percentage form", () => {
@@ -56,6 +68,28 @@ describe("Forecast hedge feature", () => {
     assert.match(html, /Peak MWh/);
     assert.match(html, /Peak MW/);
     assert.doesNotMatch(html, /Allocation Peak MW/);
+  });
+
+  it("renders editable hedge forecast input values with at most three decimals", () => {
+    const html = renderHedgingTool(createPocSeedData(), {
+      portfolio_id: "CUS02-0",
+      feature_id: "forecast-hedge",
+      forecast_hedge_profile: buildForecastHedgeProfile(createPocSeedData(), {
+        portfolio_id: "CUS02-0",
+        start_month: "2027-01",
+        end_month: "2027-01",
+        percentage: "50",
+      }),
+    });
+
+    const values = [...html.matchAll(/data-role="modern-(?:base|peak)-mwh(?:-input)?"[^>]*value="([^"]+)"/g)].map((match) => match[1]);
+
+    assert.ok(values.length > 0);
+    assert.equal(values.every((value) => decimalPlaces(value) <= 3), true);
+    assert.match(html, /value="560\.735"/);
+    assert.match(html, /value="54\.265"/);
+    assert.doesNotMatch(html, /value="560\.735294"/);
+    assert.doesNotMatch(html, /value="54\.264706"/);
   });
 
   it("generates profile for a 3-month range", () => {
@@ -528,4 +562,8 @@ function toAcceptRow(row: {
     modern_base_mwh: String(row.modern_base_mwh),
     modern_peak_mwh: String(row.modern_peak_mwh),
   };
+}
+
+function decimalPlaces(value: string): number {
+  return value.includes(".") ? value.split(".")[1].length : 0;
 }

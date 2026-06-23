@@ -4,6 +4,8 @@ import { createPocSeedData } from "../../src/database/pocSeedData.ts";
 import {
   defaultPerspectiveForPortfolio,
   getApplicationFeaturesForPortfolio,
+  getDataViewerPerspectiveOptions,
+  getPerspectiveOptions,
   isPeaksClassicPortfolio,
   isPeaksModernPortfolio,
   parsePerspectiveId,
@@ -12,45 +14,32 @@ import {
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 
 describe("application configuration", () => {
-  it("returns Baseloads perspective features for the selected portfolio", () => {
+  it("returns one generic single-portfolio feature list", () => {
     const config = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS00-0");
 
     assert.equal(config.variant_id, "baseloads");
     assert.equal(config.perspective_id, "baseloads");
+    assert.equal(config.title, "Universal model demo");
     assert.deepEqual(
       config.features.map((feature) => feature.feature_id),
-      ["portfolio-details", "forecast", "buy-baseloads", "baseloads-calloff-list", "position-report", "financial-settlement", "data-viewer"],
+      ["portfolio-details", "forecast", "forecast-hedge", "calloff-list", "position-report", "position", "data-viewer", "buy-baseloads"],
     );
   });
 
-  it("returns Modern perspective features for the selected portfolio", () => {
-    const config = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS02-0");
-
-    assert.equal(config.variant_id, "peaks-modern");
-    assert.equal(config.perspective_id, "modern");
-    assert.deepEqual(
-      config.features.map((feature) => feature.feature_id),
-      ["portfolio-details", "forecast", "forecast-hedge", "modern-calloff-transaction-list", "position-report", "data-viewer"],
-    );
-  });
-
-  it("returns Classic perspective features for the selected portfolio", () => {
-    const config = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS01-0");
-
-    assert.equal(config.variant_id, "peaks-classic");
-    assert.equal(config.perspective_id, "classic");
-    assert.deepEqual(
-      config.features.map((feature) => feature.feature_id),
-      ["portfolio-details", "forecast", "forecast-hedge", "legacy-calloff-list", "position-report", "data-viewer"],
-    );
-  });
-
-  it("same selected portfolio can show Baseloads, Classic and Modern perspectives", () => {
+  it("requested perspective does not change the global feature list", () => {
     const database = createPocSeedData();
+    const baseloads = getApplicationFeaturesForPortfolio(database, "CUS00-0", "baseloads");
+    const classic = getApplicationFeaturesForPortfolio(database, "CUS00-0", "classic");
+    const modern = getApplicationFeaturesForPortfolio(database, "CUS00-0", "modern");
 
-    assert.equal(getApplicationFeaturesForPortfolio(database, "CUS00-0", "baseloads").title, "Baseloads perspective");
-    assert.equal(getApplicationFeaturesForPortfolio(database, "CUS00-0", "classic").title, "Classic perspective");
-    assert.equal(getApplicationFeaturesForPortfolio(database, "CUS00-0", "modern").title, "Modern perspective");
+    assert.deepEqual(
+      classic.features.map((feature) => feature.feature_id),
+      baseloads.features.map((feature) => feature.feature_id),
+    );
+    assert.deepEqual(
+      modern.features.map((feature) => feature.feature_id),
+      baseloads.features.map((feature) => feature.feature_id),
+    );
   });
 
   it("detects Peaks.Modern portfolio", () => {
@@ -61,35 +50,45 @@ describe("application configuration", () => {
     assert.equal(isPeaksClassicPortfolio(createPocSeedData(), "CUS01-0"), true);
   });
 
-  it("Modern perspective does not show Baseloads-only features", () => {
+  it("global navigation uses generic labels without perspective suffixes", () => {
     const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS02-0", perspective_id: "modern" });
 
-    assert.doesNotMatch(html, /Hedge Baseload/);
-    assert.doesNotMatch(html, /Calloff List - Baseloads/);
+    assert.match(html, /Hedge Baseload/);
     assert.match(html, /Portfolio Details/);
     assert.match(html, /Forecast/);
+    assert.doesNotMatch(html, /Calloff List - Baseloads/);
+    assert.doesNotMatch(html, /Calloff List - Modern/);
   });
 
-  it("switching from Baseloads to Modern perspective resets unavailable active feature", () => {
+  it("legacy active feature aliases still resolve into the generic calloff list", () => {
     const database = createPocSeedData();
 
-    assert.equal(resolveActiveFeature(database, "CUS00-0", "buy-baseloads", "modern"), "portfolio-details");
-    const html = renderHedgingTool(database, { portfolio_id: "CUS00-0", perspective_id: "modern", feature_id: "buy-baseloads" });
-    assert.match(html, /Portfolio Details/);
-    assert.doesNotMatch(html, /Confirm purchase/);
-    assert.match(html, /portfolio_id=CUS00-0&perspective_id=modern/);
+    assert.equal(resolveActiveFeature(database, "CUS00-0", "calloff-list"), "calloff-list");
+    const html = renderHedgingTool(database, { portfolio_id: "CUS00-0", feature_id: "modern-calloff-transaction-list" });
+    assert.match(html, /Calloff List/);
+    assert.match(html, /selected/);
   });
 
   it("shared feature remains active when switching application variant", () => {
     assert.equal(resolveActiveFeature(createPocSeedData(), "CUS02-0", "portfolio-details"), "portfolio-details");
   });
 
-  it("changes visible application context text and appearance for Modern perspective", () => {
+  it("uses one visible application context across perspective choices", () => {
     const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS02-0" });
 
-    assert.match(html, /variant-peaks-modern/);
-    assert.match(html, /Modern perspective/);
-    assert.match(html, /Modern projection over the selected portfolio/);
+    assert.match(html, /variant-neutral/);
+    assert.match(html, /one canonical portfolio/);
+  });
+
+  it("declares feature-level perspective options", () => {
+    assert.deepEqual(
+      getPerspectiveOptions().map((option) => option.label),
+      ["Baseloads", "Classic", "Modern"],
+    );
+    assert.deepEqual(
+      getDataViewerPerspectiveOptions().map((option) => option.label),
+      ["Canonical", "Baseloads", "Classic", "Modern"],
+    );
   });
 
   it("parses perspective ids with portfolio-derived fallback", () => {

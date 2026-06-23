@@ -11,10 +11,10 @@ import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 import { purchaseBaseloads } from "../../src/purchase/baseloadsPurchase.ts";
 
 describe("Financial Settlement", () => {
-  it("feature menu includes Financial Settlement", () => {
+  it("feature menu does not include legacy Financial Settlement", () => {
     const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0" });
 
-    assert.match(html, /Financial Settlement/);
+    assert.doesNotMatch(html, /Financial Settlement/);
   });
 
   it("renders month dropdown", () => {
