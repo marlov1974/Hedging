@@ -35,6 +35,25 @@ describe("Forecast hedge feature", () => {
     assert.match(html, /name="percentage"/);
   });
 
+  it("renders corrected modern peak premium columns", () => {
+    const html = renderHedgingTool(createPocSeedData(), {
+      portfolio_id: "CUS02-0",
+      feature_id: "forecast-hedge",
+      forecast_hedge_profile: buildForecastHedgeProfile(createPocSeedData(), {
+        portfolio_id: "CUS02-0",
+        start_month: "2027-01",
+        end_month: "2027-01",
+        percentage: "50",
+      }),
+    });
+
+    assert.match(html, /Peak %/);
+    assert.match(html, /Base MWh/);
+    assert.match(html, /Base MW/);
+    assert.match(html, /Modern Peak MWh/);
+    assert.match(html, /Modern Peak MW/);
+  });
+
   it("generates profile for a 3-month range", () => {
     const profile = buildForecastHedgeProfile(createPocSeedData(), {
       portfolio_id: "CUS02-0",
@@ -74,7 +93,7 @@ describe("Forecast hedge feature", () => {
     assert.equal(row.hedge_mw, 0.826613);
   });
 
-  it("peak hedge volume uses forecast peak percentage and peak hours", () => {
+  it("modern peak volume uses premium above flat base and peak hours", () => {
     const row = buildForecastHedgeProfile(createPocSeedData(), {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
@@ -84,8 +103,53 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(row.forecast_peak_pct, 0.5);
     assert.equal(row.calendar_peak_h, 336);
-    assert.equal(row.peak_hedge_mwh, 307.5);
-    assert.equal(row.peak_hedge_mw, 0.915179);
+    assert.equal(row.modern_peak_mwh, 29.758);
+    assert.equal(row.modern_peak_mw, 0.088565);
+  });
+
+  it("matches the P0024 numeric premium volume example", () => {
+    const row = updateForecastHedgeProfileRow({
+      month: "2027-01",
+      forecast_mwh: 100,
+      forecast_peak_pct: 0.5,
+      calendar_total_h: 744,
+      calendar_peak_h: 320,
+      hedge_mwh: "100",
+    });
+
+    assert.equal(row.hedge_mwh, 100);
+    assert.equal(row.hedge_mw, 0.134409);
+    assert.equal(row.modern_peak_mwh, 6.989);
+    assert.equal(row.modern_peak_mw, 0.021841);
+  });
+
+  it("allows negative modern peak MWh and MW", () => {
+    const row = updateForecastHedgeProfileRow({
+      month: "2027-01",
+      forecast_mwh: 100,
+      forecast_peak_pct: 0.35,
+      calendar_total_h: 744,
+      calendar_peak_h: 320,
+      hedge_mwh: "100",
+    });
+
+    assert.equal(row.hedge_mwh, 100);
+    assert.equal(row.modern_peak_mwh, -8.011);
+    assert.equal(row.modern_peak_mw, -0.025034);
+  });
+
+  it("flat profile gives zero modern peak MWh", () => {
+    const row = updateForecastHedgeProfileRow({
+      month: "2027-01",
+      forecast_mwh: 100,
+      forecast_peak_pct: 320 / 744,
+      calendar_total_h: 744,
+      calendar_peak_h: 320,
+      hedge_mwh: "100",
+    });
+
+    assert.equal(row.modern_peak_mwh, 0);
+    assert.equal(row.modern_peak_mw, 0);
   });
 
   it("editing Hedge MWh recalculates Hedge MW and Hedge %", () => {
@@ -100,8 +164,8 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(row.hedge_mwh, 250);
     assert.equal(row.hedge_mw, 0.5);
-    assert.equal(row.peak_hedge_mwh, 125);
-    assert.equal(row.peak_hedge_mw, 0.5);
+    assert.equal(row.modern_peak_mwh, 0);
+    assert.equal(row.modern_peak_mw, 0);
     assert.equal(row.percentage, 0.25);
   });
 
@@ -158,7 +222,7 @@ describe("Forecast hedge feature", () => {
     );
   });
 
-  it("base and peak transactions use separate MW formulas and q-factor values", () => {
+  it("base and peak transactions use separate premium MW formulas and q-factor values", () => {
     const database = createPocSeedData();
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
@@ -179,8 +243,8 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(rowsByComponent.get("base.sys")?.mw, 0.826613);
     assert.equal(rowsByComponent.get("base.epad")?.mw, 0.826613);
-    assert.equal(rowsByComponent.get("peak.modern.sys")?.mw, 0.915179);
-    assert.equal(rowsByComponent.get("peak.modern.epad")?.mw, 0.915179);
+    assert.equal(rowsByComponent.get("peak.modern.sys")?.mw, 0.088565);
+    assert.equal(rowsByComponent.get("peak.modern.epad")?.mw, 0.088565);
     assert.equal(rowsByComponent.get("base.sys")?.q_factor, 1);
     assert.equal(rowsByComponent.get("base.epad")?.q_factor, 1);
     assert.equal(rowsByComponent.get("peak.modern.sys")?.q_factor, 1.2);

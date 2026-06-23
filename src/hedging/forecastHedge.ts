@@ -47,8 +47,8 @@ export type ForecastHedgeProfileRow = {
   percentage: number;
   hedge_mwh: number;
   hedge_mw: number;
-  peak_hedge_mwh: number;
-  peak_hedge_mw: number;
+  modern_peak_mwh: number;
+  modern_peak_mw: number;
   calendar_total_h: number;
   calendar_peak_h: number;
 };
@@ -147,7 +147,7 @@ export function updateForecastHedgeProfileRow(input: {
   }
 
   const hedgeMwhRounded = roundMwh(hedgeMwh);
-  const peakHedgeMwh = roundMwh(hedgeMwh * input.forecast_peak_pct);
+  const modernPeakMwh = calculateModernPeakMwh(hedgeMwh, input.forecast_peak_pct, input.calendar_total_h, input.calendar_peak_h);
 
   return {
     month: input.month,
@@ -157,8 +157,8 @@ export function updateForecastHedgeProfileRow(input: {
     calendar_peak_h: input.calendar_peak_h,
     hedge_mwh: hedgeMwhRounded,
     hedge_mw: roundMw(hedgeMwh / input.calendar_total_h),
-    peak_hedge_mwh: peakHedgeMwh,
-    peak_hedge_mw: roundMw(peakHedgeMwh / input.calendar_peak_h),
+    modern_peak_mwh: modernPeakMwh,
+    modern_peak_mw: roundMw(modernPeakMwh / input.calendar_peak_h),
     percentage: input.forecast_mwh === 0 ? 0 : roundDecimal(hedgeMwh / input.forecast_mwh),
   };
 }
@@ -321,9 +321,17 @@ function getForecastHedgeComponents(database: PrototypeDatabase, productId: stri
 
 function transactionMwForComponent(row: ForecastHedgeProfileRow, componentCode: string): number {
   if (componentCode === "peak.modern.sys" || componentCode === "peak.modern.epad") {
-    return row.peak_hedge_mw;
+    return row.modern_peak_mw;
   }
   return row.hedge_mw;
+}
+
+function calculateModernPeakMwh(baseMwh: number, forecastPeakPct: number, totalHours: number, peakHours: number): number {
+  return roundMwh(baseMwh * (forecastPeakPct - flatPeakShare(totalHours, peakHours)));
+}
+
+function flatPeakShare(totalHours: number, peakHours: number): number {
+  return peakHours / totalHours;
 }
 
 function getQFactorForComponentMonth(

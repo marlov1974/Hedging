@@ -25,8 +25,8 @@ For every month in the selected range:
 ```text
 hedge_mwh = forecast_mwh * percentage
 hedge_mw = hedge_mwh / calendar.total_h
-peak_hedge_mwh = hedge_mwh * forecast_peak_pct
-peak_hedge_mw = peak_hedge_mwh / calendar.peak_h
+modern_peak_mwh = hedge_mwh * (forecast_peak_pct - calendar.peak_h / calendar.total_h)
+modern_peak_mw = modern_peak_mwh / calendar.peak_h
 ```
 
 The percentage input is converted from percent to decimal before calculation.
@@ -44,16 +44,21 @@ The generated profile displays:
 ```text
 Month
 Forecast MWh
+Peak %
 Hedge %
-Hedge MWh
-Hedge MW
+Base MWh
+Base MW
+Modern Peak MWh
+Modern Peak MW
 ```
 
-`Hedge MWh` is editable. `Hedge MW` and `Hedge %` are derived values:
+`Base MWh` is editable. `Base MW`, `Hedge %` and modern peak values are derived values:
 
 ```text
-Hedge MW = Hedge MWh / calendar.total_h
-Hedge % = Hedge MWh / Forecast MWh
+Base MW = Base MWh / calendar.total_h
+Hedge % = Base MWh / Forecast MWh
+Modern Peak MWh = Base MWh * (Forecast Peak % - calendar.peak_h / calendar.total_h)
+Modern Peak MW = Modern Peak MWh / calendar.peak_h
 ```
 
 The browser view recalculates the displayed derived values while editing. The server recalculates the same values again when the profile is accepted.
@@ -75,7 +80,9 @@ peak.modern.sys
 peak.modern.epad
 ```
 
-Base transactions use `hedge_mwh / calendar.total_h`. Peak transactions use `hedge_mwh * forecast_peak_pct / calendar.peak_h`.
+Base transactions use `hedge_mwh / calendar.total_h`. Peak transactions use corrected premium/shape MW: `hedge_mwh * (forecast_peak_pct - calendar.peak_h / calendar.total_h) / calendar.peak_h`.
+
+Modern peak MWh and MW may be negative. Negative values mean the forecast peak share is lower than the flat base share implied by the calendar.
 
 ## Q-Factor Usage
 

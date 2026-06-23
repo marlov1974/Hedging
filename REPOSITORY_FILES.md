@@ -22,6 +22,7 @@ docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
 docs/hedging/peaks_modern_forecast_feature.md
 docs/hedging/peaks_modern_forecast_hedge.md
+docs/hedging/peaks_modern_volume_semantics.md
 docs/hedging/position_report.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
@@ -99,6 +100,9 @@ requirements/package-runs/P0022/review.md
 requirements/package-runs/P0023/design.md
 requirements/package-runs/P0023/functions.md
 requirements/package-runs/P0023/review.md
+requirements/package-runs/P0024/design.md
+requirements/package-runs/P0024/functions.md
+requirements/package-runs/P0024/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -124,6 +128,7 @@ requirements/packages/P0021-application-product-skin-addendum.md
 requirements/packages/P0021-peaks-modern-application-and-forecast-feature.md
 requirements/packages/P0022-peaks-modern-forecast-hedge-purchase.md
 requirements/packages/P0023-raw-data-viewer-feature.md
+requirements/packages/P0024-correct-peaks-modern-premium-volume.md
 src/README.md
 src/database/fixtures.ts
 src/database/pocSeedData.ts
