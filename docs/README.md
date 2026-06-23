@@ -27,3 +27,7 @@ Durable design and function documentation lives here.
 - [Classic projection Peak/Offpeak rules](hedging/classic_projection_peak_offpeak_rules.md)
 - [Modern projection Base/Peak rules](hedging/modern_projection_base_peak_rules.md)
 - [Classic projection price rules](hedging/classic_projection_price_rules.md)
+- [Data Viewer](hedging/data_viewer.md)
+- [Modern projected model](hedging/modern_projected_model.md)
+- [Modern projected transactions](hedging/modern_projected_transactions.md)
+- [Modern projected calloffs](hedging/modern_projected_calloffs.md)

@@ -1,9 +1,14 @@
 import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { Calloff, CustomerTransaction } from "../database/types.ts";
-import { projectPeaksCalloffMonth, type PeaksMonthlyProjection } from "./peaksCalloffTransactionList.ts";
 
-export type DataViewerTableId = "calloffs" | "transactions" | "modern-calloffs" | "modern-transactions";
+const EPSILON = 0.000001;
+
+export type DataViewerTableId =
+  | "calloffs"
+  | "transactions"
+  | "modern-projected-calloffs"
+  | "modern-projected-transactions";
 
 export type DataViewerTable = {
   table_id: DataViewerTableId;
@@ -28,31 +33,36 @@ export type RawTransactionRow = {
   q_factor: number;
 };
 
-export type ModernCalloffRow = {
+export type ModernProjectedCalloffRow = {
   calloff_id: string;
-  source_product_id: string;
-  projected_product_package: string;
-  portfolio_id: string;
   date: string;
-  delivery_start_month: string;
-  delivery_end_month: string;
-  canonical_total_value: number;
-  projected_total_value: number;
+  period_start: string;
+  period_end: string;
+  base_mwh: number;
+  peak_mwh: number;
+  base_price: number | null;
+  peak_price: number | null;
+  base_value: number;
+  peak_value: number;
+  total_value: number;
+  warnings: string[];
 };
 
-export type ModernTransactionRow = {
-  projected_transaction_id: string;
+export type ModernProjectedTransactionRow = {
   calloff_id: string;
-  period: string;
-  component: "base" | "peak";
-  mwh: number;
+  month: string;
+  component: "modern.base.sys" | "modern.base.epad" | "modern.peak.sys" | "modern.peak.epad";
+  mw: number | null;
   price: number | null;
+  mwh: number;
   value: number;
+  source_components: string;
+  warnings: string[];
 };
 
 export type DataViewerRows = {
   table_id: DataViewerTableId;
-  rows: RawCalloffRow[] | RawTransactionRow[] | ModernCalloffRow[] | ModernTransactionRow[];
+  rows: RawCalloffRow[] | RawTransactionRow[] | ModernProjectedCalloffRow[] | ModernProjectedTransactionRow[];
 };
 
 export class DataViewerError extends Error {
@@ -69,8 +79,8 @@ export function getDataViewerTables(): DataViewerTable[] {
   return [
     { table_id: "calloffs", label: "Calloffs" },
     { table_id: "transactions", label: "Transactions" },
-    { table_id: "modern-calloffs", label: "Modern Calloffs" },
-    { table_id: "modern-transactions", label: "Modern Transactions" },
+    { table_id: "modern-projected-calloffs", label: "Modern Projected Calloffs" },
+    { table_id: "modern-projected-transactions", label: "Modern Projected Transactions" },
   ];
 }
 
@@ -80,7 +90,7 @@ export function getDataViewerYears(database: PrototypeDatabase, portfolioId: str
 
   const years = new Set([...database.calendars.values()].map((calendar) => calendar.month.slice(0, 4)));
 
-  if (tableId === "calloffs" || tableId === "modern-calloffs" || tableId === "modern-transactions") {
+  if (tableId === "calloffs" || tableId === "modern-projected-calloffs" || tableId === "modern-projected-transactions") {
     for (const calloff of getPortfolioCalloffs(database, portfolioId)) {
       years.add(calloff.delivery_start_month.slice(0, 4));
     }
@@ -139,53 +149,57 @@ export function getRawTransactionsForPortfolioYear(database: PrototypeDatabase, 
     }));
 }
 
-export function getModernCalloffsForPortfolioYear(database: PrototypeDatabase, portfolioId: string, year: string): ModernCalloffRow[] {
+export function getModernProjectedCalloffsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): ModernProjectedCalloffRow[] {
   validatePortfolio(database, portfolioId);
   validateYear(year);
 
   return getProjectedPeaksCalloffs(database, portfolioId, year).map((calloff) => {
-    const projection = aggregateModernProjection(projectCalloffMonths(database, calloff));
+    const rows = projectCalloffMonths(database, calloff);
+    const baseSysRows = rows.filter((row) => row.component === "modern.base.sys");
+    const baseEpadRows = rows.filter((row) => row.component === "modern.base.epad");
+    const peakSysRows = rows.filter((row) => row.component === "modern.peak.sys");
+    const peakEpadRows = rows.filter((row) => row.component === "modern.peak.epad");
+    const baseMwh = sumModernRows(baseSysRows, "mwh");
+    const peakMwh = sumModernRows(peakSysRows, "mwh");
+    const baseValue = roundProjection(sumModernRows(baseSysRows, "value") + sumModernRows(baseEpadRows, "value"));
+    const peakValue = roundProjection(sumModernRows(peakSysRows, "value") + sumModernRows(peakEpadRows, "value"));
+    const warnings = [
+      ...new Set([
+        ...rows.flatMap((row) => row.warnings),
+        ...(mwhMismatch(baseSysRows, baseEpadRows) ? ["mismatched modern base sys/epad MWh"] : []),
+        ...(mwhMismatch(peakSysRows, peakEpadRows) ? ["mismatched modern peak sys/epad MWh"] : []),
+      ]),
+    ];
     return {
       calloff_id: calloff.calloff_id,
-      source_product_id: calloff.product_id,
-      projected_product_package: "Peaks.Modern",
-      portfolio_id: calloff.portfolio_id,
       date: calloff.date,
-      delivery_start_month: calloff.delivery_start_month,
-      delivery_end_month: calloff.delivery_end_month,
-      canonical_total_value: projection.canonical_total_value,
-      projected_total_value: projection.modern_total_value,
+      period_start: calloff.delivery_start_month,
+      period_end: calloff.delivery_end_month,
+      base_mwh: roundProjection(baseMwh),
+      peak_mwh: roundProjection(peakMwh),
+      base_price: divideOrNull(baseValue, baseMwh),
+      peak_price: divideOrNull(peakValue, peakMwh),
+      base_value: baseValue,
+      peak_value: peakValue,
+      total_value: roundProjection(baseValue + peakValue),
+      warnings,
     };
   });
 }
 
-export function getModernTransactionsForPortfolioYear(database: PrototypeDatabase, portfolioId: string, year: string): ModernTransactionRow[] {
+export function getModernProjectedTransactionsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): ModernProjectedTransactionRow[] {
   validatePortfolio(database, portfolioId);
   validateYear(year);
 
-  return getProjectedPeaksCalloffs(database, portfolioId, year).flatMap((calloff) => {
-    const projection = aggregateModernProjection(projectCalloffMonths(database, calloff));
-    return [
-      {
-        projected_transaction_id: `${calloff.calloff_id}:modern.base`,
-        calloff_id: calloff.calloff_id,
-        period: projection.period,
-        component: "base" as const,
-        mwh: projection.base_mwh,
-        price: projection.base_price,
-        value: projection.base_value,
-      },
-      {
-        projected_transaction_id: `${calloff.calloff_id}:modern.peak`,
-        calloff_id: calloff.calloff_id,
-        period: projection.period,
-        component: "peak" as const,
-        mwh: projection.peak_mwh,
-        price: projection.peak_price,
-        value: projection.peak_value,
-      },
-    ];
-  });
+  return getProjectedPeaksCalloffs(database, portfolioId, year).flatMap((calloff) => projectCalloffMonths(database, calloff));
 }
 
 export function getDataViewerRows(
@@ -203,17 +217,17 @@ export function getDataViewerRows(
     };
   }
 
-  if (tableId === "modern-calloffs") {
+  if (tableId === "modern-projected-calloffs") {
     return {
       table_id: tableId,
-      rows: getModernCalloffsForPortfolioYear(database, portfolioId, year),
+      rows: getModernProjectedCalloffsForPortfolioYear(database, portfolioId, year),
     };
   }
 
-  if (tableId === "modern-transactions") {
+  if (tableId === "modern-projected-transactions") {
     return {
       table_id: tableId,
-      rows: getModernTransactionsForPortfolioYear(database, portfolioId, year),
+      rows: getModernProjectedTransactionsForPortfolioYear(database, portfolioId, year),
     };
   }
 
@@ -252,42 +266,187 @@ function isPeaksCalloff(database: PrototypeDatabase, calloff: Calloff): boolean 
   return productPackage === "Peaks.Classic" || productPackage === "Peaks.Modern";
 }
 
-function projectCalloffMonths(database: PrototypeDatabase, calloff: Calloff): PeaksMonthlyProjection[] {
+function projectCalloffMonths(database: PrototypeDatabase, calloff: Calloff): ModernProjectedTransactionRow[] {
   const transactions = getCalloffTransactions(database, calloff.calloff_id);
   const months = [...new Set(transactions.map((transaction) => transaction.month))].sort();
   if (months.length === 0) {
-    return [projectPeaksCalloffMonth(database, calloff, [])];
+    return projectModernMonth(database, calloff, calloff.delivery_start_month, []);
   }
-  return months.map((month) =>
-    projectPeaksCalloffMonth(
+  return months.flatMap((month) =>
+    projectModernMonth(
       database,
       calloff,
+      month,
       transactions.filter((transaction) => transaction.month === month),
     ),
   );
 }
 
-function aggregateModernProjection(rows: PeaksMonthlyProjection[]) {
-  const baseMwh = sum(rows, "modern_base_mwh");
-  const peakMwh = sum(rows, "modern_peak_mwh");
-  const baseValue = sum(rows, "modern_base_value");
-  const peakValue = sum(rows, "modern_peak_value");
+function projectModernMonth(
+  database: PrototypeDatabase,
+  calloff: Calloff,
+  month: string,
+  transactions: CustomerTransaction[],
+): ModernProjectedTransactionRow[] {
+  const calendar = [...database.calendars.values()].find((candidate) => candidate.month === month);
+  if (!calendar) {
+    return emptyModernRows(calloff.calloff_id, month, "missing calendar");
+  }
 
-  return {
-    period: rows.length === 1 ? rows[0].month : `${rows[0].month} - ${rows[rows.length - 1].month}`,
-    base_mwh: roundProjection(baseMwh),
-    peak_mwh: roundProjection(peakMwh),
-    base_price: divideOrNull(baseValue, baseMwh),
-    peak_price: divideOrNull(peakValue, peakMwh),
-    base_value: roundProjection(baseValue),
-    peak_value: roundProjection(peakValue),
-    canonical_total_value: roundProjection(sum(rows, "canonical_total_value")),
-    modern_total_value: roundProjection(baseValue + peakValue),
-  };
+  const offpeakH = calendar.total_h - calendar.peak_h;
+  if (calendar.peak_h === 0 || offpeakH === 0) {
+    return emptyModernRows(calloff.calloff_id, month, "zero peak or offpeak hours");
+  }
+
+  return [
+    ...projectModernDimension(database, calloff.calloff_id, month, transactions, "sys", calendar.total_h, calendar.peak_h, offpeakH),
+    ...projectModernDimension(database, calloff.calloff_id, month, transactions, "epad", calendar.total_h, calendar.peak_h, offpeakH),
+  ].sort((left, right) => componentSort(left.component) - componentSort(right.component));
+}
+
+function projectModernDimension(
+  database: PrototypeDatabase,
+  calloffId: string,
+  month: string,
+  transactions: CustomerTransaction[],
+  dimension: "sys" | "epad",
+  totalH: number,
+  peakH: number,
+  offpeakH: number,
+): ModernProjectedTransactionRow[] {
+  const warnings: string[] = [];
+  const base = findComponentTransaction(database, transactions, `base.${dimension}`);
+  const allocation = findComponentTransaction(database, transactions, `allocation.peak.${dimension}`);
+  const peak = findComponentTransaction(database, transactions, `peak.${dimension}`);
+  if (!base) {
+    warnings.push(`missing base.${dimension}`);
+  }
+  if (!allocation) {
+    warnings.push(`missing allocation.peak.${dimension}`);
+  }
+  if (!peak) {
+    warnings.push(`missing peak.${dimension}`);
+  }
+
+  const basePrice = findComponentPrice(database, `base.${dimension}`, transactions, warnings);
+  const peakPrice = findComponentPrice(database, `peak.${dimension}`, transactions, warnings);
+
+  if (!base || !allocation || !peak || basePrice === null || peakPrice === null) {
+    return emptyModernRows(calloffId, month, warnings.join("; "), dimension);
+  }
+
+  const baseMw = (base.mw * totalH - allocation.mw * peakH) / offpeakH;
+  const modernPeakMw = allocation.mw - baseMw;
+  const baseMwh = baseMw * totalH;
+  const peakMwh = modernPeakMw * peakH;
+  const canonicalValue = base.mw * totalH * basePrice + peak.mw * peakH * peakPrice;
+  const baseValue = baseMwh * basePrice;
+  const projectedPeakPrice = divideOrNull(canonicalValue - baseValue, peakMwh);
+  if (projectedPeakPrice === null) {
+    warnings.push(`zero modern peak ${dimension} MWh`);
+  }
+  const peakValue = projectedPeakPrice === null ? 0 : canonicalValue - baseValue;
+
+  return [
+    {
+      calloff_id: calloffId,
+      month,
+      component: `modern.base.${dimension}`,
+      mw: roundProjection(baseMw),
+      price: roundProjection(basePrice),
+      mwh: roundProjection(baseMwh),
+      value: roundProjection(baseValue),
+      source_components: `base.${dimension}, allocation.peak.${dimension}`,
+      warnings,
+    },
+    {
+      calloff_id: calloffId,
+      month,
+      component: `modern.peak.${dimension}`,
+      mw: roundProjection(modernPeakMw),
+      price: projectedPeakPrice,
+      mwh: roundProjection(peakMwh),
+      value: roundProjection(peakValue),
+      source_components: `base.${dimension}, allocation.peak.${dimension}, peak.${dimension}`,
+      warnings,
+    },
+  ];
 }
 
 function getCalloffTransactions(database: PrototypeDatabase, calloffId: string): CustomerTransaction[] {
   return [...database.transactions.values()].filter((transaction) => transaction.calloff_id === calloffId);
+}
+
+function findComponentTransaction(
+  database: PrototypeDatabase,
+  transactions: CustomerTransaction[],
+  componentCode: string,
+): CustomerTransaction | undefined {
+  return transactions.find(
+    (transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component === componentCode,
+  );
+}
+
+function findComponentPrice(
+  database: PrototypeDatabase,
+  componentCode: string,
+  transactions: CustomerTransaction[],
+  warnings: string[],
+): number | null {
+  const component = transactions
+    .map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id))
+    .find((candidate) => candidate?.component === componentCode);
+  if (!component) {
+    warnings.push(`missing ${componentCode} price source`);
+    return null;
+  }
+  const price = [...database.priceComponents.values()].find((candidate) => candidate.productcomponent_id === component.productcomponent_id);
+  if (!price) {
+    warnings.push(`missing ${componentCode} price`);
+    return null;
+  }
+  return price.price;
+}
+
+function emptyModernRows(
+  calloffId: string,
+  month: string,
+  warning: string,
+  dimension?: "sys" | "epad",
+): ModernProjectedTransactionRow[] {
+  const dimensions = dimension ? [dimension] : (["sys", "epad"] as const);
+  return dimensions.flatMap((candidate) => [
+    emptyModernRow(calloffId, month, `modern.base.${candidate}`, warning),
+    emptyModernRow(calloffId, month, `modern.peak.${candidate}`, warning),
+  ]);
+}
+
+function emptyModernRow(
+  calloffId: string,
+  month: string,
+  component: ModernProjectedTransactionRow["component"],
+  warning: string,
+): ModernProjectedTransactionRow {
+  return {
+    calloff_id: calloffId,
+    month,
+    component,
+    mw: null,
+    price: null,
+    mwh: 0,
+    value: 0,
+    source_components: "",
+    warnings: [warning].filter(Boolean),
+  };
+}
+
+function componentSort(component: ModernProjectedTransactionRow["component"]): number {
+  return ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad"].indexOf(component);
+}
+
+function mwhMismatch(leftRows: ModernProjectedTransactionRow[], rightRows: ModernProjectedTransactionRow[]): boolean {
+  const byMonth = new Map(rightRows.map((row) => [row.month, row.mwh]));
+  return leftRows.some((row) => Math.abs(row.mwh - (byMonth.get(row.month) ?? row.mwh)) > EPSILON);
 }
 
 function getPortfolioCalloffs(database: PrototypeDatabase, portfolioId: string) {
@@ -306,7 +465,7 @@ function divideOrNull(numerator: number, denominator: number): number | null {
   return roundProjection(numerator / denominator);
 }
 
-function sum(rows: PeaksMonthlyProjection[], key: keyof PeaksMonthlyProjection): number {
+function sumModernRows(rows: ModernProjectedTransactionRow[], key: "mwh" | "value"): number {
   return rows.reduce((total, row) => total + Number(row[key] ?? 0), 0);
 }
 

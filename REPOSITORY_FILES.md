@@ -24,6 +24,9 @@ docs/hedging/component_categories_and_projection_listeners.md
 docs/hedging/data_viewer.md
 docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
+docs/hedging/modern_projected_calloffs.md
+docs/hedging/modern_projected_model.md
+docs/hedging/modern_projected_transactions.md
 docs/hedging/modern_projection_base_peak_rules.md
 docs/hedging/peaks_classic_calloff_transaction_list.md
 docs/hedging/peaks_classic_legacy_calloff_list.md
@@ -33,8 +36,8 @@ docs/hedging/peaks_modern_forecast_hedge.md
 docs/hedging/peaks_modern_volume_semantics.md
 docs/hedging/portfolio_hedging_product_family.md
 docs/hedging/position_report.md
-docs/hedging/projection_mw_and_price_rules.md
 docs/hedging/product_packages_and_feature_sets.md
+docs/hedging/projection_mw_and_price_rules.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
 docs/market-derivation/runtime_derivation_policy.md
@@ -142,6 +145,10 @@ requirements/package-runs/P0031/design.md
 requirements/package-runs/P0031/findings.md
 requirements/package-runs/P0031/functions.md
 requirements/package-runs/P0031/review.md
+requirements/package-runs/P0032/design.md
+requirements/package-runs/P0032/findings.md
+requirements/package-runs/P0032/functions.md
+requirements/package-runs/P0032/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -175,6 +182,7 @@ requirements/packages/P0028-split-allocation-peak-into-sys-epad.md
 requirements/packages/P0029-peaks-modern-calloff-transaction-list.md
 requirements/packages/P0030-calloff-lists-use-mwh-columns.md
 requirements/packages/P0031-data-viewer-modern-projection-views.md
+requirements/packages/P0032-modern-projected-transaction-model.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts

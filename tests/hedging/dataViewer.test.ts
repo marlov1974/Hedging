@@ -6,8 +6,8 @@ import {
   getDataViewerRows,
   getDataViewerTables,
   getDataViewerYears,
-  getModernCalloffsForPortfolioYear,
-  getModernTransactionsForPortfolioYear,
+  getModernProjectedCalloffsForPortfolioYear,
+  getModernProjectedTransactionsForPortfolioYear,
   getRawCalloffsForPortfolioYear,
   getRawTransactionsForPortfolioYear,
 } from "../../src/hedging/dataViewer.ts";
@@ -32,8 +32,8 @@ describe("Data Viewer", () => {
     assert.match(html, /name="selected_table"/);
     assert.match(html, /Calloffs/);
     assert.match(html, /Transactions/);
-    assert.match(html, /Modern Calloffs/);
-    assert.match(html, /Modern Transactions/);
+    assert.match(html, /Modern Projected Calloffs/);
+    assert.match(html, /Modern Projected Transactions/);
   });
 
   it("renders year selector", () => {
@@ -51,7 +51,7 @@ describe("Data Viewer", () => {
   it("returns supported tables", () => {
     assert.deepEqual(
       getDataViewerTables().map((table) => table.table_id),
-      ["calloffs", "transactions", "modern-calloffs", "modern-transactions"],
+      ["calloffs", "transactions", "modern-projected-calloffs", "modern-projected-transactions"],
     );
   });
 
@@ -106,53 +106,100 @@ describe("Data Viewer", () => {
     assert.equal(row?.q_factor, 1);
   });
 
-  it("Modern Calloffs projects Peaks.Classic calloffs as Peaks.Modern compatible rows", () => {
-    const rows = getModernCalloffsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
+  it("Modern Projected Calloffs aggregates projected modern transactions", () => {
+    const rows = getModernProjectedCalloffsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
 
     assert.deepEqual(
       rows.map((row) => row.calloff_id),
       ["CAL30"],
     );
-    assert.equal(rows[0].source_product_id, "PRO01");
-    assert.equal(rows[0].projected_product_package, "Peaks.Modern");
-    assert.equal(rows[0].canonical_total_value, rows[0].projected_total_value);
+    assert.equal(rows[0].date, "2027-01-20");
+    assert.equal(rows[0].period_start, "2027-01");
+    assert.equal(rows[0].period_end, "2027-01");
+    assert.equal(rows[0].base_mwh, 87.735849);
+    assert.equal(rows[0].peak_mwh, 12.264151);
+    assert.equal(rows[0].base_price, 85);
+    assert.equal(rows[0].peak_price, 97.537634);
+    assert.equal(rows[0].total_value, 8653.763441);
   });
 
-  it("Modern Transactions projects canonical rows into Base and Peak rows", () => {
-    const rows = getModernTransactionsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
+  it("Modern Projected Transactions uses explicit modern component rows", () => {
+    const rows = getModernProjectedTransactionsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
 
     assert.deepEqual(
       rows.map((row) => row.component),
-      ["base", "peak"],
-    );
-    assert.deepEqual(
-      rows.map((row) => row.projected_transaction_id),
-      ["CAL30:modern.base", "CAL30:modern.peak"],
+      ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad"],
     );
     assert.equal(rows.every((row) => row.calloff_id === "CAL30"), true);
+    assert.equal(rows.every((row) => row.month === "2027-01"), true);
+    assert.equal(rows.some((row) => row.component === "base.sys" as never), false);
+    assert.equal(rows.some((row) => row.component === "peak.sys" as never), false);
     assert.equal(rows.some((row) => row.component === "allocation.peak.sys" as never), false);
-    assert.equal(rows.reduce((sum, row) => sum + row.value, 0), getModernCalloffsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027")[0].canonical_total_value);
+  });
+
+  it("Modern Projected Transactions calculates MW and prices per dimension", () => {
+    const rows = getModernProjectedTransactionsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
+    const baseSys = rows.find((row) => row.component === "modern.base.sys");
+    const baseEpad = rows.find((row) => row.component === "modern.base.epad");
+    const peakSys = rows.find((row) => row.component === "modern.peak.sys");
+    const peakEpad = rows.find((row) => row.component === "modern.peak.epad");
+
+    assert.equal(baseSys?.mw, 0.117925);
+    assert.equal(baseEpad?.mw, 0.117925);
+    assert.equal(peakSys?.mw, 0.038325);
+    assert.equal(peakEpad?.mw, 0.038325);
+    assert.notEqual(baseSys?.mw, round(100 / 744));
+    assert.notEqual(peakSys?.mw, round(0.15625 - 100 / 744));
+    assert.equal(baseSys?.price, 70);
+    assert.equal(baseEpad?.price, 15);
+    assert.equal(peakSys?.price, 81.397849);
+    assert.equal(peakEpad?.price, 16.139785);
+    assert.equal(round((baseSys?.value ?? 0) + (peakSys?.value ?? 0)), 7139.784946);
+    assert.equal(round((baseEpad?.value ?? 0) + (peakEpad?.value ?? 0)), 1513.978495);
+  });
+
+  it("Modern Projected Transactions allows negative modern peak MW", () => {
+    const database = createDataViewerDatabase({ allocationPeakMw: 0.109375, peakMw: -0.0250336022 });
+    const peakSys = getModernProjectedTransactionsForPortfolioYear(database, "CUS01-0", "2027").find(
+      (row) => row.component === "modern.peak.sys",
+    );
+
+    assert.ok(peakSys);
+    assert.ok((peakSys.mw ?? 0) < 0);
+    assert.ok(peakSys.price !== null);
+  });
+
+  it("Modern Projected Transactions warns instead of dividing by zero", () => {
+    const database = createDataViewerDatabase();
+    const calendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
+    assert.ok(calendar);
+    calendar.peak_h = calendar.total_h;
+
+    const rows = getModernProjectedTransactionsForPortfolioYear(database, "CUS01-0", "2027");
+
+    assert.equal(rows.every((row) => row.mw === null), true);
+    assert.match(rows[0].warnings.join("; "), /zero peak or offpeak hours/);
   });
 
   it("renders Modern projection tables", () => {
     const calloffsHtml = renderHedgingTool(createDataViewerDatabase(), {
       portfolio_id: "CUS01-0",
       feature_id: "data-viewer",
-      selected_table: "modern-calloffs",
+      selected_table: "modern-projected-calloffs",
       selected_year: "2027",
     });
     const transactionsHtml = renderHedgingTool(createDataViewerDatabase(), {
       portfolio_id: "CUS01-0",
       feature_id: "data-viewer",
-      selected_table: "modern-transactions",
+      selected_table: "modern-projected-transactions",
       selected_year: "2027",
     });
 
-    assert.match(calloffsHtml, /projected_product_package/);
-    assert.match(calloffsHtml, /Peaks.Modern/);
-    assert.match(transactionsHtml, /projected_transaction_id/);
-    assert.match(transactionsHtml, /CAL30:modern.base/);
-    assert.doesNotMatch(transactionsHtml, /allocation\.peak\.sys/);
+    assert.match(calloffsHtml, /base_mwh/);
+    assert.match(calloffsHtml, /total_value/);
+    assert.match(transactionsHtml, /calloff_id[\s\S]*month[\s\S]*component[\s\S]*mw[\s\S]*price/);
+    assert.match(transactionsHtml, /modern\.base\.sys/);
+    assert.doesNotMatch(transactionsHtml, /<td>allocation\.peak\.sys<\/td>/);
   });
 
   it("Calloffs table includes raw calloff columns", () => {
@@ -207,12 +254,22 @@ describe("Data Viewer", () => {
 
   it("returns data-derived years plus seed years", () => {
     assert.deepEqual(getDataViewerYears(createDataViewerDatabase(), "CUS00-0", "calloffs"), ["2027", "2028", "2029"]);
-    assert.deepEqual(getDataViewerYears(createDataViewerDatabase(), "CUS01-0", "modern-transactions"), ["2027", "2028", "2029"]);
+    assert.deepEqual(getDataViewerYears(createDataViewerDatabase(), "CUS01-0", "modern-projected-transactions"), ["2027", "2028", "2029"]);
   });
 });
 
-function createDataViewerDatabase() {
+function createDataViewerDatabase(
+  overrides: Partial<{
+    allocationPeakMw: number;
+    peakMw: number;
+  }> = {},
+) {
   const database = createPocSeedData();
+  const januaryCalendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
+  assert.ok(januaryCalendar);
+  januaryCalendar.total_h = 744;
+  januaryCalendar.peak_h = 320;
+  setPeaksClassicPrices(database);
 
   insertCalloff(database, {
     calloff_id: "CAL10",
@@ -280,12 +337,12 @@ function createDataViewerDatabase() {
     q_factor: 1,
   });
   for (const [index, component, mw, qFactor] of [
-    [0, "allocation.peak.sys", 0.15625, 0],
-    [1, "allocation.peak.epad", 0.15625, 0],
+    [0, "allocation.peak.sys", overrides.allocationPeakMw ?? 0.15625, 0],
+    [1, "allocation.peak.epad", overrides.allocationPeakMw ?? 0.15625, 0],
     [2, "base.sys", 100 / 744, 1],
     [3, "base.epad", 100 / 744, 1],
-    [4, "peak.sys", 0.15625 - 100 / 744, 1],
-    [5, "peak.epad", 0.15625 - 100 / 744, 1],
+    [4, "peak.sys", overrides.peakMw ?? 0.15625 - 100 / 744, 1],
+    [5, "peak.epad", overrides.peakMw ?? 0.15625 - 100 / 744, 1],
   ] as const) {
     insertTransaction(database, {
       transaction_id: `CAL30-${String(index).padStart(3, "0")}`,
@@ -298,4 +355,32 @@ function createDataViewerDatabase() {
   }
 
   return database;
+}
+
+function setPeaksClassicPrices(database: ReturnType<typeof createPocSeedData>): void {
+  const prices = new Map([
+    ["base.sys", 70],
+    ["base.epad", 15],
+    ["peak.sys", 20],
+    ["peak.epad", 2],
+  ]);
+
+  for (const component of database.productConfigurationComponents.values()) {
+    if (component.product_id !== "PRO01") {
+      continue;
+    }
+    const price = prices.get(component.component);
+    if (price === undefined) {
+      continue;
+    }
+    const priceComponent = [...database.priceComponents.values()].find(
+      (candidate) => candidate.productcomponent_id === component.productcomponent_id,
+    );
+    assert.ok(priceComponent);
+    priceComponent.price = price;
+  }
+}
+
+function round(value: number): number {
+  return Number(value.toFixed(6));
 }

@@ -9,8 +9,8 @@ The supported tables are:
 ```text
 Calloffs
 Transactions
-Modern Calloffs
-Modern Transactions
+Modern Projected Calloffs
+Modern Projected Transactions
 ```
 
 ## Portfolio Scoping
@@ -39,8 +39,8 @@ The table selector supports:
 ```text
 calloffs
 transactions
-modern-calloffs
-modern-transactions
+modern-projected-calloffs
+modern-projected-transactions
 ```
 
 Unknown table values are handled as invalid input.
@@ -91,41 +91,51 @@ q_factor
 
 Default sorting is by month ascending, then calloff id ascending, then transaction id ascending.
 
-## Modern Calloffs Projection View
+## Modern Projected Calloffs View
 
-The Modern Calloffs table shows Peaks calloffs through the Modern projection lens:
+The Modern Projected Calloffs table shows Peaks calloffs through the Modern projection lens:
 
 ```text
 calloff_id
-source_product_id
-projected_product_package
-portfolio_id
 date
-delivery_start_month
-delivery_end_month
-canonical_total_value
-projected_total_value
+period_start
+period_end
+base_mwh
+peak_mwh
+base_price
+peak_price
+base_value
+peak_value
+total_value
 ```
 
-`projected_product_package` is `Peaks.Modern`. This allows Peaks.Classic and Peaks.Modern canonical calloffs to be viewed as compatible Modern calloffs.
+`base_mwh` and `peak_mwh` are physical volumes carried by the sys dimension. Sys and epad values are combined into all-in base and peak prices without double-counting physical volume.
 
-## Modern Transactions Projection View
+## Modern Projected Transactions View
 
-The Modern Transactions table shows projected Base/Peak rows:
+The Modern Projected Transactions table shows projected Base/Peak component rows:
 
 ```text
-projected_transaction_id
 calloff_id
-period
+month
 component
-mwh
+mw
 price
 value
+source_components
+warnings
 ```
 
-The projected rows are derived from the canonical Peaks component rows.
+The `component` column uses only projected Modern component names:
 
-Allocation rows are not shown directly in the Modern projection. Raw allocation and canonical MW rows remain visible in the original Transactions view.
+```text
+modern.base.sys
+modern.base.epad
+modern.peak.sys
+modern.peak.epad
+```
+
+The projected rows are derived from canonical Peaks component rows. Allocation rows and canonical component names are not shown as projected component values. They remain visible in the raw Transactions view and may appear in debug-only `source_components`.
 
 ## Known PoC Limitations
 
