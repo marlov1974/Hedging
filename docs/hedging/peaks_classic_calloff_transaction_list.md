@@ -23,11 +23,18 @@ Compatibility aliases are read only when older fixture rows remain.
 
 ## Projection
 
-For each month:
+For each month, MW can be calculated internally:
 
 ```text
 ClassicOffpeakMW = (B * H - A * Hp) / Ho
 ClassicPeakMW = A
+```
+
+The customer list displays MWh:
+
+```text
+ClassicOffpeakMWh = B * H - A * Hp
+ClassicPeakMWh = A * Hp
 ClassicOffpeakPrice = CanonicalBasePrice
 ClassicPeakPrice = residual price preserving CanonicalTotalValue
 ```
@@ -38,8 +45,8 @@ ClassicPeakPrice = residual price preserving CanonicalTotalValue
 
 ```text
 Date
-OffpeakMW
-PeakMW
+OffpeakMWh
+PeakMWh
 OffpeakPrice
 PeakPrice
 ```
@@ -50,7 +57,7 @@ The implementation also keeps compact metadata columns for calloff id, period an
 
 Single-month calloffs show one row.
 
-Multi-month calloffs show one calloff-level row. Monthly values are projected first, then aggregated with hour-weighted MW and value-weighted prices.
+Multi-month calloffs show one calloff-level row. Monthly values are projected first, then MWh is summed and prices are value-weighted.
 
 ## Raw Data
 

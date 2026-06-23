@@ -49,8 +49,8 @@ The UI shows:
 
 ```text
 Date
-OffpeakMW
-PeakMW
+OffpeakMWh
+PeakMWh
 OffpeakPrice
 PeakPrice
 Warnings

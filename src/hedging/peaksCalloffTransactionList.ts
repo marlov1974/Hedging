@@ -11,8 +11,8 @@ export type PeaksClassicCalloffTransactionRow = {
   date: string;
   calloff_id: string;
   period: string;
-  offpeak_mw: number | null;
-  peak_mw: number | null;
+  offpeak_mwh: number;
+  peak_mwh: number;
   offpeak_price: number | null;
   peak_price: number | null;
   canonical_total_value: number;
@@ -24,8 +24,8 @@ export type PeaksModernCalloffTransactionRow = {
   date: string;
   calloff_id: string;
   period: string;
-  base_mw: number | null;
-  peak_mw: number | null;
+  base_mwh: number;
+  peak_mwh: number;
   base_price: number | null;
   peak_price: number | null;
   canonical_total_value: number;
@@ -240,8 +240,6 @@ function aggregateClassicProjection(rows: PeaksMonthlyProjection[]): PeaksClassi
   const warnings = aggregateWarnings(rows);
   const offpeakMwh = sum(rows, "classic_offpeak_mwh");
   const peakMwh = sum(rows, "classic_peak_mwh");
-  const offpeakHours = sum(rows, "offpeak_h");
-  const peakHours = sum(rows, "peak_h");
   const offpeakValue = sum(rows, "classic_offpeak_value");
   const peakValue = sum(rows, "classic_peak_value");
 
@@ -249,8 +247,8 @@ function aggregateClassicProjection(rows: PeaksMonthlyProjection[]): PeaksClassi
     date: rows[0].date,
     calloff_id: rows[0].calloff_id,
     period: periodForRows(rows),
-    offpeak_mw: divideOrNull(offpeakMwh, offpeakHours, warnings, "zero classic offpeak hours"),
-    peak_mw: divideOrNull(peakMwh, peakHours, warnings, "zero classic peak hours"),
+    offpeak_mwh: roundProjection(offpeakMwh),
+    peak_mwh: roundProjection(peakMwh),
     offpeak_price: divideOrNull(offpeakValue, offpeakMwh, warnings, "zero classic offpeak MWh"),
     peak_price: divideOrNull(peakValue, peakMwh, warnings, "zero classic peak MWh"),
     canonical_total_value: roundProjection(sum(rows, "canonical_total_value")),
@@ -263,8 +261,6 @@ function aggregateModernProjection(rows: PeaksMonthlyProjection[]): PeaksModernC
   const warnings = aggregateWarnings(rows);
   const baseMwh = sum(rows, "modern_base_mwh");
   const peakMwh = sum(rows, "modern_peak_mwh");
-  const totalHours = sum(rows, "total_h");
-  const peakHours = sum(rows, "peak_h");
   const baseValue = sum(rows, "modern_base_value");
   const peakValue = sum(rows, "modern_peak_value");
 
@@ -272,8 +268,8 @@ function aggregateModernProjection(rows: PeaksMonthlyProjection[]): PeaksModernC
     date: rows[0].date,
     calloff_id: rows[0].calloff_id,
     period: periodForRows(rows),
-    base_mw: divideOrNull(baseMwh, totalHours, warnings, "zero modern base hours"),
-    peak_mw: divideOrNull(peakMwh, peakHours, warnings, "zero modern peak hours"),
+    base_mwh: roundProjection(baseMwh),
+    peak_mwh: roundProjection(peakMwh),
     base_price: divideOrNull(baseValue, baseMwh, warnings, "zero modern base MWh"),
     peak_price: divideOrNull(peakValue, peakMwh, warnings, "zero modern peak MWh"),
     canonical_total_value: roundProjection(sum(rows, "canonical_total_value")),

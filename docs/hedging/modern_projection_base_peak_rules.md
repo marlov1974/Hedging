@@ -8,7 +8,7 @@ The Modern list is a customer projection from canonical component transactions, 
 
 ## MW Projection
 
-Modern Base is the offpeak level applied across the full month.
+Modern can use MW internally. Modern Base is the offpeak level applied across the full month.
 
 Modern Peak is the extra effect above Modern Base during peak hours.
 
@@ -34,6 +34,17 @@ ModernPeakMW != peak.sys.mw
 They are projected customer MW values.
 
 `ModernPeakMW` may be negative.
+
+## Customer MWh Projection
+
+The Modern customer list displays MWh:
+
+```text
+ModernBaseMWh = ModernBaseMW * H
+ModernPeakMWh = ModernPeakMW * Hp
+```
+
+`ModernPeakMWh` may be negative.
 
 ## Price Projection
 
@@ -61,8 +72,8 @@ The customer list shows:
 
 ```text
 Date
-BaseMW
-PeakMW
+BaseMWh
+PeakMWh
 BasePrice
 PeakPrice
 ```

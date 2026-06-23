@@ -451,8 +451,8 @@ function renderClassicCalloffTransactionList(database: PrototypeDatabase, select
       <thead>
         <tr>
           <th>Date</th>
-          <th>OffpeakMW</th>
-          <th>PeakMW</th>
+          <th>OffpeakMWh</th>
+          <th>PeakMWh</th>
           <th>OffpeakPrice</th>
           <th>PeakPrice</th>
           <th>Warnings</th>
@@ -463,8 +463,8 @@ function renderClassicCalloffTransactionList(database: PrototypeDatabase, select
           .map(
             (row) => `<tr>
               <td>${escapeHtml(row.date)}</td>
-              <td class="number">${formatOptionalNumber(row.offpeak_mw)}</td>
-              <td class="number">${formatOptionalNumber(row.peak_mw)}</td>
+              <td class="number">${formatNumber(row.offpeak_mwh)}</td>
+              <td class="number">${formatNumber(row.peak_mwh)}</td>
               <td class="number">${formatOptionalNumber(row.offpeak_price)}</td>
               <td class="number">${formatOptionalNumber(row.peak_price)}</td>
               <td>${escapeHtml(row.warnings.join("; "))}</td>
@@ -489,8 +489,8 @@ function renderModernCalloffTransactionList(database: PrototypeDatabase, selecte
       <thead>
         <tr>
           <th>Date</th>
-          <th>BaseMW</th>
-          <th>PeakMW</th>
+          <th>BaseMWh</th>
+          <th>PeakMWh</th>
           <th>BasePrice</th>
           <th>PeakPrice</th>
           <th>Warnings</th>
@@ -501,8 +501,8 @@ function renderModernCalloffTransactionList(database: PrototypeDatabase, selecte
           .map(
             (row) => `<tr>
               <td>${escapeHtml(row.date)}</td>
-              <td class="number">${formatOptionalNumber(row.base_mw)}</td>
-              <td class="number">${formatOptionalNumber(row.peak_mw)}</td>
+              <td class="number">${formatNumber(row.base_mwh)}</td>
+              <td class="number">${formatNumber(row.peak_mwh)}</td>
               <td class="number">${formatOptionalNumber(row.base_price)}</td>
               <td class="number">${formatOptionalNumber(row.peak_price)}</td>
               <td>${escapeHtml(row.warnings.join("; "))}</td>

@@ -8,7 +8,7 @@ The Classic list is a customer projection from canonical component transactions,
 
 ## MW Projection
 
-Classic uses the physical customer peak level directly from allocation:
+Classic can use MW internally. It uses the physical customer peak level directly from allocation:
 
 ```text
 ClassicOffpeakMW = (B * H - A * Hp) / Ho
@@ -26,6 +26,15 @@ Ho = offpeak_h
 ```
 
 Allocation rows are not displayed as customer rows.
+
+## Customer MWh Projection
+
+The Classic customer list displays MWh:
+
+```text
+ClassicPeakMWh = A * Hp
+ClassicOffpeakMWh = B * H - ClassicPeakMWh
+```
 
 ## Price Projection
 
@@ -51,8 +60,8 @@ The customer list shows:
 
 ```text
 Date
-OffpeakMW
-PeakMW
+OffpeakMWh
+PeakMWh
 OffpeakPrice
 PeakPrice
 ```

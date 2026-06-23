@@ -23,7 +23,7 @@ Durable design and function documentation lives here.
 - [Peaks.Modern Forecast](hedging/peaks_modern_forecast_feature.md)
 - [Peaks.Classic Calloff Transaction List](hedging/peaks_classic_calloff_transaction_list.md)
 - [Peaks.Modern Calloff Transaction List](hedging/peaks_modern_calloff_transaction_list.md)
-- [Projection MW and price rules](hedging/projection_mw_and_price_rules.md)
+- [Projection MWh and price rules](hedging/projection_mw_and_price_rules.md)
 - [Classic projection Peak/Offpeak rules](hedging/classic_projection_peak_offpeak_rules.md)
 - [Modern projection Base/Peak rules](hedging/modern_projection_base_peak_rules.md)
 - [Classic projection price rules](hedging/classic_projection_price_rules.md)

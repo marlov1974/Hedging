@@ -30,28 +30,32 @@ describe("Peaks calloff transaction lists", () => {
     const database = createWorkedExampleDatabase("classic");
     const html = renderHedgingTool(database, { portfolio_id: "CUS01-0", feature_id: "legacy-calloff-list" });
 
-    assert.match(html, /Date[\s\S]*OffpeakMW[\s\S]*PeakMW[\s\S]*OffpeakPrice[\s\S]*PeakPrice/);
+    assert.match(html, /Date[\s\S]*OffpeakMWh[\s\S]*PeakMWh[\s\S]*OffpeakPrice[\s\S]*PeakPrice/);
+    assert.doesNotMatch(html, /<th>OffpeakMW<\/th>/);
+    assert.doesNotMatch(html, /<th>PeakMW<\/th>/);
   });
 
   it("renders Modern required columns in order", () => {
     const database = createWorkedExampleDatabase("modern");
     const html = renderHedgingTool(database, { portfolio_id: "CUS02-0", feature_id: "modern-calloff-transaction-list" });
 
-    assert.match(html, /Date[\s\S]*BaseMW[\s\S]*PeakMW[\s\S]*BasePrice[\s\S]*PeakPrice/);
+    assert.match(html, /Date[\s\S]*BaseMWh[\s\S]*PeakMWh[\s\S]*BasePrice[\s\S]*PeakPrice/);
+    assert.doesNotMatch(html, /<th>BaseMW<\/th>/);
+    assert.doesNotMatch(html, /<th>PeakMW<\/th>/);
   });
 
-  it("calculates Classic and Modern projected MW values from canonical B and A", () => {
+  it("calculates Classic and Modern customer MWh values from projected MW values", () => {
     const database = createWorkedExampleDatabase("modern");
     const modern = getPeaksModernCalloffTransactionRows(database, "CUS02-0")[0];
     const classic = getPeaksClassicCalloffTransactionRows(createWorkedExampleDatabase("classic"), "CUS01-0")[0];
 
-    assert.equal(classic.offpeak_mw, 0.117925);
-    assert.equal(classic.peak_mw, 0.15625);
-    assert.equal(modern.base_mw, 0.117925);
-    assert.equal(modern.peak_mw, 0.038325);
+    assert.equal(classic.offpeak_mwh, 50);
+    assert.equal(classic.peak_mwh, 50);
+    assert.equal(modern.base_mwh, 87.735849);
+    assert.equal(modern.peak_mwh, 12.264151);
 
-    assert.notEqual(modern.base_mw, round(100 / 744));
-    assert.notEqual(modern.peak_mw, round(0.15625 - 100 / 744));
+    assert.notEqual(modern.base_mwh, 100);
+    assert.notEqual(modern.peak_mwh, round(0.0218413978 * 320));
   });
 
   it("calculates Classic and Modern value-preserving prices", () => {
@@ -68,14 +72,14 @@ describe("Peaks calloff transaction lists", () => {
     assertApprox(modern.canonical_total_value, 8653.763441);
   });
 
-  it("allows negative Modern PeakMW and preserves value", () => {
+  it("allows negative Modern PeakMWh and preserves value", () => {
     const database = createWorkedExampleDatabase("modern", {
       allocation_peak_mw: 0.109375,
       peak_mw: -0.0250336022,
     });
     const modern = getPeaksModernCalloffTransactionRows(database, "CUS02-0")[0];
 
-    assert.ok((modern.peak_mw ?? 0) < 0);
+    assert.ok(modern.peak_mwh < 0);
     assert.equal(modern.projected_total_value, modern.canonical_total_value);
   });
 
@@ -89,7 +93,7 @@ describe("Peaks calloff transaction lists", () => {
     assert.doesNotMatch(html, /fixed adjustment/);
   });
 
-  it("aggregates multi-month calloffs with hour and value weighting", () => {
+  it("aggregates multi-month calloffs by summing MWh and value-weighting prices", () => {
     const database = createWorkedExampleDatabase("modern");
     createCanonicalCalloff(database, "modern", {
       calloff_id: "CAL21",
@@ -114,10 +118,12 @@ describe("Peaks calloff transaction lists", () => {
         [...database.transactions.values()].filter((transaction) => transaction.calloff_id === "CAL20" && transaction.month === month),
       ),
     );
-    const arithmeticBaseMw = round(((monthRows[0].modern_base_mw ?? 0) + (monthRows[1].modern_base_mw ?? 0)) / 2);
+    const arithmeticPeakPrice = round(((monthRows[0].modern_peak_price ?? 0) + (monthRows[1].modern_peak_price ?? 0)) / 2);
 
-    assert.notEqual(row.base_mw, arithmeticBaseMw);
-    assert.equal(row.base_mw, round((monthRows[0].modern_base_mwh + monthRows[1].modern_base_mwh) / (744 + 672)));
+    assert.equal(row.base_mwh, round(monthRows[0].modern_base_mwh + monthRows[1].modern_base_mwh));
+    assert.equal(row.peak_mwh, round(monthRows[0].modern_peak_mwh + monthRows[1].modern_peak_mwh));
+    assert.equal(row.peak_price, round((monthRows[0].modern_peak_value + monthRows[1].modern_peak_value) / row.peak_mwh));
+    assert.notEqual(row.peak_price, arithmeticPeakPrice);
     assert.equal(row.projected_total_value, row.canonical_total_value);
   });
 
@@ -129,7 +135,7 @@ describe("Peaks calloff transaction lists", () => {
 
     const row = getPeaksModernCalloffTransactionRows(database, "CUS02-0")[0];
 
-    assert.equal(row.base_mw, null);
+    assert.equal(row.base_price, null);
     assert.match(row.warnings.join("; "), /zero peak or offpeak hours/);
   });
 
@@ -143,7 +149,7 @@ describe("Peaks calloff transaction lists", () => {
     });
     const row = getPeaksClassicCalloffTransactionRows(database, "CUS01-0")[0];
 
-    assert.equal(row.peak_mw, 0.15625);
+    assert.equal(row.peak_mwh, 50);
     assert.match(row.warnings.join("; "), /mismatched base MW/);
     assert.match(row.warnings.join("; "), /mismatched peak MW/);
     assert.match(row.warnings.join("; "), /legacy allocation\.peak alias/);

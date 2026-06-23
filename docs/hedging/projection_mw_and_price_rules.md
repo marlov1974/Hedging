@@ -1,4 +1,4 @@
-# Projection MW And Price Rules
+# Projection MWh And Price Rules
 
 ## Purpose
 
@@ -72,6 +72,33 @@ OffpeakMWh = TotalMWh - PeakMWh
 
 These volumes are the bridge from canonical component rows to customer-facing Classic and Modern projections.
 
+## Customer Display Volumes
+
+Customer-facing calloff transaction lists display MWh, not MW.
+
+Classic displayed volumes:
+
+```text
+ClassicOffpeakMWh = OffpeakMWh
+ClassicPeakMWh = A * Hp
+```
+
+Modern still uses projected MW internally:
+
+```text
+ModernBaseMW = ClassicOffpeakMWh / Ho
+ModernPeakMW = A - ModernBaseMW
+```
+
+Modern displayed volumes:
+
+```text
+ModernBaseMWh = ModernBaseMW * H
+ModernPeakMWh = ModernPeakMW * Hp
+```
+
+Negative `ModernPeakMWh` is valid.
+
 ## Value Preservation
 
 Both Classic and Modern projected rows must preserve canonical total value:
@@ -86,6 +113,6 @@ Residual projected prices are used when the displayed customer row structure dif
 
 Single-month calloffs show one row.
 
-Multi-month calloffs still show one calloff-level row. Monthly projections are calculated first, then aggregated by hours and values.
+Multi-month calloffs still show one calloff-level row. Monthly projections are calculated first, then MWh and values are summed.
 
-MW values are weighted by relevant hours. Prices are weighted by projected MWh and value. Arithmetic averaging is not used.
+Customer MWh values are not converted back to MW for display. Prices are weighted by projected MWh and value. Arithmetic averaging is not used.
