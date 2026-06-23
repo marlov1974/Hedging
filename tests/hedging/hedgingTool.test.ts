@@ -23,8 +23,9 @@ describe("hedging tool shell", () => {
     const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0" });
 
     assert.match(html, /Feature navigation/);
-    assert.match(html, /Buy Baseloads/);
-    assert.match(html, /Baseloads Calloff List/);
+    assert.match(html, /Hedge Baseload/);
+    assert.match(html, /Calloff List - Baseloads/);
+    assert.match(html, /Perspective/);
   });
 
   it("top portfolio selector stays compact and omits inline details", () => {
@@ -58,7 +59,7 @@ describe("hedging tool shell", () => {
   });
 
   it("Buy Baseloads feature is not part of Peaks.Modern application", () => {
-    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "CUS02-0");
+    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "CUS02-0", "modern");
 
     const feature = features.find((candidate) => candidate.feature_id === "buy-baseloads");
     assert.equal(feature, undefined);
@@ -76,6 +77,16 @@ describe("hedging tool shell", () => {
     assert.match(html, /Portfolio Details/);
     assert.match(html, /Position Report/);
     assert.match(html, /Financial Settlement/);
+  });
+
+  it("changing perspective keeps the selected portfolio in links", () => {
+    const html = renderHedgingTool(createPocSeedData(), {
+      portfolio_id: "CUS00-0",
+      perspective_id: "classic",
+    });
+
+    assert.match(html, /Classic perspective/);
+    assert.match(html, /portfolio_id=CUS00-0&perspective_id=classic&feature_id=legacy-calloff-list/);
   });
 
   it("unavailable active feature resets to a valid selected portfolio feature", () => {

@@ -1,7 +1,12 @@
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { BaseloadsPurchaseResult } from "../purchase/baseloadsPurchase.ts";
 import { getBaseloadsPurchasePeriods } from "../purchase/periodOptions.ts";
-import { getApplicationFeaturesForPortfolio, resolveActiveFeature } from "./applicationConfig.ts";
+import {
+  getApplicationFeaturesForPortfolio,
+  getPerspectiveOptions,
+  resolveActiveFeature,
+  type PerspectiveId,
+} from "./applicationConfig.ts";
 import { getBaseloadsCalloffListRows } from "./calloffList.ts";
 import {
   DataViewerError,
@@ -9,6 +14,7 @@ import {
   getDataViewerTables,
   getDataViewerYears,
   parseDataViewerTableId,
+  type BaseloadsProjectedTransactionRow,
   type DataViewerTableId,
   type ModernProjectedCalloffRow,
   type ModernProjectedTransactionRow,
@@ -21,6 +27,7 @@ import { getForecastRowsForYear, getForecastYears, type ForecastDisplayRow } fro
 import {
   getPeaksClassicCalloffTransactionRows,
   getPeaksModernCalloffTransactionRows,
+  type PeaksClassicCalloffTransactionRow,
 } from "./peaksCalloffTransactionList.ts";
 import { getPortfolioDetails } from "./portfolioDetails.ts";
 import { getPositionReportRows, getPositionReportYears } from "./positionReport.ts";
@@ -28,6 +35,7 @@ import { getPortfolioOptions, type HedgingFeatureId, type PortfolioOption } from
 
 export type HedgingToolState = {
   portfolio_id?: string;
+  perspective_id?: PerspectiveId;
   feature_id?: HedgingFeatureId;
   mw?: string;
   selected_period_id?: string;
@@ -49,9 +57,10 @@ export type HedgingToolState = {
 export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToolState = {}): string {
   const portfolios = getPortfolioOptions(database);
   const selectedPortfolio = portfolios.find((portfolio) => portfolio.portfolio_id === state.portfolio_id);
-  const applicationConfig = getApplicationFeaturesForPortfolio(database, selectedPortfolio?.portfolio_id);
+  const applicationConfig = getApplicationFeaturesForPortfolio(database, selectedPortfolio?.portfolio_id, state.perspective_id);
+  const activePerspective = applicationConfig.perspective_id === "none" ? undefined : applicationConfig.perspective_id;
   const features = applicationConfig.features;
-  const activeFeature = resolveActiveFeature(database, selectedPortfolio?.portfolio_id, state.feature_id);
+  const activeFeature = resolveActiveFeature(database, selectedPortfolio?.portfolio_id, state.feature_id, activePerspective);
 
   return `<!doctype html>
 <html lang="en">
@@ -275,15 +284,16 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
 <body class="variant-${escapeHtml(applicationConfig.accent)}">
   <main>
     <section class="topbar">
-      ${renderPortfolioSelector(portfolios, selectedPortfolio, activeFeature)}
+      ${renderPortfolioSelector(portfolios, selectedPortfolio, activeFeature, activePerspective)}
+      ${renderPerspectiveSelector(selectedPortfolio, activeFeature, activePerspective)}
       <div class="app-context"><strong>${escapeHtml(applicationConfig.title)}</strong><span>${escapeHtml(applicationConfig.context)}</span></div>
     </section>
     <section class="layout">
       <aside class="panel stack">
-        ${renderFeatureNav(features, selectedPortfolio, activeFeature)}
+        ${renderFeatureNav(features, selectedPortfolio, activeFeature, activePerspective)}
       </aside>
       <section class="panel stack">
-        ${renderActiveFeature(database, selectedPortfolio, activeFeature, state)}
+        ${renderActiveFeature(database, selectedPortfolio, activeFeature, state, activePerspective)}
       </section>
     </section>
   </main>
@@ -291,9 +301,15 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
 </html>`;
 }
 
-function renderPortfolioSelector(portfolios: PortfolioOption[], selectedPortfolio: PortfolioOption | undefined, activeFeature: HedgingFeatureId): string {
+function renderPortfolioSelector(
+  portfolios: PortfolioOption[],
+  selectedPortfolio: PortfolioOption | undefined,
+  activeFeature: HedgingFeatureId,
+  perspectiveId: PerspectiveId | undefined,
+): string {
   return `<form method="get" action="/hedging" class="compact-selector">
     <input type="hidden" name="feature_id" value="${escapeHtml(activeFeature)}">
+    ${renderPerspectiveHidden(perspectiveId)}
     <label>
       Portfolio
       <select name="portfolio_id" onchange="this.form.submit()">
@@ -306,7 +322,38 @@ function renderPortfolioSelector(portfolios: PortfolioOption[], selectedPortfoli
   </form>`;
 }
 
-function renderFeatureNav(features: ReturnType<typeof getAvailableFeaturesForPortfolio>, selectedPortfolio: PortfolioOption | undefined, activeFeature: HedgingFeatureId): string {
+function renderPerspectiveSelector(
+  selectedPortfolio: PortfolioOption | undefined,
+  activeFeature: HedgingFeatureId,
+  perspectiveId: PerspectiveId | undefined,
+): string {
+  if (!selectedPortfolio || !perspectiveId) {
+    return "";
+  }
+
+  return `<form method="get" action="/hedging" class="compact-selector">
+    <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+    <input type="hidden" name="feature_id" value="${escapeHtml(activeFeature)}">
+    <label>
+      Perspective
+      <select name="perspective_id" onchange="this.form.submit()">
+        ${getPerspectiveOptions()
+          .map(
+            (perspective) =>
+              `<option value="${escapeHtml(perspective.perspective_id)}"${perspective.perspective_id === perspectiveId ? " selected" : ""}>${escapeHtml(perspective.label)}</option>`,
+          )
+          .join("")}
+      </select>
+    </label>
+  </form>`;
+}
+
+function renderFeatureNav(
+  features: ReturnType<typeof getAvailableFeaturesForPortfolio>,
+  selectedPortfolio: PortfolioOption | undefined,
+  activeFeature: HedgingFeatureId,
+  perspectiveId: PerspectiveId | undefined,
+): string {
   if (!selectedPortfolio) {
     return "";
   }
@@ -314,7 +361,7 @@ function renderFeatureNav(features: ReturnType<typeof getAvailableFeaturesForPor
   return `<nav class="nav" aria-label="Feature navigation">
     ${features
       .map((feature) => {
-        const href = `/hedging?portfolio_id=${encodeURIComponent(selectedPortfolio.portfolio_id)}&feature_id=${encodeURIComponent(feature.feature_id)}`;
+        const href = `/hedging?portfolio_id=${encodeURIComponent(selectedPortfolio.portfolio_id)}&perspective_id=${encodeURIComponent(perspectiveId ?? "")}&feature_id=${encodeURIComponent(feature.feature_id)}`;
         const state = feature.feature_id === activeFeature ? " active" : "";
         return `<a class="nav-link${state}" href="${href}">${escapeHtml(feature.label)}</a>`;
       })
@@ -327,12 +374,13 @@ function renderActiveFeature(
   selectedPortfolio: PortfolioOption | undefined,
   activeFeature: HedgingFeatureId,
   state: HedgingToolState,
+  perspectiveId: PerspectiveId | undefined,
 ): string {
   if (!selectedPortfolio) {
     return `<div class="notice"><h2>Select a portfolio</h2><p>Select a portfolio first to open hedging features.</p></div>`;
   }
 
-  const feature = getApplicationFeaturesForPortfolio(database, selectedPortfolio.portfolio_id).features.find(
+  const feature = getApplicationFeaturesForPortfolio(database, selectedPortfolio.portfolio_id, perspectiveId).features.find(
     (candidate) => candidate.feature_id === activeFeature,
   );
   if (!feature?.available) {
@@ -356,29 +404,29 @@ function renderActiveFeature(
   }
 
   if (activeFeature === "position-report") {
-    return renderPositionReport(database, selectedPortfolio, state);
+    return renderPositionReport(database, selectedPortfolio, state, perspectiveId);
   }
 
   if (activeFeature === "financial-settlement") {
-    return renderFinancialSettlement(database, selectedPortfolio, state);
+    return renderFinancialSettlement(database, selectedPortfolio, state, perspectiveId);
   }
 
   if (activeFeature === "forecast") {
-    return renderForecastFeature(database, selectedPortfolio, state);
+    return renderForecastFeature(database, selectedPortfolio, state, perspectiveId);
   }
 
   if (activeFeature === "forecast-hedge") {
-    return renderForecastHedgeFeature(database, selectedPortfolio, state);
+    return renderForecastHedgeFeature(database, selectedPortfolio, state, perspectiveId);
   }
 
   if (activeFeature === "data-viewer") {
-    return renderDataViewer(database, selectedPortfolio, state);
+    return renderDataViewer(database, selectedPortfolio, state, perspectiveId);
   }
 
-  return renderBuyBaseloads(selectedPortfolio, state);
+  return renderBuyBaseloads(selectedPortfolio, state, perspectiveId);
 }
 
-function renderBuyBaseloads(selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+function renderBuyBaseloads(selectedPortfolio: PortfolioOption, state: HedgingToolState, perspectiveId: PerspectiveId | undefined): string {
   const periods = getBaseloadsPurchasePeriods();
   const selectedPeriodId = state.selected_period_id ?? periods[0]?.period_id ?? "";
 
@@ -391,6 +439,7 @@ function renderBuyBaseloads(selectedPortfolio: PortfolioOption, state: HedgingTo
     ${state.purchase_result ? `<div class="notice success">Calloff ${escapeHtml(state.purchase_result.calloff.calloff_id)} created with ${state.purchase_result.transactions.length} transactions.</div>` : ""}
     <form method="post" action="/hedging/buy-baseloads" class="stack">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      ${renderPerspectiveHidden(perspectiveId)}
       <div class="form-grid">
         <label>
           MW quantity
@@ -536,18 +585,25 @@ function renderPortfolioDetails(database: PrototypeDatabase, selectedPortfolio: 
   </div>`;
 }
 
-function renderPositionReport(database: PrototypeDatabase, selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+function renderPositionReport(
+  database: PrototypeDatabase,
+  selectedPortfolio: PortfolioOption,
+  state: HedgingToolState,
+  perspectiveId: PerspectiveId | undefined,
+): string {
   const years = getPositionReportYears(database, selectedPortfolio.portfolio_id);
   const selectedYear = state.selected_year ?? years[0] ?? "";
   const rows = selectedYear ? getPositionReportRows(database, selectedPortfolio.portfolio_id, selectedYear) : [];
+  const perspectiveLabel = labelForPerspective(perspectiveId);
 
   return `<div class="stack">
     <div>
-      <h2>Position Report</h2>
-      <p>Monthly aggregated positions by component.</p>
+      <h2>Position Report - ${escapeHtml(perspectiveLabel)}</h2>
+      <p>Monthly aggregated canonical positions viewed through the selected perspective.</p>
     </div>
     <form method="get" action="/hedging" class="compact-selector">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      ${renderPerspectiveHidden(perspectiveId)}
       <input type="hidden" name="feature_id" value="position-report">
       <label>
         Year
@@ -586,7 +642,12 @@ function renderPositionReport(database: PrototypeDatabase, selectedPortfolio: Po
   </div>`;
 }
 
-function renderFinancialSettlement(database: PrototypeDatabase, selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+function renderFinancialSettlement(
+  database: PrototypeDatabase,
+  selectedPortfolio: PortfolioOption,
+  state: HedgingToolState,
+  perspectiveId: PerspectiveId | undefined,
+): string {
   const months = getFinancialSettlementMonths(database, selectedPortfolio.portfolio_id);
   const selectedMonth = state.selected_month ?? months[0] ?? "";
 
@@ -640,6 +701,7 @@ function renderFinancialSettlement(database: PrototypeDatabase, selectedPortfoli
     </div>
     <form method="get" action="/hedging" class="compact-selector">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      ${renderPerspectiveHidden(perspectiveId)}
       <input type="hidden" name="feature_id" value="financial-settlement">
       <label>
         Month
@@ -652,20 +714,27 @@ function renderFinancialSettlement(database: PrototypeDatabase, selectedPortfoli
   </div>`;
 }
 
-function renderForecastFeature(database: PrototypeDatabase, selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+function renderForecastFeature(
+  database: PrototypeDatabase,
+  selectedPortfolio: PortfolioOption,
+  state: HedgingToolState,
+  perspectiveId: PerspectiveId | undefined,
+): string {
   const years = getForecastYears(database, selectedPortfolio.portfolio_id);
   const selectedYear = state.selected_year ?? years[0] ?? "";
   const rows = selectedYear ? getForecastRowsForYear(database, selectedPortfolio.portfolio_id, selectedYear) : [];
+  const perspectiveLabel = labelForPerspective(perspectiveId);
 
   return `<div class="stack">
     <div>
-      <h2>Forecast</h2>
-      <p>Monthly forecast values in modern base and peak terms.</p>
+      <h2>Forecast - ${escapeHtml(perspectiveLabel)}</h2>
+      <p>Forecast is edited against the canonical model. Modern perspective uses base and peak terms per P0033.</p>
     </div>
     ${state.error ? `<div class="notice error">${escapeHtml(state.error)}</div>` : ""}
     ${state.forecast_message ? `<div class="notice success">${escapeHtml(state.forecast_message)}</div>` : ""}
     <form method="get" action="/hedging" class="compact-selector">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      ${renderPerspectiveHidden(perspectiveId)}
       <input type="hidden" name="feature_id" value="forecast">
       <label>
         Year
@@ -679,6 +748,7 @@ function renderForecastFeature(database: PrototypeDatabase, selectedPortfolio: P
         ? `<div class="notice"><p>No forecast rows for ${escapeHtml(selectedYear)}.</p></div>`
         : `<form method="post" action="/hedging/forecast" class="stack">
             <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+            ${renderPerspectiveHidden(perspectiveId)}
             <input type="hidden" name="selected_year" value="${escapeHtml(selectedYear)}">
             ${renderForecastTable(rows)}
             <button class="primary" type="submit">Save forecast</button>
@@ -721,7 +791,12 @@ function renderForecastTable(rows: ForecastDisplayRow[]): string {
   </table>`;
 }
 
-function renderForecastHedgeFeature(database: PrototypeDatabase, selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+function renderForecastHedgeFeature(
+  database: PrototypeDatabase,
+  selectedPortfolio: PortfolioOption,
+  state: HedgingToolState,
+  perspectiveId: PerspectiveId | undefined,
+): string {
   const months = [...database.calendars.values()].map((calendar) => calendar.month).sort();
   const startMonth =
     state.forecast_hedge_profile?.start_month ?? state.forecast_hedge_input?.start_month ?? months[0] ?? "";
@@ -729,11 +804,12 @@ function renderForecastHedgeFeature(database: PrototypeDatabase, selectedPortfol
     state.forecast_hedge_profile?.end_month ?? state.forecast_hedge_input?.end_month ?? months[Math.min(2, months.length - 1)] ?? "";
   const percentage =
     state.forecast_hedge_profile ? String(formatPercentInput(state.forecast_hedge_profile.percentage)) : state.forecast_hedge_input?.percentage ?? "50";
+  const perspectiveLabel = labelForPerspective(perspectiveId);
 
   return `<div class="stack">
     <div>
-      <h2>Hedge Forecast</h2>
-      <p>Create a monthly hedge profile from a percentage of forecast.</p>
+      <h2>Hedge Forecast - ${escapeHtml(perspectiveLabel)}</h2>
+      <p>Create a monthly hedge profile from a percentage of forecast. Accepted rows are written as canonical transactions.</p>
     </div>
     ${state.error ? `<div class="notice error">${escapeHtml(state.error)}</div>` : ""}
     ${
@@ -743,6 +819,7 @@ function renderForecastHedgeFeature(database: PrototypeDatabase, selectedPortfol
     }
     <form method="post" action="/hedging/forecast-hedge/generate" class="stack">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      ${renderPerspectiveHidden(perspectiveId)}
       <div class="form-grid">
         <label>
           Start month
@@ -759,13 +836,18 @@ function renderForecastHedgeFeature(database: PrototypeDatabase, selectedPortfol
       </div>
       <button type="submit">Build hedge profile</button>
     </form>
-    ${state.forecast_hedge_profile ? renderForecastHedgeProfile(selectedPortfolio, state.forecast_hedge_profile) : ""}
+    ${state.forecast_hedge_profile ? renderForecastHedgeProfile(selectedPortfolio, state.forecast_hedge_profile, perspectiveId) : ""}
   </div>`;
 }
 
-function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile: ForecastHedgeProfile): string {
+function renderForecastHedgeProfile(
+  selectedPortfolio: PortfolioOption,
+  profile: ForecastHedgeProfile,
+  perspectiveId: PerspectiveId | undefined,
+): string {
   return `<form method="post" action="/hedging/forecast-hedge/accept" class="stack">
     <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+    ${renderPerspectiveHidden(perspectiveId)}
     <input type="hidden" name="start_month" value="${escapeHtml(profile.start_month)}">
     <input type="hidden" name="end_month" value="${escapeHtml(profile.end_month)}">
     <input type="hidden" name="percentage" value="${escapeHtml(String(formatPercentInput(profile.percentage)))}">
@@ -828,7 +910,12 @@ function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile:
   </form>`;
 }
 
-function renderDataViewer(database: PrototypeDatabase, selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+function renderDataViewer(
+  database: PrototypeDatabase,
+  selectedPortfolio: PortfolioOption,
+  state: HedgingToolState,
+  perspectiveId: PerspectiveId | undefined,
+): string {
   let selectedTable: DataViewerTableId = "calloffs";
   let error = state.error;
   try {
@@ -855,11 +942,12 @@ function renderDataViewer(database: PrototypeDatabase, selectedPortfolio: Portfo
   return `<div class="stack">
     <div>
       <h2>Data Viewer</h2>
-      <p>Raw portfolio-linked calloff and transaction rows.</p>
+      <p>Canonical raw rows and projected perspective views for the selected portfolio.</p>
     </div>
     ${error ? `<div class="notice error">${escapeHtml(error)}</div>` : ""}
     <form method="get" action="/hedging" class="form-grid">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      ${renderPerspectiveHidden(perspectiveId)}
       <input type="hidden" name="feature_id" value="data-viewer">
       <label>
         Table
@@ -880,7 +968,13 @@ function renderDataViewer(database: PrototypeDatabase, selectedPortfolio: Portfo
 
 function renderDataViewerRows(
   tableId: DataViewerTableId,
-  rows: RawCalloffRow[] | RawTransactionRow[] | ModernProjectedCalloffRow[] | ModernProjectedTransactionRow[],
+  rows:
+    | RawCalloffRow[]
+    | RawTransactionRow[]
+    | BaseloadsProjectedTransactionRow[]
+    | PeaksClassicCalloffTransactionRow[]
+    | ModernProjectedCalloffRow[]
+    | ModernProjectedTransactionRow[],
 ): string {
   if (rows.length === 0) {
     return `<div class="notice"><p>No rows for selected portfolio and year.</p></div>`;
@@ -892,6 +986,14 @@ function renderDataViewerRows(
 
   if (tableId === "modern-projected-calloffs") {
     return renderModernProjectedCalloffsTable(rows as ModernProjectedCalloffRow[]);
+  }
+
+  if (tableId === "baseloads-projected-transactions") {
+    return renderBaseloadsProjectedTransactionsTable(rows as BaseloadsProjectedTransactionRow[]);
+  }
+
+  if (tableId === "classic-projected-calloffs") {
+    return renderClassicProjectedCalloffsTable(rows as PeaksClassicCalloffTransactionRow[]);
   }
 
   if (tableId === "modern-projected-transactions") {
@@ -952,6 +1054,74 @@ function renderRawTransactionsTable(rows: RawTransactionRow[]): string {
             <td>${escapeHtml(row.productcomponent_id)}</td>
             <td class="number">${formatNumber(row.mw)}</td>
             <td class="number">${formatNumber(row.q_factor)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
+}
+
+function renderBaseloadsProjectedTransactionsTable(rows: BaseloadsProjectedTransactionRow[]): string {
+  return `<table>
+    <thead>
+      <tr>
+        <th>calloff_id</th>
+        <th>month</th>
+        <th>component</th>
+        <th>mwh</th>
+        <th>price</th>
+        <th>value</th>
+        <th>source_component</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeHtml(row.calloff_id)}</td>
+            <td>${escapeHtml(row.month)}</td>
+            <td>${escapeHtml(row.component)}</td>
+            <td class="number">${formatNumber(row.mwh)}</td>
+            <td class="number">${formatOptionalNumber(row.price)}</td>
+            <td class="number">${formatNumber(row.value)}</td>
+            <td>${escapeHtml(row.source_component)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
+}
+
+function renderClassicProjectedCalloffsTable(rows: PeaksClassicCalloffTransactionRow[]): string {
+  return `<table>
+    <thead>
+      <tr>
+        <th>calloff_id</th>
+        <th>date</th>
+        <th>period</th>
+        <th>offpeak_mwh</th>
+        <th>peak_mwh</th>
+        <th>offpeak_price</th>
+        <th>peak_price</th>
+        <th>canonical_total_value</th>
+        <th>projected_total_value</th>
+        <th>warnings</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeHtml(row.calloff_id)}</td>
+            <td>${escapeHtml(row.date)}</td>
+            <td>${escapeHtml(row.period)}</td>
+            <td class="number">${formatNumber(row.offpeak_mwh)}</td>
+            <td class="number">${formatNumber(row.peak_mwh)}</td>
+            <td class="number">${formatOptionalNumber(row.offpeak_price)}</td>
+            <td class="number">${formatOptionalNumber(row.peak_price)}</td>
+            <td class="number">${formatNumber(row.canonical_total_value)}</td>
+            <td class="number">${formatNumber(row.projected_total_value)}</td>
+            <td>${escapeHtml(row.warnings.join("; "))}</td>
           </tr>`,
         )
         .join("")}
@@ -1037,6 +1207,20 @@ function renderMonthSelect(name: string, months: string[], selectedMonth: string
   return `<select name="${escapeHtml(name)}">
     ${months.map((month) => `<option value="${escapeHtml(month)}"${month === selectedMonth ? " selected" : ""}>${escapeHtml(month)}</option>`).join("")}
   </select>`;
+}
+
+function renderPerspectiveHidden(perspectiveId: PerspectiveId | undefined): string {
+  return perspectiveId ? `<input type="hidden" name="perspective_id" value="${escapeHtml(perspectiveId)}">` : "";
+}
+
+function labelForPerspective(perspectiveId: PerspectiveId | undefined): string {
+  if (perspectiveId === "classic") {
+    return "Classic";
+  }
+  if (perspectiveId === "modern") {
+    return "Modern";
+  }
+  return "Baseloads";
 }
 
 function formatPercentInput(value: number): number {

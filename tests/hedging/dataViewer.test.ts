@@ -6,6 +6,8 @@ import {
   getDataViewerRows,
   getDataViewerTables,
   getDataViewerYears,
+  getBaseloadsProjectedTransactionsForPortfolioYear,
+  getClassicProjectedCalloffsForPortfolioYear,
   getModernProjectedCalloffsForPortfolioYear,
   getModernProjectedTransactionsForPortfolioYear,
   getRawCalloffsForPortfolioYear,
@@ -30,8 +32,10 @@ describe("Data Viewer", () => {
     });
 
     assert.match(html, /name="selected_table"/);
-    assert.match(html, /Calloffs/);
-    assert.match(html, /Transactions/);
+    assert.match(html, /Canonical Raw Calloffs/);
+    assert.match(html, /Canonical Raw Transactions/);
+    assert.match(html, /Baseloads Projected Transactions/);
+    assert.match(html, /Classic Projected Calloffs/);
     assert.match(html, /Modern Projected Calloffs/);
     assert.match(html, /Modern Projected Transactions/);
   });
@@ -51,7 +55,14 @@ describe("Data Viewer", () => {
   it("returns supported tables", () => {
     assert.deepEqual(
       getDataViewerTables().map((table) => table.table_id),
-      ["calloffs", "transactions", "modern-projected-calloffs", "modern-projected-transactions"],
+      [
+        "calloffs",
+        "transactions",
+        "baseloads-projected-transactions",
+        "classic-projected-calloffs",
+        "modern-projected-calloffs",
+        "modern-projected-transactions",
+      ],
     );
   });
 
@@ -121,6 +132,29 @@ describe("Data Viewer", () => {
     assert.equal(rows[0].base_price, 85);
     assert.equal(rows[0].peak_price, 97.537634);
     assert.equal(rows[0].total_value, 8653.763441);
+  });
+
+  it("Baseloads Projected Transactions shows derived base rows without becoming raw canonical data", () => {
+    const rows = getBaseloadsProjectedTransactionsForPortfolioYear(createDataViewerDatabase(), "CUS00-0", "2027");
+
+    assert.deepEqual(
+      rows.map((row) => row.component),
+      ["baseloads.base.epad", "baseloads.base.sys"],
+    );
+    assert.deepEqual(
+      rows.map((row) => row.source_component).sort(),
+      ["base.epad", "base.sys"],
+    );
+    assert.equal(rows[0].calloff_id, "CAL10");
+  });
+
+  it("Classic Projected Calloffs shows Peak and Offpeak projection for the same canonical calloff", () => {
+    const rows = getClassicProjectedCalloffsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
+
+    assert.equal(rows[0].calloff_id, "CAL30");
+    assert.equal(rows[0].offpeak_mwh, 50);
+    assert.equal(rows[0].peak_mwh, 50);
+    assert.equal(rows[0].projected_total_value, rows[0].canonical_total_value);
   });
 
   it("Modern Projected Transactions uses explicit modern component rows", () => {
@@ -200,6 +234,25 @@ describe("Data Viewer", () => {
     assert.match(transactionsHtml, /calloff_id[\s\S]*month[\s\S]*component[\s\S]*mw[\s\S]*price/);
     assert.match(transactionsHtml, /modern\.base\.sys/);
     assert.doesNotMatch(transactionsHtml, /<td>allocation\.peak\.sys<\/td>/);
+  });
+
+  it("renders Baseloads and Classic projection tables", () => {
+    const baseloadsHtml = renderHedgingTool(createDataViewerDatabase(), {
+      portfolio_id: "CUS00-0",
+      feature_id: "data-viewer",
+      selected_table: "baseloads-projected-transactions",
+      selected_year: "2027",
+    });
+    const classicHtml = renderHedgingTool(createDataViewerDatabase(), {
+      portfolio_id: "CUS01-0",
+      feature_id: "data-viewer",
+      selected_table: "classic-projected-calloffs",
+      selected_year: "2027",
+    });
+
+    assert.match(baseloadsHtml, /baseloads\.base\.sys/);
+    assert.match(classicHtml, /offpeak_mwh[\s\S]*peak_mwh/);
+    assert.match(classicHtml, /CAL30/);
   });
 
   it("Calloffs table includes raw calloff columns", () => {

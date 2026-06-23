@@ -136,16 +136,18 @@ describe("Forecast feature", () => {
     );
   });
 
-  it("rejects non-Peaks.Modern portfolio updates", () => {
-    assert.throws(
-      () =>
-        updateForecastRow(createPocSeedData(), {
-          portfolio_id: "CUS00-0",
-          month: "2027-01",
-          modern_base_mwh: "10",
-          modern_peak_mwh: "0",
-        }),
-      /Forecast is only available for Peaks\.Modern portfolios/,
-    );
+  it("allows the same portfolio to update forecast through a demo perspective", () => {
+    const database = createPocSeedData();
+
+    updateForecastRow(database, {
+      portfolio_id: "CUS00-0",
+      month: "2027-01",
+      modern_base_mwh: "10",
+      modern_peak_mwh: "0",
+    });
+
+    const row = getForecastRowsForYear(database, "CUS00-0", "2027")[0];
+    assert.ok(Math.abs(row.modern_base_mwh - 10) < 0.00001);
+    assert.ok(Math.abs(row.modern_peak_mwh) < 0.00001);
   });
 });

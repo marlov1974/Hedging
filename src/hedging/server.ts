@@ -6,6 +6,7 @@ import { ForecastFeatureError, updateForecastRows } from "./forecastFeature.ts";
 import { PurchaseError, purchaseBaseloads } from "../purchase/baseloadsPurchase.ts";
 import { renderHedgingTool } from "./HedgingToolView.ts";
 import type { HedgingFeatureId } from "./features.ts";
+import type { PerspectiveId } from "./applicationConfig.ts";
 
 export function createHedgingToolServer(database: PrototypeDatabase = createPocSeedData()) {
   return createServer(async (request, response) => {
@@ -19,6 +20,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
     if (request.method === "POST" && url.pathname === "/hedging/buy-baseloads") {
       const body = await readForm(request);
       const portfolio_id = String(body.get("portfolio_id") ?? "");
+      const perspective_id = readPerspectiveFromForm(body);
       const period_id = String(body.get("period_id") ?? "");
       const mwText = String(body.get("mw") ?? "");
       const mw = Number(mwText);
@@ -35,6 +37,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           200,
           renderHedgingTool(database, {
             portfolio_id,
+            perspective_id,
             feature_id: "buy-baseloads",
             selected_period_id: period_id,
             mw: mwText,
@@ -48,6 +51,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           400,
           renderHedgingTool(database, {
             portfolio_id,
+            perspective_id,
             feature_id: "buy-baseloads",
             selected_period_id: period_id,
             mw: mwText,
@@ -61,6 +65,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
     if (request.method === "POST" && url.pathname === "/hedging/forecast") {
       const body = await readForm(request);
       const portfolio_id = String(body.get("portfolio_id") ?? "");
+      const perspective_id = readPerspectiveFromForm(body);
       const selected_year = String(body.get("selected_year") ?? "");
       const months = body.getAll("month").map((month) => String(month));
 
@@ -80,6 +85,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           200,
           renderHedgingTool(database, {
             portfolio_id,
+            perspective_id,
             feature_id: "forecast",
             selected_year,
             forecast_message: "Forecast saved.",
@@ -92,6 +98,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           400,
           renderHedgingTool(database, {
             portfolio_id,
+            perspective_id,
             feature_id: "forecast",
             selected_year,
             error: message,
@@ -104,6 +111,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
     if (request.method === "POST" && url.pathname === "/hedging/forecast-hedge/generate") {
       const body = await readForm(request);
       const portfolio_id = String(body.get("portfolio_id") ?? "");
+      const perspective_id = readPerspectiveFromForm(body);
       const start_month = String(body.get("start_month") ?? "");
       const end_month = String(body.get("end_month") ?? "");
       const percentage = String(body.get("percentage") ?? "");
@@ -120,6 +128,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           200,
           renderHedgingTool(database, {
             portfolio_id,
+            perspective_id,
             feature_id: "forecast-hedge",
             forecast_hedge_profile: profile,
           }),
@@ -131,6 +140,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           400,
           renderHedgingTool(database, {
             portfolio_id,
+            perspective_id,
             feature_id: "forecast-hedge",
             forecast_hedge_input: { start_month, end_month, percentage },
             error: message,
@@ -143,6 +153,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
     if (request.method === "POST" && url.pathname === "/hedging/forecast-hedge/accept") {
       const body = await readForm(request);
       const portfolio_id = String(body.get("portfolio_id") ?? "");
+      const perspective_id = readPerspectiveFromForm(body);
       const start_month = String(body.get("start_month") ?? "");
       const end_month = String(body.get("end_month") ?? "");
       const percentage = String(body.get("percentage") ?? "");
@@ -165,6 +176,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           200,
           renderHedgingTool(database, {
             portfolio_id,
+            perspective_id,
             feature_id: "forecast-hedge",
             forecast_hedge_profile: result.profile,
             forecast_hedge_result: result,
@@ -183,6 +195,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           400,
           renderHedgingTool(database, {
             portfolio_id,
+            perspective_id,
             feature_id: "forecast-hedge",
             forecast_hedge_profile: profile,
             forecast_hedge_input: { start_month, end_month, percentage },
@@ -217,11 +230,16 @@ async function readForm(request: IncomingMessage): Promise<URLSearchParams> {
 function readStateFromUrl(url: URL) {
   return {
     portfolio_id: url.searchParams.get("portfolio_id") ?? undefined,
+    perspective_id: (url.searchParams.get("perspective_id") as PerspectiveId | null) ?? undefined,
     feature_id: (url.searchParams.get("feature_id") as HedgingFeatureId | null) ?? undefined,
     selected_year: url.searchParams.get("selected_year") ?? undefined,
     selected_month: url.searchParams.get("selected_month") ?? undefined,
     selected_table: url.searchParams.get("selected_table") ?? undefined,
   };
+}
+
+function readPerspectiveFromForm(body: URLSearchParams): PerspectiveId | undefined {
+  return (body.get("perspective_id") as PerspectiveId | null) ?? undefined;
 }
 
 function writeHtml(response: ServerResponse, statusCode: number, body: string): void {

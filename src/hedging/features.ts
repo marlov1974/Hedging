@@ -35,8 +35,12 @@ export function getPortfolioOptions(database: PrototypeDatabase): PortfolioOptio
     });
 }
 
-export function getAvailableFeaturesForPortfolio(database: PrototypeDatabase, portfolioId?: string): HedgingFeature[] {
-  return getApplicationFeaturesForPortfolio(database, portfolioId).features;
+export function getAvailableFeaturesForPortfolio(
+  database: PrototypeDatabase,
+  portfolioId?: string,
+  perspectiveId?: string,
+): HedgingFeature[] {
+  return getApplicationFeaturesForPortfolio(database, portfolioId, perspectiveId).features;
 }
 
 export { getProductConfigurationNameForPortfolio, isBaseloadsPortfolio, isPeaksClassicPortfolio };

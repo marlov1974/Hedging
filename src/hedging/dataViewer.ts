@@ -1,12 +1,15 @@
 import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { Calloff, CustomerTransaction } from "../database/types.ts";
+import { getPeaksClassicCalloffTransactionRows, type PeaksClassicCalloffTransactionRow } from "./peaksCalloffTransactionList.ts";
 
 const EPSILON = 0.000001;
 
 export type DataViewerTableId =
   | "calloffs"
   | "transactions"
+  | "baseloads-projected-transactions"
+  | "classic-projected-calloffs"
   | "modern-projected-calloffs"
   | "modern-projected-transactions";
 
@@ -48,6 +51,16 @@ export type ModernProjectedCalloffRow = {
   warnings: string[];
 };
 
+export type BaseloadsProjectedTransactionRow = {
+  calloff_id: string;
+  month: string;
+  component: "baseloads.base.sys" | "baseloads.base.epad";
+  mwh: number;
+  price: number | null;
+  value: number;
+  source_component: string;
+};
+
 export type ModernProjectedTransactionRow = {
   calloff_id: string;
   month: string;
@@ -62,7 +75,13 @@ export type ModernProjectedTransactionRow = {
 
 export type DataViewerRows = {
   table_id: DataViewerTableId;
-  rows: RawCalloffRow[] | RawTransactionRow[] | ModernProjectedCalloffRow[] | ModernProjectedTransactionRow[];
+  rows:
+    | RawCalloffRow[]
+    | RawTransactionRow[]
+    | BaseloadsProjectedTransactionRow[]
+    | PeaksClassicCalloffTransactionRow[]
+    | ModernProjectedCalloffRow[]
+    | ModernProjectedTransactionRow[];
 };
 
 export class DataViewerError extends Error {
@@ -77,8 +96,10 @@ export class DataViewerError extends Error {
 
 export function getDataViewerTables(): DataViewerTable[] {
   return [
-    { table_id: "calloffs", label: "Calloffs" },
-    { table_id: "transactions", label: "Transactions" },
+    { table_id: "calloffs", label: "Canonical Raw Calloffs" },
+    { table_id: "transactions", label: "Canonical Raw Transactions" },
+    { table_id: "baseloads-projected-transactions", label: "Baseloads Projected Transactions" },
+    { table_id: "classic-projected-calloffs", label: "Classic Projected Calloffs" },
     { table_id: "modern-projected-calloffs", label: "Modern Projected Calloffs" },
     { table_id: "modern-projected-transactions", label: "Modern Projected Transactions" },
   ];
@@ -90,7 +111,7 @@ export function getDataViewerYears(database: PrototypeDatabase, portfolioId: str
 
   const years = new Set([...database.calendars.values()].map((calendar) => calendar.month.slice(0, 4)));
 
-  if (tableId === "calloffs" || tableId === "modern-projected-calloffs" || tableId === "modern-projected-transactions") {
+  if (tableId !== "transactions") {
     for (const calloff of getPortfolioCalloffs(database, portfolioId)) {
       years.add(calloff.delivery_start_month.slice(0, 4));
     }
@@ -191,6 +212,42 @@ export function getModernProjectedCalloffsForPortfolioYear(
   });
 }
 
+export function getBaseloadsProjectedTransactionsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): BaseloadsProjectedTransactionRow[] {
+  validatePortfolio(database, portfolioId);
+  validateYear(year);
+
+  const calloffIds = new Set(
+    getPortfolioCalloffs(database, portfolioId)
+      .filter((calloff) => calloff.delivery_start_month.startsWith(`${year}-`))
+      .map((calloff) => calloff.calloff_id),
+  );
+
+  return [...database.transactions.values()]
+    .filter((transaction) => calloffIds.has(transaction.calloff_id))
+    .flatMap((transaction) => projectBaseloadsTransaction(database, transaction))
+    .sort(
+      (left, right) =>
+        left.month.localeCompare(right.month) ||
+        left.calloff_id.localeCompare(right.calloff_id) ||
+        left.component.localeCompare(right.component),
+    );
+}
+
+export function getClassicProjectedCalloffsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): PeaksClassicCalloffTransactionRow[] {
+  validatePortfolio(database, portfolioId);
+  validateYear(year);
+
+  return getPeaksClassicCalloffTransactionRows(database, portfolioId).filter((row) => row.period.startsWith(year));
+}
+
 export function getModernProjectedTransactionsForPortfolioYear(
   database: PrototypeDatabase,
   portfolioId: string,
@@ -221,6 +278,20 @@ export function getDataViewerRows(
     return {
       table_id: tableId,
       rows: getModernProjectedCalloffsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "baseloads-projected-transactions") {
+    return {
+      table_id: tableId,
+      rows: getBaseloadsProjectedTransactionsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "classic-projected-calloffs") {
+    return {
+      table_id: tableId,
+      rows: getClassicProjectedCalloffsForPortfolioYear(database, portfolioId, year),
     };
   }
 
@@ -255,6 +326,32 @@ function getProjectedPeaksCalloffs(database: PrototypeDatabase, portfolioId: str
         left.delivery_end_month.localeCompare(right.delivery_end_month) ||
         left.calloff_id.localeCompare(right.calloff_id),
     );
+}
+
+function projectBaseloadsTransaction(
+  database: PrototypeDatabase,
+  transaction: CustomerTransaction,
+): BaseloadsProjectedTransactionRow[] {
+  const component = database.productConfigurationComponents.get(transaction.productcomponent_id);
+  if (!component || (component.component !== "base.sys" && component.component !== "base.epad")) {
+    return [];
+  }
+  const calendar = [...database.calendars.values()].find((candidate) => candidate.month === transaction.month);
+  const price = [...database.priceComponents.values()].find(
+    (candidate) => candidate.productcomponent_id === transaction.productcomponent_id,
+  )?.price ?? null;
+  const mwh = roundProjection(transaction.mw * (calendar?.total_h ?? 0));
+  return [
+    {
+      calloff_id: transaction.calloff_id,
+      month: transaction.month,
+      component: `baseloads.${component.component}`,
+      mwh,
+      price: price === null ? null : roundProjection(price),
+      value: price === null ? 0 : roundProjection(mwh * price),
+      source_component: component.component,
+    },
+  ];
 }
 
 function isPeaksCalloff(database: PrototypeDatabase, calloff: Calloff): boolean {

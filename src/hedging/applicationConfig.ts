@@ -15,6 +15,12 @@ export type HedgingFeatureId =
   | "data-viewer";
 
 export type ApplicationVariantId = "none" | "baseloads" | "peaks-classic" | "peaks-modern" | "unsupported";
+export type PerspectiveId = "baseloads" | "classic" | "modern";
+
+export type PerspectiveOption = {
+  perspective_id: PerspectiveId;
+  label: string;
+};
 
 export type HedgingFeature = {
   feature_id: HedgingFeatureId;
@@ -25,17 +31,51 @@ export type HedgingFeature = {
 
 export type ApplicationConfig = {
   variant_id: ApplicationVariantId;
+  perspective_id: PerspectiveId | "none";
   title: string;
   context: string;
   accent: "baseloads" | "peaks-classic" | "peaks-modern" | "neutral";
   features: HedgingFeature[];
 };
 
-export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, portfolioId?: string): ApplicationConfig {
+export function getPerspectiveOptions(): PerspectiveOption[] {
+  return [
+    { perspective_id: "baseloads", label: "Baseloads" },
+    { perspective_id: "classic", label: "Classic" },
+    { perspective_id: "modern", label: "Modern" },
+  ];
+}
+
+export function parsePerspectiveId(value: string | undefined, fallback: PerspectiveId = "baseloads"): PerspectiveId {
+  const normalized = String(value ?? "").trim();
+  return getPerspectiveOptions().some((option) => option.perspective_id === normalized)
+    ? (normalized as PerspectiveId)
+    : fallback;
+}
+
+export function defaultPerspectiveForPortfolio(database: PrototypeDatabase, portfolioId?: string): PerspectiveId {
+  if (!portfolioId) {
+    return "baseloads";
+  }
+  if (isPeaksModernPortfolio(database, portfolioId)) {
+    return "modern";
+  }
+  if (isPeaksClassicPortfolio(database, portfolioId)) {
+    return "classic";
+  }
+  return "baseloads";
+}
+
+export function getApplicationFeaturesForPortfolio(
+  database: PrototypeDatabase,
+  portfolioId?: string,
+  requestedPerspectiveId?: string,
+): ApplicationConfig {
   const selectedPortfolio = portfolioId ? database.portfolios.get(portfolioId) : undefined;
   if (!selectedPortfolio) {
     return {
       variant_id: "none",
+      perspective_id: "none",
       title: "Select portfolio",
       context: "Select a portfolio to open an application variant.",
       accent: "neutral",
@@ -43,63 +83,58 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
     };
   }
 
-  if (isBaseloadsPortfolio(database, selectedPortfolio.portfolio_id)) {
+  const perspectiveId = parsePerspectiveId(requestedPerspectiveId, defaultPerspectiveForPortfolio(database, selectedPortfolio.portfolio_id));
+  if (perspectiveId === "baseloads") {
     return {
       variant_id: "baseloads",
-      title: "Baseloads application",
-      context: "Baseloads hedge purchase, position and settlement workflow.",
+      perspective_id: perspectiveId,
+      title: "Baseloads perspective",
+      context:
+        "Demo perspective over the selected portfolio. In production, product package contracts would control customer-visible features.",
       accent: "baseloads",
       features: [
         feature("portfolio-details", "Portfolio Details"),
-        feature("buy-baseloads", "Buy Baseloads"),
-        feature("baseloads-calloff-list", "Baseloads Calloff List"),
-        feature("position-report", "Position Report"),
+        feature("forecast", "Forecast - Baseloads"),
+        feature("buy-baseloads", "Hedge Baseload"),
+        feature("baseloads-calloff-list", "Calloff List - Baseloads"),
+        feature("position-report", "Position Report - Baseloads"),
         feature("financial-settlement", "Financial Settlement"),
         feature("data-viewer", "Data Viewer"),
       ],
     };
   }
 
-  if (isPeaksModernPortfolio(database, selectedPortfolio.portfolio_id)) {
+  if (perspectiveId === "modern") {
     return {
       variant_id: "peaks-modern",
-      title: "Peaks.Modern application",
-      context: "Peaks.Modern workspace for modern base and peak forecast hedging.",
+      perspective_id: perspectiveId,
+      title: "Modern perspective",
+      context: "Modern projection over the selected portfolio with base and peak views from canonical rows.",
       accent: "peaks-modern",
       features: [
         feature("portfolio-details", "Portfolio Details"),
-        feature("forecast", "Forecast"),
-        feature("forecast-hedge", "Hedge Forecast"),
-        feature("modern-calloff-transaction-list", "Calloff Transaction List"),
-        feature("data-viewer", "Data Viewer"),
-      ],
-    };
-  }
-
-  if (isPeaksClassicPortfolio(database, selectedPortfolio.portfolio_id)) {
-    return {
-      variant_id: "peaks-classic",
-      title: "Peaks.Classic application",
-      context: "Peaks.Classic legacy projection workspace for Peak and Offpeak calloff rows.",
-      accent: "peaks-classic",
-      features: [
-        feature("portfolio-details", "Portfolio Details"),
-        feature("legacy-calloff-list", "Calloff Transaction List"),
+        feature("forecast", "Forecast - Modern"),
+        feature("forecast-hedge", "Hedge Forecast - Modern"),
+        feature("modern-calloff-transaction-list", "Calloff List - Modern"),
+        feature("position-report", "Position Report - Modern"),
         feature("data-viewer", "Data Viewer"),
       ],
     };
   }
 
   return {
-    variant_id: "unsupported",
-    title: "Unsupported application",
-    context: "Selected portfolio does not have an application variant in this PoC.",
-    accent: "neutral",
+    variant_id: "peaks-classic",
+    perspective_id: perspectiveId,
+    title: "Classic perspective",
+    context: "Classic Peak/Offpeak projection over the selected portfolio from canonical rows.",
+    accent: "peaks-classic",
     features: [
       feature("portfolio-details", "Portfolio Details"),
-      unavailableFeature("forecast", "Forecast", "Selected portfolio does not support Forecast in this PoC."),
-      unavailableFeature("forecast-hedge", "Hedge Forecast", "Selected portfolio does not support Hedge Forecast in this PoC."),
-      unavailableFeature("data-viewer", "Data Viewer", "Selected portfolio does not support Data Viewer in this PoC."),
+      feature("forecast", "Forecast - Classic"),
+      feature("forecast-hedge", "Hedge Forecast - Classic"),
+      feature("legacy-calloff-list", "Calloff List - Classic"),
+      feature("position-report", "Position Report - Classic"),
+      feature("data-viewer", "Data Viewer"),
     ],
   };
 }
@@ -108,8 +143,9 @@ export function resolveActiveFeature(
   database: PrototypeDatabase,
   portfolioId: string | undefined,
   requestedFeatureId: HedgingFeatureId | undefined,
+  perspectiveId?: string,
 ): HedgingFeatureId {
-  const features = getApplicationFeaturesForPortfolio(database, portfolioId).features.filter((candidate) => candidate.available);
+  const features = getApplicationFeaturesForPortfolio(database, portfolioId, perspectiveId).features.filter((candidate) => candidate.available);
   if (requestedFeatureId && features.some((feature) => feature.feature_id === requestedFeatureId)) {
     return requestedFeatureId;
   }

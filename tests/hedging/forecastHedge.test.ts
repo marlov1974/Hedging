@@ -486,16 +486,30 @@ describe("Forecast hedge feature", () => {
     );
   });
 
-  it("non-Peaks.Modern portfolio is rejected", () => {
-    assert.throws(
-      () =>
-        buildForecastHedgeProfile(createPocSeedData(), {
-          portfolio_id: "CUS00-0",
-          start_month: "2027-01",
-          end_month: "2027-01",
-          percentage: "50",
-        }),
-      (error) => error instanceof ForecastHedgeError && /Peaks.Modern/.test(error.message),
+  it("same portfolio can generate and accept a forecast hedge through the Modern perspective", () => {
+    const database = createPocSeedData();
+    const profile = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS00-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+    });
+    const result = acceptForecastHedgeProfile(database, {
+      portfolio_id: "CUS00-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      date: "2027-01-15",
+      calloff_id: "CALLOFF_SHARED",
+      rows: profile.rows.map(toAcceptRow),
+    });
+
+    assert.equal(result.calloff.portfolio_id, "CUS00-0");
+    assert.equal(result.calloff.product_id, "PRO02");
+    assert.equal(result.transactions.length, 6);
+    assert.deepEqual(
+      getModernProjectedTransactionsForPortfolioYear(database, "CUS00-0", "2027").map((row) => row.component),
+      ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad"],
     );
   });
 

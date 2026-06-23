@@ -1,6 +1,5 @@
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { CustomerForecast } from "../database/types.ts";
-import { isPeaksModernPortfolio } from "./applicationConfig.ts";
 import { convertModernForecastToStored, deriveModernFromForecast, ModernProjectionError } from "./modernProjection.ts";
 
 export class ForecastFeatureError extends Error {
@@ -80,9 +79,6 @@ export function updateForecastRows(database: PrototypeDatabase, input: ForecastR
 
 export function updateForecastRow(database: PrototypeDatabase, input: ForecastUpdateInput): CustomerForecast {
   const update = validateForecastUpdate(database, input);
-  if (!isPeaksModernPortfolio(database, update.portfolio_id)) {
-    throw new ForecastFeatureError("invalid_input", "Forecast is only available for Peaks.Modern portfolios");
-  }
 
   const forecast = getPortfolioForecasts(database, update.portfolio_id).find((candidate) => candidate.month === update.month);
   if (!forecast) {

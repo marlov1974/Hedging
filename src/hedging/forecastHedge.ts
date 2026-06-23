@@ -7,7 +7,6 @@ import {
   type ProductConfigurationComponent,
 } from "../database/types.ts";
 import { getPortfolioProductComponents, getQFactorValuesBySet, insertCalloff, insertTransaction } from "../database/repository.ts";
-import { isPeaksModernPortfolio } from "./applicationConfig.ts";
 import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
 import { convertModernHedgeToCanonical, deriveModernFromForecast, ModernProjectionError } from "./modernProjection.ts";
 
@@ -268,10 +267,6 @@ export function createForecastHedgeCalloff(
   database: PrototypeDatabase,
   input: { portfolio_id: string; date: string; delivery_start_month: string; delivery_end_month: string; calloff_id?: string },
 ): Calloff {
-  if (!isPeaksModernPortfolio(database, input.portfolio_id)) {
-    throw new ForecastHedgeError("invalid_input", "Hedge Forecast is only available for Peaks.Modern portfolios");
-  }
-
   const product = getPeaksModernProduct(database);
   return wrapDatabaseError(() =>
     insertCalloff(database, {
@@ -318,8 +313,8 @@ function validateProfileInput(database: PrototypeDatabase, input: ForecastHedgeP
   if (!portfolioId) {
     throw new ForecastHedgeError("invalid_input", "portfolio_id is required");
   }
-  if (!isPeaksModernPortfolio(database, portfolioId)) {
-    throw new ForecastHedgeError("invalid_input", "Hedge Forecast is only available for Peaks.Modern portfolios");
+  if (!database.portfolios.has(portfolioId)) {
+    throw new ForecastHedgeError("not_found", `portfolio_id ${portfolioId} does not exist`);
   }
 
   const startMonth = String(input.start_month ?? "").trim();
@@ -405,11 +400,9 @@ function getQFactorForComponentMonth(
   const portfolioComponent = getPortfolioProductComponents(database, portfolioId).find(
     (candidate) => candidate.productcomponent_id === component.productcomponent_id,
   );
-  if (!portfolioComponent) {
-    throw new ForecastHedgeError("not_found", `missing portfolio product component for ${component.component}`);
-  }
-
-  const qFactorSet = database.qFactorSets.get(portfolioComponent.qfactor_set_id);
+  const qFactorSet = portfolioComponent
+    ? database.qFactorSets.get(portfolioComponent.qfactor_set_id)
+    : [...database.qFactorSets.values()].find((candidate) => candidate.component === component.component);
   if (!qFactorSet || qFactorSet.component !== component.component) {
     throw new ForecastHedgeError("not_found", `missing Q-factor set for ${component.component}`);
   }

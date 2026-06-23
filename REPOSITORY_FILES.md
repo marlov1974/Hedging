@@ -36,10 +36,13 @@ docs/hedging/peaks_modern_forecast_feature.md
 docs/hedging/peaks_modern_forecast_hedge.md
 docs/hedging/peaks_modern_hedge_forecast_flow.md
 docs/hedging/peaks_modern_volume_semantics.md
+docs/hedging/perspective_feature_matrix.md
+docs/hedging/perspectives_and_product_packages.md
 docs/hedging/portfolio_hedging_product_family.md
 docs/hedging/position_report.md
 docs/hedging/product_packages_and_feature_sets.md
 docs/hedging/projection_mw_and_price_rules.md
+docs/hedging/universal_model_demo_tool.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
 docs/market-derivation/runtime_derivation_policy.md
@@ -155,6 +158,10 @@ requirements/package-runs/P0033/design.md
 requirements/package-runs/P0033/findings.md
 requirements/package-runs/P0033/functions.md
 requirements/package-runs/P0033/review.md
+requirements/package-runs/P0034/design.md
+requirements/package-runs/P0034/findings.md
+requirements/package-runs/P0034/functions.md
+requirements/package-runs/P0034/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md

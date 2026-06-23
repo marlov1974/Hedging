@@ -1,7 +1,6 @@
 import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { Calloff, CustomerTransaction } from "../database/types.ts";
-import { isPeaksClassicPortfolio, isPeaksModernPortfolio } from "./applicationConfig.ts";
 
 const EPSILON = 0.000001;
 
@@ -75,11 +74,7 @@ export function getPeaksClassicCalloffTransactionRows(
   database: PrototypeDatabase,
   portfolioId: string,
 ): PeaksClassicCalloffTransactionRow[] {
-  if (!isPeaksClassicPortfolio(database, portfolioId)) {
-    return [];
-  }
-
-  return getPeaksCalloffs(database, portfolioId, "Peaks.Classic").map((calloff) =>
+  return getPeaksCalloffs(database, portfolioId).map((calloff) =>
     aggregateClassicProjection(projectCalloffMonths(database, calloff)),
   );
 }
@@ -88,11 +83,7 @@ export function getPeaksModernCalloffTransactionRows(
   database: PrototypeDatabase,
   portfolioId: string,
 ): PeaksModernCalloffTransactionRow[] {
-  if (!isPeaksModernPortfolio(database, portfolioId)) {
-    return [];
-  }
-
-  return getPeaksCalloffs(database, portfolioId, "Peaks.Modern").map((calloff) =>
+  return getPeaksCalloffs(database, portfolioId).map((calloff) =>
     aggregateModernProjection(projectCalloffMonths(database, calloff)),
   );
 }
@@ -215,9 +206,9 @@ export function projectPeaksCalloffMonth(
   };
 }
 
-function getPeaksCalloffs(database: PrototypeDatabase, portfolioId: string, productPackage: string): Calloff[] {
+function getPeaksCalloffs(database: PrototypeDatabase, portfolioId: string): Calloff[] {
   return [...database.calloffs.values()]
-    .filter((calloff) => calloff.portfolio_id === portfolioId && productPackageName(database, calloff.product_id) === productPackage)
+    .filter((calloff) => calloff.portfolio_id === portfolioId && isPeaksProductPackage(productPackageName(database, calloff.product_id)))
     .sort((left, right) => left.date.localeCompare(right.date) || left.calloff_id.localeCompare(right.calloff_id));
 }
 
@@ -417,6 +408,10 @@ function emptyMonthlyProjection(
 function productPackageName(database: PrototypeDatabase, productId: string): string | undefined {
   const product = database.productConfigurations.get(productId);
   return product ? canonicalProductPackageName(product.name) : undefined;
+}
+
+function isPeaksProductPackage(productPackage: string | undefined): boolean {
+  return productPackage === "Peaks.Classic" || productPackage === "Peaks.Modern";
 }
 
 function aggregateWarnings(rows: PeaksMonthlyProjection[]): string[] {
