@@ -6,6 +6,7 @@ export type HedgingFeatureId =
   | "buy-baseloads"
   | "baseloads-calloff-list"
   | "legacy-calloff-list"
+  | "modern-calloff-transaction-list"
   | "portfolio-details"
   | "position-report"
   | "financial-settlement"
@@ -69,6 +70,7 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
         feature("portfolio-details", "Portfolio Details"),
         feature("forecast", "Forecast"),
         feature("forecast-hedge", "Hedge Forecast"),
+        feature("modern-calloff-transaction-list", "Calloff Transaction List"),
         feature("data-viewer", "Data Viewer"),
       ],
     };
@@ -82,7 +84,7 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
       accent: "peaks-classic",
       features: [
         feature("portfolio-details", "Portfolio Details"),
-        feature("legacy-calloff-list", "Legacy Calloff List"),
+        feature("legacy-calloff-list", "Calloff Transaction List"),
         feature("data-viewer", "Data Viewer"),
       ],
     };

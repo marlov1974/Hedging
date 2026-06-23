@@ -36,10 +36,11 @@ peak.epad
 
 `allocation.peak.sys` and `allocation.peak.epad` are dimension-specific helper rows. They normally carry the same MW, have price `0` and q-factor `0`, and must not be summed as physical customer volume.
 
-The first implemented Classic projection is:
+The implemented Peaks customer transaction list projections are:
 
 ```text
-Peaks.Classic -> Legacy Calloff List
+Peaks.Classic -> Calloff Transaction List -> Offpeak/Peak
+Peaks.Modern  -> Calloff Transaction List -> Base/Peak
 ```
 
 ## Current PoC Scope

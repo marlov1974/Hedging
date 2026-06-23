@@ -26,7 +26,7 @@ describe("application configuration", () => {
     assert.equal(config.variant_id, "peaks-modern");
     assert.deepEqual(
       config.features.map((feature) => feature.feature_id),
-      ["portfolio-details", "forecast", "forecast-hedge", "data-viewer"],
+      ["portfolio-details", "forecast", "forecast-hedge", "modern-calloff-transaction-list", "data-viewer"],
     );
   });
 

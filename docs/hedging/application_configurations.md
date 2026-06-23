@@ -40,6 +40,7 @@ Peaks.Modern portfolios use the Peaks.Modern application appearance and feature 
 Portfolio Details
 Forecast
 Hedge Forecast
+Calloff Transaction List
 Data Viewer
 ```
 
@@ -51,11 +52,13 @@ Peaks.Classic portfolios use the Classic Feature Set application appearance and 
 
 ```text
 Portfolio Details
-Legacy Calloff List
+Calloff Transaction List
 Data Viewer
 ```
 
-`Legacy Calloff List` is a Peak/Offpeak customer projection from canonical component transactions.
+Classic `Calloff Transaction List` is a Peak/Offpeak customer projection from canonical component transactions.
+
+Modern `Calloff Transaction List` is a Base/Peak customer projection from the same canonical component transactions.
 
 ## Appearance
 

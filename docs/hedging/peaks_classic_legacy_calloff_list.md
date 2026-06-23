@@ -2,9 +2,11 @@
 
 ## Purpose
 
-`Legacy Calloff List` is the first Classic Feature Set projection.
+`Legacy Calloff List` is the earlier name for the Peaks.Classic `Calloff Transaction List`.
 
-It presents Peaks.Classic calloffs as customer-facing Peak and Offpeak rows while using the canonical component model underneath.
+The current customer-facing feature presents Peaks.Classic calloffs as Offpeak and Peak columns while using the canonical component model underneath.
+
+See [Peaks.Classic Calloff Transaction List](peaks_classic_calloff_transaction_list.md) and [Classic Projection Peak Offpeak Rules](classic_projection_peak_offpeak_rules.md) for the current projection contract.
 
 ## Inputs
 
@@ -47,19 +49,16 @@ The UI shows:
 
 ```text
 Date
-Calloff
-Period
-Block
-MW
-MWh
-Price
-Value
+OffpeakMW
+PeakMW
+OffpeakPrice
+PeakPrice
 Warnings
 ```
 
-`Block` is either `Peak` or `Offpeak`.
+The implementation may keep compact metadata columns for calloff id and period.
 
-Multi-month calloffs aggregate by block. Aggregated price is value-weighted:
+Multi-month calloffs aggregate at calloff resolution. Aggregated price is value-weighted:
 
 ```text
 aggregated_price = aggregated_value / aggregated_mwh

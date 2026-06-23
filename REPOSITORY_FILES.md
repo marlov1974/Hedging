@@ -18,17 +18,22 @@ docs/data-model/transaction_model.md
 docs/hedging/application_configurations.md
 docs/hedging/baseloads_calloff_list.md
 docs/hedging/canonical_component_model.md
+docs/hedging/classic_projection_peak_offpeak_rules.md
 docs/hedging/classic_projection_price_rules.md
 docs/hedging/component_categories_and_projection_listeners.md
 docs/hedging/data_viewer.md
 docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
+docs/hedging/modern_projection_base_peak_rules.md
+docs/hedging/peaks_classic_calloff_transaction_list.md
 docs/hedging/peaks_classic_legacy_calloff_list.md
+docs/hedging/peaks_modern_calloff_transaction_list.md
 docs/hedging/peaks_modern_forecast_feature.md
 docs/hedging/peaks_modern_forecast_hedge.md
 docs/hedging/peaks_modern_volume_semantics.md
 docs/hedging/portfolio_hedging_product_family.md
 docs/hedging/position_report.md
+docs/hedging/projection_mw_and_price_rules.md
 docs/hedging/product_packages_and_feature_sets.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
@@ -125,6 +130,10 @@ requirements/package-runs/P0028/design.md
 requirements/package-runs/P0028/findings.md
 requirements/package-runs/P0028/functions.md
 requirements/package-runs/P0028/review.md
+requirements/package-runs/P0029/design.md
+requirements/package-runs/P0029/findings.md
+requirements/package-runs/P0029/functions.md
+requirements/package-runs/P0029/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -155,6 +164,7 @@ requirements/packages/P0025-canonical-product-model-realignment.md
 requirements/packages/P0026-peaks-classic-legacy-calloff-list.md
 requirements/packages/P0027-rename-peak-premium-to-peak.md
 requirements/packages/P0028-split-allocation-peak-into-sys-epad.md
+requirements/packages/P0029-peaks-modern-calloff-transaction-list.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
@@ -174,6 +184,7 @@ src/hedging/forecastFeature.ts
 src/hedging/forecastHedge.ts
 src/hedging/legacyCalloffList.ts
 src/hedging/marketProjection.ts
+src/hedging/peaksCalloffTransactionList.ts
 src/hedging/portfolioDetails.ts
 src/hedging/positionReport.ts
 src/hedging/server.ts
@@ -207,6 +218,7 @@ tests/hedging/forecastFeature.test.ts
 tests/hedging/forecastHedge.test.ts
 tests/hedging/hedgingTool.test.ts
 tests/hedging/legacyCalloffList.test.ts
+tests/hedging/peaksCalloffTransactionList.test.ts
 tests/hedging/portfolioDetails.test.ts
 tests/hedging/positionReport.test.ts
 tests/price-api/priceApi.test.ts

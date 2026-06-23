@@ -16,7 +16,10 @@ import {
 import { calculateFinancialSettlementForMonth, getFinancialSettlementMonths } from "./financialSettlement.ts";
 import type { ForecastHedgeAcceptResult, ForecastHedgeProfile } from "./forecastHedge.ts";
 import { getForecastRowsForYear, getForecastYears, type ForecastDisplayRow } from "./forecastFeature.ts";
-import { getLegacyCalloffListRows } from "./legacyCalloffList.ts";
+import {
+  getPeaksClassicCalloffTransactionRows,
+  getPeaksModernCalloffTransactionRows,
+} from "./peaksCalloffTransactionList.ts";
 import { getPortfolioDetails } from "./portfolioDetails.ts";
 import { getPositionReportRows, getPositionReportYears } from "./positionReport.ts";
 import { getPortfolioOptions, type HedgingFeatureId, type PortfolioOption } from "./features.ts";
@@ -338,7 +341,11 @@ function renderActiveFeature(
   }
 
   if (activeFeature === "legacy-calloff-list") {
-    return renderLegacyCalloffList(database, selectedPortfolio);
+    return renderClassicCalloffTransactionList(database, selectedPortfolio);
+  }
+
+  if (activeFeature === "modern-calloff-transaction-list") {
+    return renderModernCalloffTransactionList(database, selectedPortfolio);
   }
 
   if (activeFeature === "portfolio-details") {
@@ -431,26 +438,23 @@ function renderCalloffList(database: PrototypeDatabase, selectedPortfolio: Portf
   </div>`;
 }
 
-function renderLegacyCalloffList(database: PrototypeDatabase, selectedPortfolio: PortfolioOption): string {
-  const rows = getLegacyCalloffListRows(database, selectedPortfolio.portfolio_id);
+function renderClassicCalloffTransactionList(database: PrototypeDatabase, selectedPortfolio: PortfolioOption): string {
+  const rows = getPeaksClassicCalloffTransactionRows(database, selectedPortfolio.portfolio_id);
   if (rows.length === 0) {
-    return `<div class="notice"><h2>Legacy Calloff List</h2><p>No Peaks.Classic calloffs for the selected portfolio.</p></div>`;
+    return `<div class="notice"><h2>Calloff Transaction List</h2><p>No Peaks.Classic calloffs for the selected portfolio.</p></div>`;
   }
 
   return `<div>
-    <h2>Legacy Calloff List</h2>
-    <p>Projected Peak/Offpeak rows from canonical component transactions.</p>
+    <h2>Calloff Transaction List</h2>
+    <p>Projected Peak/Offpeak values from canonical component transactions.</p>
     <table>
       <thead>
         <tr>
           <th>Date</th>
-          <th>Calloff</th>
-          <th>Period</th>
-          <th>Block</th>
-          <th>MW</th>
-          <th>MWh</th>
-          <th>Price</th>
-          <th>Value</th>
+          <th>OffpeakMW</th>
+          <th>PeakMW</th>
+          <th>OffpeakPrice</th>
+          <th>PeakPrice</th>
           <th>Warnings</th>
         </tr>
       </thead>
@@ -459,13 +463,48 @@ function renderLegacyCalloffList(database: PrototypeDatabase, selectedPortfolio:
           .map(
             (row) => `<tr>
               <td>${escapeHtml(row.date)}</td>
-              <td>${escapeHtml(row.calloff_id)}</td>
-              <td>${escapeHtml(row.period)}</td>
-              <td>${escapeHtml(row.block)}</td>
-              <td class="number">${formatOptionalNumber(row.mw)}</td>
-              <td class="number">${formatNumber(row.mwh)}</td>
-              <td class="number">${formatOptionalNumber(row.price)}</td>
-              <td class="number">${formatNumber(row.value)}</td>
+              <td class="number">${formatOptionalNumber(row.offpeak_mw)}</td>
+              <td class="number">${formatOptionalNumber(row.peak_mw)}</td>
+              <td class="number">${formatOptionalNumber(row.offpeak_price)}</td>
+              <td class="number">${formatOptionalNumber(row.peak_price)}</td>
+              <td>${escapeHtml(row.warnings.join("; "))}</td>
+            </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function renderModernCalloffTransactionList(database: PrototypeDatabase, selectedPortfolio: PortfolioOption): string {
+  const rows = getPeaksModernCalloffTransactionRows(database, selectedPortfolio.portfolio_id);
+  if (rows.length === 0) {
+    return `<div class="notice"><h2>Calloff Transaction List</h2><p>No Peaks.Modern calloffs for the selected portfolio.</p></div>`;
+  }
+
+  return `<div>
+    <h2>Calloff Transaction List</h2>
+    <p>Projected Base/Peak values from canonical component transactions.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>BaseMW</th>
+          <th>PeakMW</th>
+          <th>BasePrice</th>
+          <th>PeakPrice</th>
+          <th>Warnings</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) => `<tr>
+              <td>${escapeHtml(row.date)}</td>
+              <td class="number">${formatOptionalNumber(row.base_mw)}</td>
+              <td class="number">${formatOptionalNumber(row.peak_mw)}</td>
+              <td class="number">${formatOptionalNumber(row.base_price)}</td>
+              <td class="number">${formatOptionalNumber(row.peak_price)}</td>
               <td>${escapeHtml(row.warnings.join("; "))}</td>
             </tr>`,
           )

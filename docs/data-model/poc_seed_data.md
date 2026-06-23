@@ -107,7 +107,9 @@ profile.epad
 volume
 ```
 
-Peaks.Classic differs by feature set and projection. Its `Legacy Calloff List` projects canonical rows into Peak/Offpeak customer rows.
+Peaks.Classic differs by feature set and projection. Its `Calloff Transaction List` projects canonical rows into Offpeak/Peak customer rows.
+
+Peaks.Modern uses the same canonical component rows. Its `Calloff Transaction List` projects canonical rows into Base/Peak customer rows.
 
 Deprecated aliases are accepted only for compatibility:
 

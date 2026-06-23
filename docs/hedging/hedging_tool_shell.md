@@ -51,6 +51,7 @@ The current Peaks.Modern features are:
 Portfolio Details
 Forecast
 Hedge Forecast
+Calloff Transaction List
 Data Viewer
 ```
 
@@ -58,7 +59,7 @@ The current Peaks.Classic features are:
 
 ```text
 Portfolio Details
-Legacy Calloff List
+Calloff Transaction List
 Data Viewer
 ```
 

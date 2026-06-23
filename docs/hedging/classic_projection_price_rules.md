@@ -31,25 +31,25 @@ total_value = base_value + peak_value
 Offpeak anchors to base price:
 
 ```text
-legacy_offpeak_price = base_price
+ClassicOffpeakPrice = CanonicalBasePrice
 ```
 
 Peak receives the residual value:
 
 ```text
-legacy_peak_price =
-  (total_value - legacy_offpeak_mwh * legacy_offpeak_price)
-  / legacy_peak_mwh
+ClassicPeakPrice =
+  (CanonicalTotalValue - ClassicOffpeakMWh * ClassicOffpeakPrice)
+  / ClassicPeakMWh
 ```
 
 This preserves:
 
 ```text
-legacy_offpeak_mwh * legacy_offpeak_price
-+ legacy_peak_mwh * legacy_peak_price
-= total_value
+ClassicOffpeakMWh * ClassicOffpeakPrice
++ ClassicPeakMWh * ClassicPeakPrice
+= CanonicalTotalValue
 ```
 
 Negative peak MW is valid and can make projected peak price lower than base price.
 
-Projected legacy prices are presentation prices. They are not original market transaction prices.
+Projected Classic prices are presentation prices. They are not original market transaction prices.

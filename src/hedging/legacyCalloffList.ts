@@ -2,8 +2,7 @@ import { canonicalProductPackageName } from "../database/canonicalComponents.ts"
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { Calloff, CustomerTransaction } from "../database/types.ts";
 import { isPeaksClassicPortfolio } from "./applicationConfig.ts";
-
-const EPSILON = 0.000001;
+import { projectPeaksCalloffMonth, type PeaksMonthlyProjection } from "./peaksCalloffTransactionList.ts";
 
 export type LegacyCalloffListBlock = "Offpeak" | "Peak";
 
@@ -37,6 +36,9 @@ export function getLegacyCalloffListRows(database: PrototypeDatabase, portfolioI
 function projectCalloffMonths(database: PrototypeDatabase, calloff: Calloff): MonthlyProjection[] {
   const transactions = [...database.transactions.values()].filter((transaction) => transaction.calloff_id === calloff.calloff_id);
   const months = [...new Set(transactions.map((transaction) => transaction.month))].sort();
+  if (months.length === 0) {
+    return projectLegacyCalloffMonth(database, calloff, []);
+  }
   return months.flatMap((month) =>
     projectLegacyCalloffMonth(
       database,
@@ -51,118 +53,41 @@ export function projectLegacyCalloffMonth(
   calloff: Calloff,
   transactions: CustomerTransaction[],
 ): MonthlyProjection[] {
-  const month = transactions[0]?.month ?? calloff.delivery_start_month;
-  const calendar = [...database.calendars.values()].find((candidate) => candidate.month === month);
-  const warnings: string[] = [];
-
-  if (!calendar) {
-    return errorRows(calloff, month, "missing calendar");
-  }
-
-  const offpeakHours = calendar.total_h - calendar.peak_h;
-  if (calendar.peak_h === 0 || offpeakHours === 0) {
-    return errorRows(calloff, month, "zero peak or offpeak hours");
-  }
-
-  const base = selectComponentMw(database, transactions, ["base.sys", "base.epad"], "base", warnings);
-  const allocationPeak = selectAllocationPeakMw(database, transactions, warnings);
-  const peak = selectComponentMw(
-    database,
-    transactions,
-    ["peak.sys", "peak.epad", "peak.premium.sys", "peak.premium.epad", "peak.modern.sys", "peak.modern.epad"],
-    "peak",
-    warnings,
-  );
-
-  if (base.mw === null || allocationPeak.mw === null) {
-    return errorRows(calloff, month, warnings.join("; "));
-  }
-
-  const basePrice = sumTransactionComponentPrices(database, transactions, ["base.sys", "base.epad"], warnings, "base price");
-  const peakPrice = sumTransactionComponentPrices(
-    database,
-    transactions,
-    ["peak.sys", "peak.epad", "peak.premium.sys", "peak.premium.epad", "peak.modern.sys", "peak.modern.epad"],
-    warnings,
-    "peak price",
-  );
-
-  const baseMwh = base.mw * calendar.total_h;
-  const legacyPeakMwh = allocationPeak.mw * calendar.peak_h;
-  const legacyOffpeakMwh = baseMwh - legacyPeakMwh;
-  const legacyOffpeakMw = legacyOffpeakMwh / offpeakHours;
-  const legacyPeakMw = allocationPeak.mw;
-  const peakMwh = (peak.mw ?? 0) * calendar.peak_h;
-  const baseValue = baseMwh * basePrice;
-  const peakValue = peakMwh * peakPrice;
-  const totalValue = baseValue + peakValue;
-  const legacyOffpeakPrice = basePrice;
-  const legacyOffpeakValue = legacyOffpeakMwh * legacyOffpeakPrice;
-  const legacyPeakPrice = legacyPeakMwh === 0 ? null : (totalValue - legacyOffpeakValue) / legacyPeakMwh;
-  const legacyPeakValue = legacyPeakPrice === null ? 0 : legacyPeakMwh * legacyPeakPrice;
-
-  if (legacyOffpeakMwh < 0) {
-    warnings.push("negative offpeak MWh");
-  }
-  if (legacyPeakPrice === null) {
-    warnings.push("zero peak MWh");
-  }
-
+  const projection = projectPeaksCalloffMonth(database, calloff, transactions);
   return [
-    {
-      date: calloff.date,
-      calloff_id: calloff.calloff_id,
-      period: month,
-      block: "Offpeak",
-      mw: roundProjection(legacyOffpeakMw),
-      mwh: roundProjection(legacyOffpeakMwh),
-      price: roundProjection(legacyOffpeakPrice),
-      value: roundProjection(legacyOffpeakValue),
-      warnings,
-      hours: offpeakHours,
-    },
-    {
-      date: calloff.date,
-      calloff_id: calloff.calloff_id,
-      period: month,
-      block: "Peak",
-      mw: roundProjection(legacyPeakMw),
-      mwh: roundProjection(legacyPeakMwh),
-      price: legacyPeakPrice === null ? null : roundProjection(legacyPeakPrice),
-      value: roundProjection(legacyPeakValue),
-      warnings,
-      hours: calendar.peak_h,
-    },
+    legacyRowFromProjection(projection, "Offpeak"),
+    legacyRowFromProjection(projection, "Peak"),
   ];
 }
 
-function selectAllocationPeakMw(
-  database: PrototypeDatabase,
-  transactions: CustomerTransaction[],
-  warnings: string[],
-): { mw: number | null } {
-  const sys = findComponentTransaction(database, transactions, "allocation.peak.sys");
-  const epad = findComponentTransaction(database, transactions, "allocation.peak.epad");
-
-  if (sys || epad) {
-    if (!sys || !epad) {
-      warnings.push("partial allocation peak");
-      return { mw: (sys ?? epad)?.mw ?? null };
-    }
-    if (Math.abs(sys.mw - epad.mw) > EPSILON) {
-      warnings.push("mismatched allocation peak MW");
-    }
-    return { mw: sys.mw };
+function legacyRowFromProjection(projection: PeaksMonthlyProjection, block: LegacyCalloffListBlock): MonthlyProjection {
+  if (block === "Offpeak") {
+    return {
+      date: projection.date,
+      calloff_id: projection.calloff_id,
+      period: projection.month,
+      block,
+      mw: projection.classic_offpeak_mw,
+      mwh: projection.classic_offpeak_mwh,
+      price: projection.classic_offpeak_price,
+      value: projection.classic_offpeak_value,
+      warnings: projection.warnings,
+      hours: projection.offpeak_h,
+    };
   }
 
-  const legacy = findComponentTransaction(database, transactions, "allocation.peak");
-  if (legacy) {
-    warnings.push("legacy allocation.peak alias");
-    return { mw: legacy.mw };
-  }
-
-  warnings.push("missing allocation peak");
-  return { mw: null };
+  return {
+    date: projection.date,
+    calloff_id: projection.calloff_id,
+    period: projection.month,
+    block,
+    mw: projection.classic_peak_mw,
+    mwh: projection.classic_peak_mwh,
+    price: projection.classic_peak_price,
+    value: projection.classic_peak_value,
+    warnings: projection.warnings,
+    hours: projection.peak_h,
+  };
 }
 
 function aggregateCalloffRows(rows: MonthlyProjection[]): LegacyCalloffListRow[] {
@@ -192,96 +117,6 @@ function aggregateCalloffRows(rows: MonthlyProjection[]): LegacyCalloffListRow[]
         warnings,
       };
     });
-}
-
-function selectComponentMw(
-  database: PrototypeDatabase,
-  transactions: CustomerTransaction[],
-  components: string[],
-  label: string,
-  warnings: string[],
-): { mw: number | null } {
-  const rows = components.map((component) => findComponentTransaction(database, transactions, component)).filter(Boolean) as CustomerTransaction[];
-  if (rows.length === 0) {
-    warnings.push(`missing ${label}`);
-    return { mw: null };
-  }
-  if (rows.length === 1) {
-    warnings.push(`single ${label} component`);
-    return { mw: rows[0].mw };
-  }
-  const [first, second] = rows;
-  if (Math.abs(first.mw - second.mw) > EPSILON) {
-    warnings.push(`mismatched ${label} MW`);
-  }
-  return { mw: first.mw };
-}
-
-function findComponentTransaction(
-  database: PrototypeDatabase,
-  transactions: CustomerTransaction[],
-  componentCode: string,
-): CustomerTransaction | undefined {
-  return transactions.find(
-    (transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component === componentCode,
-  );
-}
-
-function sumTransactionComponentPrices(
-  database: PrototypeDatabase,
-  transactions: CustomerTransaction[],
-  componentCodes: string[],
-  warnings: string[],
-  label: string,
-): number {
-  const components = transactions
-    .map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id))
-    .filter((component) => component && componentCodes.includes(component.component));
-  let price = 0;
-  for (const component of components) {
-    const priceComponent = [...database.priceComponents.values()].find(
-      (candidate) => candidate.productcomponent_id === component.productcomponent_id,
-    );
-    if (!priceComponent) {
-      warnings.push(`missing ${label} component ${component.component}`);
-      continue;
-    }
-    price += priceComponent.price;
-  }
-  if (components.length < 2) {
-    warnings.push(`partial ${label}`);
-  }
-  return price;
-}
-
-function errorRows(calloff: Calloff, period: string, warning: string): MonthlyProjection[] {
-  const warnings = [warning].filter(Boolean);
-  return [
-    {
-      date: calloff.date,
-      calloff_id: calloff.calloff_id,
-      period,
-      block: "Offpeak",
-      mw: null,
-      mwh: 0,
-      price: null,
-      value: 0,
-      warnings,
-      hours: 0,
-    },
-    {
-      date: calloff.date,
-      calloff_id: calloff.calloff_id,
-      period,
-      block: "Peak",
-      mw: null,
-      mwh: 0,
-      price: null,
-      value: 0,
-      warnings,
-      hours: 0,
-    },
-  ];
 }
 
 function productPackageName(database: PrototypeDatabase, productId: string): string | undefined {
