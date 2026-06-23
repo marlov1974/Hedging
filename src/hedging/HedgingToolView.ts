@@ -16,6 +16,7 @@ import {
 import { calculateFinancialSettlementForMonth, getFinancialSettlementMonths } from "./financialSettlement.ts";
 import type { ForecastHedgeAcceptResult, ForecastHedgeProfile } from "./forecastHedge.ts";
 import { getForecastRowsForYear, getForecastYears, type ForecastDisplayRow } from "./forecastFeature.ts";
+import { getLegacyCalloffListRows } from "./legacyCalloffList.ts";
 import { getPortfolioDetails } from "./portfolioDetails.ts";
 import { getPositionReportRows, getPositionReportYears } from "./positionReport.ts";
 import { getPortfolioOptions, type HedgingFeatureId, type PortfolioOption } from "./features.ts";
@@ -71,6 +72,11 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
       --accent: #08705f;
       --accent-soft: #edf8f5;
       --variant-line: #9ed5c9;
+    }
+    body.variant-peaks-classic {
+      --accent: #6d4b0f;
+      --accent-soft: #fff7e8;
+      --variant-line: #e3c783;
     }
     * { box-sizing: border-box; }
     body {
@@ -331,6 +337,10 @@ function renderActiveFeature(
     return renderCalloffList(database, selectedPortfolio);
   }
 
+  if (activeFeature === "legacy-calloff-list") {
+    return renderLegacyCalloffList(database, selectedPortfolio);
+  }
+
   if (activeFeature === "portfolio-details") {
     return renderPortfolioDetails(database, selectedPortfolio);
   }
@@ -413,6 +423,50 @@ function renderCalloffList(database: PrototypeDatabase, selectedPortfolio: Portf
               <td>${escapeHtml(row.derivative_name)}</td>
               <td class="number">${formatNumber(row.mwh)}</td>
               <td class="number">${formatNumber(row.price)}</td>
+            </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function renderLegacyCalloffList(database: PrototypeDatabase, selectedPortfolio: PortfolioOption): string {
+  const rows = getLegacyCalloffListRows(database, selectedPortfolio.portfolio_id);
+  if (rows.length === 0) {
+    return `<div class="notice"><h2>Legacy Calloff List</h2><p>No Peaks.Classic calloffs for the selected portfolio.</p></div>`;
+  }
+
+  return `<div>
+    <h2>Legacy Calloff List</h2>
+    <p>Projected Peak/Offpeak rows from canonical component transactions.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Calloff</th>
+          <th>Period</th>
+          <th>Block</th>
+          <th>MW</th>
+          <th>MWh</th>
+          <th>Price</th>
+          <th>Value</th>
+          <th>Warnings</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) => `<tr>
+              <td>${escapeHtml(row.date)}</td>
+              <td>${escapeHtml(row.calloff_id)}</td>
+              <td>${escapeHtml(row.period)}</td>
+              <td>${escapeHtml(row.block)}</td>
+              <td class="number">${formatOptionalNumber(row.mw)}</td>
+              <td class="number">${formatNumber(row.mwh)}</td>
+              <td class="number">${formatOptionalNumber(row.price)}</td>
+              <td class="number">${formatNumber(row.value)}</td>
+              <td>${escapeHtml(row.warnings.join("; "))}</td>
             </tr>`,
           )
           .join("")}
@@ -863,6 +917,10 @@ function formatPercentInput(value: number): number {
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatOptionalNumber(value: number | null): string {
+  return value === null ? "" : formatNumber(value);
 }
 
 function escapeHtml(value: string): string {

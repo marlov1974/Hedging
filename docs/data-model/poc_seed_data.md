@@ -82,11 +82,7 @@ The PoC uses:
 ```text
 base.sys
 base.epad
-base.classic.sys
-base.classic.epad
 allocation.peak
-peak.classic.sys
-peak.classic.epad
 peak.premium.sys
 peak.premium.epad
 profile.sys
@@ -96,16 +92,7 @@ volume
 
 ## Classic and Modern Families
 
-Classic peak structures use explicit timeblock/energy-partition components:
-
-```text
-base.classic.sys
-base.classic.epad
-peak.classic.sys
-peak.classic.epad
-```
-
-Modern structures use total-consumption base components and separate exposure/risk layers:
+Peaks.Classic and Peaks.Modern both use canonical component rows in seed data:
 
 ```text
 allocation.peak
@@ -117,6 +104,8 @@ profile.sys
 profile.epad
 volume
 ```
+
+Peaks.Classic differs by feature set and projection. Its `Legacy Calloff List` projects canonical rows into Peak/Offpeak customer rows.
 
 Deprecated aliases are accepted only for compatibility:
 
@@ -169,10 +158,8 @@ Deterministic values stay inside these ranges:
 
 ```text
 base.sys / base.epad = 1.0
-base.classic.sys / base.classic.epad = 1.0
 allocation.peak = 0
 peak.premium.sys / peak.premium.epad = 1.2-1.5
-peak.classic.sys / peak.classic.epad = 2.2-2.5
 profile.sys / profile.epad = 1.03-1.09
 volume = 0
 ```

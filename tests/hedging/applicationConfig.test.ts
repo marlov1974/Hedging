@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { createPocSeedData } from "../../src/database/pocSeedData.ts";
 import {
   getApplicationFeaturesForPortfolio,
+  isPeaksClassicPortfolio,
   isPeaksModernPortfolio,
   resolveActiveFeature,
 } from "../../src/hedging/applicationConfig.ts";
@@ -29,8 +30,22 @@ describe("application configuration", () => {
     );
   });
 
+  it("returns Peaks.Classic features for Peaks.Classic portfolio", () => {
+    const config = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS01-0");
+
+    assert.equal(config.variant_id, "peaks-classic");
+    assert.deepEqual(
+      config.features.map((feature) => feature.feature_id),
+      ["portfolio-details", "legacy-calloff-list", "data-viewer"],
+    );
+  });
+
   it("detects Peaks.Modern portfolio", () => {
     assert.equal(isPeaksModernPortfolio(createPocSeedData(), "CUS02-0"), true);
+  });
+
+  it("detects Peaks.Classic portfolio", () => {
+    assert.equal(isPeaksClassicPortfolio(createPocSeedData(), "CUS01-0"), true);
   });
 
   it("Peaks.Modern does not show Baseloads-only features", () => {

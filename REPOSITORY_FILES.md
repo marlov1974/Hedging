@@ -18,10 +18,12 @@ docs/data-model/transaction_model.md
 docs/hedging/application_configurations.md
 docs/hedging/baseloads_calloff_list.md
 docs/hedging/canonical_component_model.md
+docs/hedging/classic_projection_price_rules.md
 docs/hedging/component_categories_and_projection_listeners.md
 docs/hedging/data_viewer.md
 docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
+docs/hedging/peaks_classic_legacy_calloff_list.md
 docs/hedging/peaks_modern_forecast_feature.md
 docs/hedging/peaks_modern_forecast_hedge.md
 docs/hedging/peaks_modern_volume_semantics.md
@@ -111,6 +113,10 @@ requirements/package-runs/P0025/design.md
 requirements/package-runs/P0025/findings.md
 requirements/package-runs/P0025/functions.md
 requirements/package-runs/P0025/review.md
+requirements/package-runs/P0026/design.md
+requirements/package-runs/P0026/findings.md
+requirements/package-runs/P0026/functions.md
+requirements/package-runs/P0026/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -138,6 +144,7 @@ requirements/packages/P0022-peaks-modern-forecast-hedge-purchase.md
 requirements/packages/P0023-raw-data-viewer-feature.md
 requirements/packages/P0024-correct-peaks-modern-premium-volume.md
 requirements/packages/P0025-canonical-product-model-realignment.md
+requirements/packages/P0026-peaks-classic-legacy-calloff-list.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
@@ -155,6 +162,7 @@ src/hedging/features.ts
 src/hedging/financialSettlement.ts
 src/hedging/forecastFeature.ts
 src/hedging/forecastHedge.ts
+src/hedging/legacyCalloffList.ts
 src/hedging/marketProjection.ts
 src/hedging/portfolioDetails.ts
 src/hedging/positionReport.ts
@@ -188,6 +196,7 @@ tests/hedging/financialSettlement.test.ts
 tests/hedging/forecastFeature.test.ts
 tests/hedging/forecastHedge.test.ts
 tests/hedging/hedgingTool.test.ts
+tests/hedging/legacyCalloffList.test.ts
 tests/hedging/portfolioDetails.test.ts
 tests/hedging/positionReport.test.ts
 tests/price-api/priceApi.test.ts

@@ -45,12 +45,25 @@ Data Viewer
 
 Baseloads-specific features are not shown for Peaks.Modern portfolios.
 
+## Peaks.Classic Application
+
+Peaks.Classic portfolios use the Classic Feature Set application appearance and feature list:
+
+```text
+Portfolio Details
+Legacy Calloff List
+Data Viewer
+```
+
+`Legacy Calloff List` is a Peak/Offpeak customer projection from canonical component transactions.
+
 ## Appearance
 
 The current PoC uses a minimal shared shell with product-specific variant styling and context copy:
 
 ```text
 Baseloads application
+Peaks.Classic application
 Peaks.Modern application
 ```
 

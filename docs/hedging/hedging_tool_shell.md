@@ -27,6 +27,7 @@ The selected portfolio's product configuration determines the application varian
 
 ```text
 Baseloads portfolio -> Baseloads application appearance and features
+Peaks.Classic portfolio -> Peaks.Classic application appearance and features
 Peaks.Modern portfolio -> Peaks.Modern application appearance and features
 ```
 
@@ -50,6 +51,14 @@ The current Peaks.Modern features are:
 Portfolio Details
 Forecast
 Hedge Forecast
+Data Viewer
+```
+
+The current Peaks.Classic features are:
+
+```text
+Portfolio Details
+Legacy Calloff List
 Data Viewer
 ```
 

@@ -209,21 +209,23 @@ describe("P0015 PoC seed data", () => {
     assert.equal(byComponent.get("volume")?.component_category, "volume");
   });
 
-  it("distinguishes classic and modern peak component structures", () => {
+  it("uses canonical peak components for Peaks packages and reserves profile extensions", () => {
     const database = createPocSeedData();
     const peaksClassic = productComponentsByProductName(database, "Peaks.Classic");
     const peaksModern = productComponentsByProductName(database, "Peaks.Modern");
     const profilesClassic = productComponentsByProductName(database, "Profiles.Classic");
     const profilesModern = productComponentsByProductName(database, "Profiles.Modern");
 
-    assert.ok(peaksClassic.has("peak.classic.sys"));
-    assert.ok(peaksClassic.has("peak.classic.epad"));
+    assert.ok(peaksClassic.has("allocation.peak"));
+    assert.ok(peaksClassic.has("base.sys"));
+    assert.ok(peaksClassic.has("base.epad"));
+    assert.ok(peaksClassic.has("peak.premium.sys"));
+    assert.ok(peaksClassic.has("peak.premium.epad"));
     assert.ok(!peaksClassic.has("peak.modern.sys"));
     assert.ok(peaksModern.has("allocation.peak"));
     assert.ok(peaksModern.has("peak.premium.sys"));
     assert.ok(peaksModern.has("peak.premium.epad"));
     assert.ok(!peaksModern.has("peak.modern.sys"));
-    assert.ok(!peaksModern.has("peak.classic.sys"));
     assert.ok(profilesClassic.has("profile.sys"));
     assert.ok(profilesClassic.has("profile.epad"));
     assert.ok(profilesModern.has("profile.sys"));

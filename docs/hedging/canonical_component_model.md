@@ -24,6 +24,8 @@ peak.premium.epad
 
 `allocation.peak` is a helper component. It stores the customer's forecast peak-hour effect in MW, uses `peak_h`, has price `0`, q-factor `0`, and does not create market quantity.
 
+Classic/Legacy customer projections use `allocation.peak` as the peak-hour volume driver, but do not display it as its own customer row.
+
 `base.sys` and `base.epad` carry the flat total monthly hedge:
 
 ```text

@@ -23,6 +23,12 @@ Modern customer views present Base/Peak terms.
 
 Both can use the same canonical component model underneath.
 
+The first implemented Classic projection is:
+
+```text
+Peaks.Classic -> Legacy Calloff List
+```
+
 ## Current PoC Scope
 
 Baseloads and Peaks.Modern have active workflows in the current UI.

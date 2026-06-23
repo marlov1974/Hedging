@@ -21,3 +21,5 @@ Durable design and function documentation lives here.
 - [Product packages and feature sets](hedging/product_packages_and_feature_sets.md)
 - [Component categories and projection listeners](hedging/component_categories_and_projection_listeners.md)
 - [Peaks.Modern Forecast](hedging/peaks_modern_forecast_feature.md)
+- [Peaks.Classic Legacy Calloff List](hedging/peaks_classic_legacy_calloff_list.md)
+- [Classic projection price rules](hedging/classic_projection_price_rules.md)

@@ -3,6 +3,7 @@ import {
   getApplicationFeaturesForPortfolio,
   getProductConfigurationNameForPortfolio,
   isBaseloadsPortfolio,
+  isPeaksClassicPortfolio,
   type HedgingFeature,
   type HedgingFeatureId,
 } from "./applicationConfig.ts";
@@ -38,4 +39,4 @@ export function getAvailableFeaturesForPortfolio(database: PrototypeDatabase, po
   return getApplicationFeaturesForPortfolio(database, portfolioId).features;
 }
 
-export { getProductConfigurationNameForPortfolio, isBaseloadsPortfolio };
+export { getProductConfigurationNameForPortfolio, isBaseloadsPortfolio, isPeaksClassicPortfolio };

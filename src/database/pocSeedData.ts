@@ -17,7 +17,7 @@ export const CALENDAR_SET_ID = "CAL_SE_TRADING";
 
 export const COMPONENTS_BY_PRODUCT = new Map([
   ["Baseloads", ["base.sys", "base.epad"]],
-  ["Peaks.Classic", ["base.classic.sys", "base.classic.epad", "peak.classic.sys", "peak.classic.epad"]],
+  ["Peaks.Classic", ["allocation.peak", "base.sys", "base.epad", "peak.premium.sys", "peak.premium.epad"]],
   ["Peaks.Modern", ["allocation.peak", "base.sys", "base.epad", "peak.premium.sys", "peak.premium.epad"]],
   [
     "Profiles.Classic",

@@ -5,6 +5,7 @@ import { canonicalProductPackageName } from "../database/canonicalComponents.ts"
 export type HedgingFeatureId =
   | "buy-baseloads"
   | "baseloads-calloff-list"
+  | "legacy-calloff-list"
   | "portfolio-details"
   | "position-report"
   | "financial-settlement"
@@ -12,7 +13,7 @@ export type HedgingFeatureId =
   | "forecast-hedge"
   | "data-viewer";
 
-export type ApplicationVariantId = "none" | "baseloads" | "peaks-modern" | "unsupported";
+export type ApplicationVariantId = "none" | "baseloads" | "peaks-classic" | "peaks-modern" | "unsupported";
 
 export type HedgingFeature = {
   feature_id: HedgingFeatureId;
@@ -25,7 +26,7 @@ export type ApplicationConfig = {
   variant_id: ApplicationVariantId;
   title: string;
   context: string;
-  accent: "baseloads" | "peaks-modern" | "neutral";
+  accent: "baseloads" | "peaks-classic" | "peaks-modern" | "neutral";
   features: HedgingFeature[];
 };
 
@@ -73,6 +74,20 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
     };
   }
 
+  if (isPeaksClassicPortfolio(database, selectedPortfolio.portfolio_id)) {
+    return {
+      variant_id: "peaks-classic",
+      title: "Peaks.Classic application",
+      context: "Peaks.Classic legacy projection workspace for Peak and Offpeak calloff rows.",
+      accent: "peaks-classic",
+      features: [
+        feature("portfolio-details", "Portfolio Details"),
+        feature("legacy-calloff-list", "Legacy Calloff List"),
+        feature("data-viewer", "Data Viewer"),
+      ],
+    };
+  }
+
   return {
     variant_id: "unsupported",
     title: "Unsupported application",
@@ -105,6 +120,10 @@ export function isBaseloadsPortfolio(database: PrototypeDatabase, portfolioId: s
 
 export function isPeaksModernPortfolio(database: PrototypeDatabase, portfolioId: string): boolean {
   return canonicalProductPackageName(getProductConfigurationNameForPortfolio(database, database.portfolios.get(portfolioId)) ?? "") === "Peaks.Modern";
+}
+
+export function isPeaksClassicPortfolio(database: PrototypeDatabase, portfolioId: string): boolean {
+  return canonicalProductPackageName(getProductConfigurationNameForPortfolio(database, database.portfolios.get(portfolioId)) ?? "") === "Peaks.Classic";
 }
 
 export function getProductConfigurationNameForPortfolio(
