@@ -17,6 +17,7 @@ docs/data-model/poc_seed_data.md
 docs/data-model/transaction_model.md
 docs/hedging/application_configurations.md
 docs/hedging/baseloads_calloff_list.md
+docs/hedging/data_viewer.md
 docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
 docs/hedging/peaks_modern_forecast_feature.md
@@ -95,6 +96,9 @@ requirements/package-runs/P0021/review.md
 requirements/package-runs/P0022/design.md
 requirements/package-runs/P0022/functions.md
 requirements/package-runs/P0022/review.md
+requirements/package-runs/P0023/design.md
+requirements/package-runs/P0023/functions.md
+requirements/package-runs/P0023/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -119,6 +123,7 @@ requirements/packages/P0020-minimal-ui-and-financial-settlement.md
 requirements/packages/P0021-application-product-skin-addendum.md
 requirements/packages/P0021-peaks-modern-application-and-forecast-feature.md
 requirements/packages/P0022-peaks-modern-forecast-hedge-purchase.md
+requirements/packages/P0023-raw-data-viewer-feature.md
 src/README.md
 src/database/fixtures.ts
 src/database/pocSeedData.ts
@@ -129,6 +134,7 @@ src/database/validation.ts
 src/hedging/HedgingToolView.ts
 src/hedging/applicationConfig.ts
 src/hedging/calloffList.ts
+src/hedging/dataViewer.ts
 src/hedging/derivativeNames.ts
 src/hedging/features.ts
 src/hedging/financialSettlement.ts
@@ -161,6 +167,7 @@ tests/database/customerProductSchema.test.ts
 tests/database/pocSeedData.test.ts
 tests/hedging/applicationConfig.test.ts
 tests/hedging/baseloadsCalloffList.test.ts
+tests/hedging/dataViewer.test.ts
 tests/hedging/financialSettlement.test.ts
 tests/hedging/forecastFeature.test.ts
 tests/hedging/forecastHedge.test.ts

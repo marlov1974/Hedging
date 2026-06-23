@@ -3,6 +3,16 @@ import type { BaseloadsPurchaseResult } from "../purchase/baseloadsPurchase.ts";
 import { getBaseloadsPurchasePeriods } from "../purchase/periodOptions.ts";
 import { getApplicationFeaturesForPortfolio, resolveActiveFeature } from "./applicationConfig.ts";
 import { getBaseloadsCalloffListRows } from "./calloffList.ts";
+import {
+  DataViewerError,
+  getDataViewerRows,
+  getDataViewerTables,
+  getDataViewerYears,
+  parseDataViewerTableId,
+  type DataViewerTableId,
+  type RawCalloffRow,
+  type RawTransactionRow,
+} from "./dataViewer.ts";
 import { calculateFinancialSettlementForMonth, getFinancialSettlementMonths } from "./financialSettlement.ts";
 import type { ForecastHedgeAcceptResult, ForecastHedgeProfile } from "./forecastHedge.ts";
 import { getForecastRowsForYear, getForecastYears, type ForecastDisplayRow } from "./forecastFeature.ts";
@@ -17,6 +27,7 @@ export type HedgingToolState = {
   selected_period_id?: string;
   selected_year?: string;
   selected_month?: string;
+  selected_table?: string;
   forecast_message?: string;
   forecast_hedge_input?: {
     start_month?: string;
@@ -338,6 +349,10 @@ function renderActiveFeature(
 
   if (activeFeature === "forecast-hedge") {
     return renderForecastHedgeFeature(database, selectedPortfolio, state);
+  }
+
+  if (activeFeature === "data-viewer") {
+    return renderDataViewer(database, selectedPortfolio, state);
   }
 
   return renderBuyBaseloads(selectedPortfolio, state);
@@ -698,6 +713,130 @@ function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile:
       });
     </script>
   </form>`;
+}
+
+function renderDataViewer(database: PrototypeDatabase, selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+  let selectedTable: DataViewerTableId = "calloffs";
+  let error = state.error;
+  try {
+    selectedTable = parseDataViewerTableId(state.selected_table);
+  } catch (caught) {
+    error = caught instanceof DataViewerError ? caught.message : "Data Viewer failed";
+  }
+
+  const tables = getDataViewerTables();
+  const years = getDataViewerYears(database, selectedPortfolio.portfolio_id, selectedTable);
+  const selectedYear = state.selected_year ?? years[0] ?? "";
+  let content = `<div class="notice"><p>No rows for selected portfolio and year.</p></div>`;
+
+  if (!error && selectedYear) {
+    try {
+      const result = getDataViewerRows(database, selectedPortfolio.portfolio_id, selectedTable, selectedYear);
+      content = renderDataViewerRows(result.table_id, result.rows);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Data Viewer failed";
+      content = `<div class="notice error">${escapeHtml(message)}</div>`;
+    }
+  }
+
+  return `<div class="stack">
+    <div>
+      <h2>Data Viewer</h2>
+      <p>Raw portfolio-linked calloff and transaction rows.</p>
+    </div>
+    ${error ? `<div class="notice error">${escapeHtml(error)}</div>` : ""}
+    <form method="get" action="/hedging" class="form-grid">
+      <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      <input type="hidden" name="feature_id" value="data-viewer">
+      <label>
+        Table
+        <select name="selected_table" onchange="this.form.submit()">
+          ${tables.map((table) => `<option value="${escapeHtml(table.table_id)}"${table.table_id === selectedTable ? " selected" : ""}>${escapeHtml(table.label)}</option>`).join("")}
+        </select>
+      </label>
+      <label>
+        Year
+        <select name="selected_year" onchange="this.form.submit()">
+          ${years.map((year) => `<option value="${escapeHtml(year)}"${year === selectedYear ? " selected" : ""}>${escapeHtml(year)}</option>`).join("")}
+        </select>
+      </label>
+    </form>
+    ${content}
+  </div>`;
+}
+
+function renderDataViewerRows(tableId: DataViewerTableId, rows: RawCalloffRow[] | RawTransactionRow[]): string {
+  if (rows.length === 0) {
+    return `<div class="notice"><p>No rows for selected portfolio and year.</p></div>`;
+  }
+
+  if (tableId === "calloffs") {
+    return renderRawCalloffsTable(rows as RawCalloffRow[]);
+  }
+
+  return renderRawTransactionsTable(rows as RawTransactionRow[]);
+}
+
+function renderRawCalloffsTable(rows: RawCalloffRow[]): string {
+  return `<table>
+    <thead>
+      <tr>
+        <th>calloff_id</th>
+        <th>product_id</th>
+        <th>product name</th>
+        <th>portfolio_id</th>
+        <th>portfolio name</th>
+        <th>date</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeHtml(row.calloff_id)}</td>
+            <td>${escapeHtml(row.product_id)}</td>
+            <td>${escapeHtml(row.product_name)}</td>
+            <td>${escapeHtml(row.portfolio_id)}</td>
+            <td>${escapeHtml(row.portfolio_name)}</td>
+            <td>${escapeHtml(row.date)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
+}
+
+function renderRawTransactionsTable(rows: RawTransactionRow[]): string {
+  return `<table>
+    <thead>
+      <tr>
+        <th>transaction_id</th>
+        <th>calloff_id</th>
+        <th>month</th>
+        <th>productcomponent_id</th>
+        <th>component</th>
+        <th>product name</th>
+        <th>mw</th>
+        <th>q_factor</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeHtml(row.transaction_id)}</td>
+            <td>${escapeHtml(row.calloff_id)}</td>
+            <td>${escapeHtml(row.month)}</td>
+            <td>${escapeHtml(row.productcomponent_id)}</td>
+            <td>${escapeHtml(row.component)}</td>
+            <td>${escapeHtml(row.product_name)}</td>
+            <td class="number">${formatNumber(row.mw)}</td>
+            <td class="number">${formatNumber(row.q_factor)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
 }
 
 function renderMonthSelect(name: string, months: string[], selectedMonth: string): string {

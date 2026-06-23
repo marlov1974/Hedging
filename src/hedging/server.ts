@@ -219,6 +219,7 @@ function readStateFromUrl(url: URL) {
     feature_id: (url.searchParams.get("feature_id") as HedgingFeatureId | null) ?? undefined,
     selected_year: url.searchParams.get("selected_year") ?? undefined,
     selected_month: url.searchParams.get("selected_month") ?? undefined,
+    selected_table: url.searchParams.get("selected_table") ?? undefined,
   };
 }
 

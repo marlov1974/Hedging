@@ -8,7 +8,8 @@ export type HedgingFeatureId =
   | "position-report"
   | "financial-settlement"
   | "forecast"
-  | "forecast-hedge";
+  | "forecast-hedge"
+  | "data-viewer";
 
 export type ApplicationVariantId = "none" | "baseloads" | "peaks-modern" | "unsupported";
 
@@ -51,6 +52,7 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
         feature("baseloads-calloff-list", "Baseloads Calloff List"),
         feature("position-report", "Position Report"),
         feature("financial-settlement", "Financial Settlement"),
+        feature("data-viewer", "Data Viewer"),
       ],
     };
   }
@@ -61,7 +63,12 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
       title: "PeaksModern application",
       context: "PeaksModern forecast workspace for total monthly consumption and peak share.",
       accent: "peaks-modern",
-      features: [feature("portfolio-details", "Portfolio Details"), feature("forecast", "Forecast"), feature("forecast-hedge", "Hedge Forecast")],
+      features: [
+        feature("portfolio-details", "Portfolio Details"),
+        feature("forecast", "Forecast"),
+        feature("forecast-hedge", "Hedge Forecast"),
+        feature("data-viewer", "Data Viewer"),
+      ],
     };
   }
 
@@ -74,6 +81,7 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
       feature("portfolio-details", "Portfolio Details"),
       unavailableFeature("forecast", "Forecast", "Selected portfolio does not support Forecast in this PoC."),
       unavailableFeature("forecast-hedge", "Hedge Forecast", "Selected portfolio does not support Hedge Forecast in this PoC."),
+      unavailableFeature("data-viewer", "Data Viewer", "Selected portfolio does not support Data Viewer in this PoC."),
     ],
   };
 }
