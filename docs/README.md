@@ -15,3 +15,5 @@ Durable design and function documentation lives here.
 - [Price API v2 profile request](price-api/price_api_v2_profile_request.md)
 - [Static spot actuals](settlement/static_spot_actuals.md)
 - [Financial Settlement](hedging/financial_settlement.md)
+- [Application configurations](hedging/application_configurations.md)
+- [PeaksModern Forecast](hedging/peaks_modern_forecast_feature.md)

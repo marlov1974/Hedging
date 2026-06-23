@@ -15,9 +15,11 @@ docs/data-model/customer_product_database_structure.md
 docs/data-model/customer_transaction_list.md
 docs/data-model/poc_seed_data.md
 docs/data-model/transaction_model.md
+docs/hedging/application_configurations.md
 docs/hedging/baseloads_calloff_list.md
 docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
+docs/hedging/peaks_modern_forecast_feature.md
 docs/hedging/position_report.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
@@ -86,6 +88,9 @@ requirements/package-runs/P0019/review.md
 requirements/package-runs/P0020/design.md
 requirements/package-runs/P0020/functions.md
 requirements/package-runs/P0020/review.md
+requirements/package-runs/P0021/design.md
+requirements/package-runs/P0021/functions.md
+requirements/package-runs/P0021/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -107,6 +112,8 @@ requirements/packages/P0017-hedging-tool-shell-and-baseloads-calloff-list.md
 requirements/packages/P0018-hedging-tool-minimal-layout-and-position-report.md
 requirements/packages/P0019-static-derivative-and-spot-actual-price-lists.md
 requirements/packages/P0020-minimal-ui-and-financial-settlement.md
+requirements/packages/P0021-application-product-skin-addendum.md
+requirements/packages/P0021-peaks-modern-application-and-forecast-feature.md
 src/README.md
 src/database/fixtures.ts
 src/database/pocSeedData.ts
@@ -115,10 +122,12 @@ src/database/schema.ts
 src/database/types.ts
 src/database/validation.ts
 src/hedging/HedgingToolView.ts
+src/hedging/applicationConfig.ts
 src/hedging/calloffList.ts
 src/hedging/derivativeNames.ts
 src/hedging/features.ts
 src/hedging/financialSettlement.ts
+src/hedging/forecastFeature.ts
 src/hedging/portfolioDetails.ts
 src/hedging/positionReport.ts
 src/hedging/server.ts
@@ -144,8 +153,10 @@ tests/README.md
 tests/database/calloffTransactionModel.test.ts
 tests/database/customerProductSchema.test.ts
 tests/database/pocSeedData.test.ts
+tests/hedging/applicationConfig.test.ts
 tests/hedging/baseloadsCalloffList.test.ts
 tests/hedging/financialSettlement.test.ts
+tests/hedging/forecastFeature.test.ts
 tests/hedging/hedgingTool.test.ts
 tests/hedging/portfolioDetails.test.ts
 tests/hedging/positionReport.test.ts

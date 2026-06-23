@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createPocSeedData } from "../database/pocSeedData.ts";
 import type { PrototypeDatabase } from "../database/schema.ts";
+import { ForecastFeatureError, updateForecastRows } from "./forecastFeature.ts";
 import { PurchaseError, purchaseBaseloads } from "../purchase/baseloadsPurchase.ts";
 import { renderHedgingTool } from "./HedgingToolView.ts";
 import type { HedgingFeatureId } from "./features.ts";
@@ -49,6 +50,49 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
             feature_id: "buy-baseloads",
             selected_period_id: period_id,
             mw: mwText,
+            error: message,
+          }),
+        );
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/hedging/forecast") {
+      const body = await readForm(request);
+      const portfolio_id = String(body.get("portfolio_id") ?? "");
+      const selected_year = String(body.get("selected_year") ?? "");
+      const months = body.getAll("month").map((month) => String(month));
+
+      try {
+        updateForecastRows(database, {
+          portfolio_id,
+          rows: months.map((month) => ({
+            portfolio_id,
+            month,
+            mwh: String(body.get(`mwh_${month}`) ?? ""),
+            peak_percent: String(body.get(`peak_percent_${month}`) ?? ""),
+          })),
+        });
+
+        writeHtml(
+          response,
+          200,
+          renderHedgingTool(database, {
+            portfolio_id,
+            feature_id: "forecast",
+            selected_year,
+            forecast_message: "Forecast saved.",
+          }),
+        );
+      } catch (error) {
+        const message = error instanceof ForecastFeatureError ? error.message : "Forecast save failed";
+        writeHtml(
+          response,
+          400,
+          renderHedgingTool(database, {
+            portfolio_id,
+            feature_id: "forecast",
+            selected_year,
             error: message,
           }),
         );

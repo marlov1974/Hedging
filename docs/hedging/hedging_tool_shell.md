@@ -1,6 +1,6 @@
 # Hedging tool shell
 
-P0017 introduced the first local hedging tool shell. P0018 refined it into a compact work surface. P0020 removes remaining visual-only shell elements and adds the Financial Settlement feature.
+P0017 introduced the first local hedging tool shell. P0018 refined it into a compact work surface. P0020 removes remaining visual-only shell elements and adds the Financial Settlement feature. P0021 makes portfolio selection switch the application configuration.
 
 ## Portfolio Context
 
@@ -21,19 +21,37 @@ calendar id
 
 If no portfolio is selected, the feature area asks the user to select a portfolio first.
 
-## Feature Navigation
+## Application Configuration
 
-The current features are:
+The selected portfolio's product configuration determines the application variant. Current variants are documented in `application_configurations.md`.
 
 ```text
+Baseloads portfolio -> Baseloads application appearance and features
+PeaksModern portfolio -> PeaksModern application appearance and features
+```
+
+If the selected active feature does not exist in the new application variant, the shell resets it to the first available feature in that variant.
+
+## Feature Navigation
+
+The current Baseloads features are:
+
+```text
+Portfolio Details
 Buy Baseloads
 Baseloads Calloff List
-Portfolio Details
 Position Report
 Financial Settlement
 ```
 
-Feature availability is evaluated from the active portfolio context. Baseloads features are available only when the selected portfolio is linked to the Baseloads product configuration.
+The current PeaksModern features are:
+
+```text
+Portfolio Details
+Forecast
+```
+
+Feature availability is evaluated from the active portfolio application configuration.
 
 ## Minimal Layout
 
@@ -90,6 +108,18 @@ financial_settlement = hedge_volume_mwh * (monthly_spot_price - hedge_price)
 Positive value means spot price is above hedge price.
 
 The feature uses monthly average spot actuals from the static spot actual list. Peak/offpeak actuals remain available for later reports but are not used here.
+
+## Forecast Feature
+
+`Forecast` is available in the PeaksModern application. It shows monthly forecast rows with:
+
+```text
+Month
+MWh
+Peak %
+```
+
+The feature displays `Peak %` as percent and stores `peak_pct` as decimal. Details are documented in `peaks_modern_forecast_feature.md`.
 
 ## UI Entry Point
 

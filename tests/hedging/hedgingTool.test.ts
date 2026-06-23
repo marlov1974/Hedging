@@ -57,12 +57,11 @@ describe("hedging tool shell", () => {
     assert.equal(features.find((feature) => feature.feature_id === "buy-baseloads")?.available, true);
   });
 
-  it("Buy Baseloads feature is unavailable for non-Baseloads portfolio", () => {
-    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "PORT_PEAKS_CLASSIC");
+  it("Buy Baseloads feature is not part of PeaksModern application", () => {
+    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "PORT_PEAKS_MODERN");
 
     const feature = features.find((candidate) => candidate.feature_id === "buy-baseloads");
-    assert.equal(feature?.available, false);
-    assert.match(feature?.unavailable_reason ?? "", /not linked to Baseloads/);
+    assert.equal(feature, undefined);
   });
 
   it("Baseloads Calloff List feature is available for Baseloads portfolio", () => {
@@ -79,12 +78,13 @@ describe("hedging tool shell", () => {
     assert.match(html, /Financial Settlement/);
   });
 
-  it("non-Baseloads selected portfolio shows clear unavailable message", () => {
+  it("unavailable active feature resets to a valid selected portfolio feature", () => {
     const html = renderHedgingTool(createPocSeedData(), {
-      portfolio_id: "PORT_PEAKS_CLASSIC",
+      portfolio_id: "PORT_PEAKS_MODERN",
       feature_id: "buy-baseloads",
     });
 
-    assert.match(html, /Selected portfolio is not linked to Baseloads/);
+    assert.match(html, /Portfolio Details/);
+    assert.doesNotMatch(html, /Confirm purchase/);
   });
 });
