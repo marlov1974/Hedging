@@ -1,18 +1,15 @@
-# P0029 - Peaks.Modern Calloff Transaction List
+# P0029 - Peaks Calloff Transaction Lists: Classic and Modern Projections
 
 ## Purpose
 
-Build the first customer-facing Modern Feature Set projection: a `Peaks.Modern` calloff transaction list in Base/Peak terms.
-
-This feature should project canonical component transactions into one calloff-level row per calloff, with the following columns:
+Build both customer-facing Peaks calloff transaction list projections from the same canonical component model:
 
 ```text
-Date
-BaseMW
-PeakMW
-BasePrice
-PeakPrice
+Peaks.Classic -> Classic Feature Set -> Peak/Offpeak transaction list
+Peaks.Modern  -> Modern Feature Set  -> Base/Peak transaction list
 ```
+
+This replaces the earlier narrower P0029 scope that only described the Modern list and incorrectly treated canonical MW values as projected customer MW values.
 
 This is a coding package.
 
@@ -35,66 +32,288 @@ Expected product package terminology:
 
 ```text
 Product family: Portfolio Hedging Products
-Product package: Peaks.Modern
-Feature set: Modern Feature Set
-Projection: Modern Projection / Base-Peak view
+Product packages: Peaks.Classic, Peaks.Modern
+Feature sets: Classic Feature Set, Modern Feature Set
 ```
 
-## Scope
+## Core principle
 
-Implement a `Calloff Transaction List` feature for `Peaks.Modern`.
+The database stores the canonical model.
 
-The list is a customer-facing Modern Projection.
+Customer transaction lists are projections.
 
-It should show the position in Base/Peak terms, not Peak/Offpeak terms.
+Do not show canonical component rows directly in either transaction list.
 
-It should be shown in calloff resolution.
+The same canonical calloff must be projectable into:
 
-Do not build full settlement or full market position in this package.
+```text
+Classic: Offpeak / Peak
+Modern:  Base / Peak
+```
 
-## Feature placement
+## Canonical inputs per month
 
-The feature belongs to:
+For each calloff/month and dimension, read:
+
+```text
+base.sys.mw
+base.epad.mw
+peak.sys.mw
+peak.epad.mw
+allocation.peak.sys.mw
+allocation.peak.epad.mw
+```
+
+Use effective values for customer projection.
+
+Normal cases:
+
+```text
+base.sys.mw == base.epad.mw
+peak.sys.mw == peak.epad.mw
+allocation.peak.sys.mw == allocation.peak.epad.mw
+```
+
+Effective customer values:
+
+```text
+B = effective canonical base MW
+P = effective canonical peak component MW
+A = effective allocation peak MW
+```
+
+Use `sys` as the effective volume carrier if `sys` and `epad` differ, and show a data-quality warning. Do not silently average.
+
+Expected canonical relation:
+
+```text
+A = B + P
+P = A - B
+```
+
+If this relation does not hold within tolerance, show a data-quality warning and use `B` and `A` as primary projection inputs. Derive projected customer MW from `B` and `A`.
+
+Calendar values:
+
+```text
+H  = total_h
+Hp = peak_h
+Ho = offpeak_h
+```
+
+Do not divide by zero. If `Hp` or `Ho` is zero, show an error/warning for that calloff/month.
+
+## Canonical prices and values
+
+Canonical all-in prices:
+
+```text
+CanonicalBasePrice = base.sys.price + base.epad.price
+CanonicalPeakPrice = peak.sys.price + peak.epad.price
+```
+
+If a dimension is missing, use the available dimension and show a warning.
+
+Canonical values:
+
+```text
+CanonicalBaseMWh = B * H
+CanonicalPeakMWh = P * Hp
+CanonicalBaseValue = CanonicalBaseMWh * CanonicalBasePrice
+CanonicalPeakValue = CanonicalPeakMWh * CanonicalPeakPrice
+CanonicalTotalValue = CanonicalBaseValue + CanonicalPeakValue
+```
+
+`P` and therefore `CanonicalPeakMWh` may be positive, zero or negative.
+
+## Projection MW calculations
+
+From canonical model, compute the four projected MW values:
+
+```text
+ClassicOffpeakMW
+ClassicPeakMW
+ModernBaseMW
+ModernPeakMW
+```
+
+### Step 1: physical customer volumes
+
+```text
+TotalMWh = B * H
+PeakMWh = A * Hp
+OffpeakMWh = TotalMWh - PeakMWh
+```
+
+### Step 2: Classic projection MW
+
+Classic means Peak/Offpeak levels.
+
+```text
+ClassicOffpeakMW = OffpeakMWh / Ho
+ClassicPeakMW = A
+```
+
+Equivalent formula:
+
+```text
+ClassicOffpeakMW = (B * H - A * Hp) / Ho
+```
+
+If the canonical relation `A = B + P` holds, this can also be written:
+
+```text
+ClassicOffpeakMW = B - P * Hp / Ho
+ClassicPeakMW = B + P
+```
+
+### Step 3: Modern projection MW
+
+Modern means Base/Peak where:
+
+```text
+Base = offpeak level applied as base layer
+Peak = extra effect above Base in peak hours
+```
+
+Therefore:
+
+```text
+ModernBaseMW = ClassicOffpeakMW
+ModernPeakMW = ClassicPeakMW - ModernBaseMW
+```
+
+Equivalent formula, when canonical relation holds:
+
+```text
+ModernBaseMW = B - P * Hp / Ho
+ModernPeakMW = P * H / Ho
+```
+
+`ModernPeakMW` may be positive, zero or negative.
+
+## Projection price calculations
+
+Compute four projected prices:
+
+```text
+ClassicOffpeakPrice
+ClassicPeakPrice
+ModernBasePrice
+ModernPeakPrice
+```
+
+All projection prices must preserve canonical total value.
+
+### Classic projection prices
+
+Classic Offpeak is anchored to canonical base price.
+
+```text
+ClassicOffpeakPrice = CanonicalBasePrice
+```
+
+Classic Peak is residual/value-preserving.
+
+```text
+ClassicOffpeakMWh = ClassicOffpeakMW * Ho
+ClassicPeakMWh = ClassicPeakMW * Hp
+
+ClassicPeakPrice =
+  (CanonicalTotalValue - ClassicOffpeakMWh * ClassicOffpeakPrice)
+  / ClassicPeakMWh
+```
+
+If `ClassicPeakMWh = 0`, set `ClassicPeakPrice` to blank/null and show a warning. Do not divide by zero.
+
+Value check:
+
+```text
+ClassicOffpeakMWh * ClassicOffpeakPrice
++ ClassicPeakMWh * ClassicPeakPrice
+= CanonicalTotalValue
+```
+
+### Modern projection prices
+
+Modern Base is anchored to canonical base price.
+
+```text
+ModernBasePrice = CanonicalBasePrice
+```
+
+Modern Peak is residual/value-preserving.
+
+Modern Base is a base layer across the whole month. Modern Peak is an additional layer during peak hours.
+
+```text
+ModernBaseMWh = ModernBaseMW * H
+ModernPeakMWh = ModernPeakMW * Hp
+
+ModernPeakPrice =
+  (CanonicalTotalValue - ModernBaseMWh * ModernBasePrice)
+  / ModernPeakMWh
+```
+
+If `ModernPeakMWh = 0`, set `ModernPeakPrice` to blank/null and show a warning. Do not divide by zero.
+
+If `ModernPeakMWh` is negative, the same formula applies. Negative modern peak is valid.
+
+Value check:
+
+```text
+ModernBaseMWh * ModernBasePrice
++ ModernPeakMWh * ModernPeakPrice
+= CanonicalTotalValue
+```
+
+## Customer-facing features
+
+Implement or align two transaction list features.
+
+### 1. Peaks.Classic Calloff Transaction List
+
+Feature placement:
+
+```text
+Product package: Peaks.Classic
+Feature set: Classic Feature Set
+Projection: Peak/Offpeak transaction list
+```
+
+Required columns:
+
+```text
+Date
+OffpeakMW
+PeakMW
+OffpeakPrice
+PeakPrice
+```
+
+Column definitions:
+
+```text
+Date = calloff date
+OffpeakMW = ClassicOffpeakMW
+PeakMW = ClassicPeakMW
+OffpeakPrice = ClassicOffpeakPrice
+PeakPrice = ClassicPeakPrice
+```
+
+This may reuse or replace the existing P0026 Legacy Calloff List logic. If both features exist, ensure they use the same calculation engine and do not diverge.
+
+### 2. Peaks.Modern Calloff Transaction List
+
+Feature placement:
 
 ```text
 Product package: Peaks.Modern
 Feature set: Modern Feature Set
-Projection: Modern Projection / Base-Peak view
+Projection: Base/Peak transaction list
 ```
 
-The feature should be available for selected portfolios/products/packages identified as `Peaks.Modern`.
-
-If old compatibility names still exist, support aliases:
-
-```text
-PeaksModern -> Peaks.Modern
-```
-
-Do not show this feature for `Peaks.Classic` unless a temporary compatibility condition makes it unavoidable. If compatibility leakage is needed, document it in the package run report.
-
-## Input rows
-
-For each calloff and month, read canonical rows:
-
-```text
-base.sys
-base.epad
-peak.sys
-peak.epad
-```
-
-Allocation rows are not displayed directly in this feature:
-
-```text
-allocation.peak.sys
-allocation.peak.epad
-```
-
-They may be used for validation, but the Modern transaction list columns are based on base and peak rows.
-
-## Required output columns
-
-The table must include:
+Required columns:
 
 ```text
 Date
@@ -104,151 +323,77 @@ BasePrice
 PeakPrice
 ```
 
-### Date
-
-`Date` is the calloff date, i.e. when the calloff was made.
-
-Use the canonical calloff date field.
-
-### BaseMW
-
-`BaseMW` is the effective base MW for the calloff.
-
-Normal case:
+Column definitions:
 
 ```text
-base.sys.mw == base.epad.mw
+Date = calloff date
+BaseMW = ModernBaseMW
+PeakMW = ModernPeakMW
+BasePrice = ModernBasePrice
+PeakPrice = ModernPeakPrice
 ```
 
-Use:
+Important: Modern `BaseMW` is not canonical `base.sys.mw`. It is the projected base/offpeak level.
 
-```text
-BaseMW = base.sys.mw
-```
-
-If `base.sys.mw` and `base.epad.mw` differ beyond tolerance:
-
-- show a warning,
-- use `base.sys.mw` as effective BaseMW,
-- do not silently average.
-
-If only one base dimension exists, use the one that exists and show a warning.
-
-### PeakMW
-
-`PeakMW` is the effective canonical peak MW for the calloff.
-
-Normal case:
-
-```text
-peak.sys.mw == peak.epad.mw
-```
-
-Use:
-
-```text
-PeakMW = peak.sys.mw
-```
-
-If `peak.sys.mw` and `peak.epad.mw` differ beyond tolerance:
-
-- show a warning,
-- use `peak.sys.mw` as effective PeakMW,
-- do not silently average.
-
-`PeakMW` may be positive, zero or negative.
-
-This is valid and must not be rejected.
-
-### BasePrice
-
-`BasePrice` is the all-in base price:
-
-```text
-BasePrice = base.sys.price + base.epad.price
-```
-
-If one dimension is missing, use the available dimension and show a warning.
-
-Do not average sys and epad. This is a sum of price components.
-
-### PeakPrice
-
-`PeakPrice` is the all-in peak price:
-
-```text
-PeakPrice = peak.sys.price + peak.epad.price
-```
-
-If one dimension is missing, use the available dimension and show a warning.
-
-Do not average sys and epad. This is a sum of price components.
+Important: Modern `PeakMW` is not canonical `peak.sys.mw`. It is the projected extra effect above the Modern Base level.
 
 ## Resolution and aggregation
 
-The feature is in calloff resolution.
+Both transaction lists are in calloff resolution.
 
 If a calloff has one month only, show one row.
 
-If a calloff spans multiple months, the feature should still show one calloff-level row, not one row per canonical transaction.
+If a calloff spans multiple months, show one calloff-level row, not one row per canonical transaction.
 
-For multi-month calloffs, aggregate as follows.
+For multi-month calloffs, aggregate by value and hours, not by arithmetic averages.
 
-### BaseMW aggregation
+### Aggregate Classic values
 
-Use MWh-weighted average MW by total hours, equivalent to total base MWh divided by total hours:
+For each month, compute monthly projected MW, MWh, price and value first.
 
-```text
-BaseMW = sum(base_mw_month * total_h_month) / sum(total_h_month)
-```
-
-### PeakMW aggregation
-
-Use MWh-weighted average MW by peak hours, equivalent to total peak component MWh divided by total peak hours:
+Then aggregate:
 
 ```text
-PeakMW = sum(peak_mw_month * peak_h_month) / sum(peak_h_month)
+ClassicOffpeakMW = sum(ClassicOffpeakMWh) / sum(Ho)
+ClassicPeakMW = sum(ClassicPeakMWh) / sum(Hp)
+ClassicOffpeakPrice = sum(ClassicOffpeakValue) / sum(ClassicOffpeakMWh)
+ClassicPeakPrice = sum(ClassicPeakValue) / sum(ClassicPeakMWh)
 ```
 
-### BasePrice aggregation
+If denominator is zero, show blank/null and warning.
 
-Use value-weighted base price:
+### Aggregate Modern values
+
+For each month, compute monthly projected MW, MWh, price and value first.
+
+Then aggregate:
 
 ```text
-base_mwh_month = base_mw_month * total_h_month
-base_price_month = base.sys.price + base.epad.price
-base_value_month = base_mwh_month * base_price_month
-
-BasePrice = sum(base_value_month) / sum(base_mwh_month)
+ModernBaseMW = sum(ModernBaseMWh) / sum(H)
+ModernPeakMW = sum(ModernPeakMWh) / sum(Hp)
+ModernBasePrice = sum(ModernBaseValue) / sum(ModernBaseMWh)
+ModernPeakPrice = sum(ModernPeakValue) / sum(ModernPeakMWh)
 ```
 
-Do not use arithmetic average across months.
+If denominator is zero, show blank/null and warning.
 
-### PeakPrice aggregation
-
-Use value-weighted peak price:
-
-```text
-peak_mwh_month = peak_mw_month * peak_h_month
-peak_price_month = peak.sys.price + peak.epad.price
-peak_value_month = peak_mwh_month * peak_price_month
-
-PeakPrice = sum(peak_value_month) / sum(peak_mwh_month)
-```
-
-If `sum(peak_mwh_month) = 0`, set `PeakPrice` to blank/null and show a warning. Do not divide by zero.
-
-If `sum(peak_mwh_month)` is negative, the value-weighted formula still applies. Negative peak MW/MWh is valid.
+Negative ModernPeakMWh is valid and should use the same value-weighted formula.
 
 ## Display rules
 
-Show the required columns in this order:
+Classic list column order:
+
+```text
+Date | OffpeakMW | PeakMW | OffpeakPrice | PeakPrice
+```
+
+Modern list column order:
 
 ```text
 Date | BaseMW | PeakMW | BasePrice | PeakPrice
 ```
 
-Optional additional columns are allowed only if already standard in the UI, for example:
+Optional columns are allowed if already standard in the UI:
 
 ```text
 CalloffId
@@ -256,9 +401,14 @@ Period
 Warnings
 ```
 
-Do not show canonical component codes as customer-facing rows in this feature.
+Do not show canonical component codes as customer-facing rows.
 
-Do not show `allocation.peak.sys` or `allocation.peak.epad` as rows.
+Do not show allocation rows directly:
+
+```text
+allocation.peak.sys
+allocation.peak.epad
+```
 
 Do not show internal adjustment rows.
 
@@ -271,11 +421,6 @@ peak.premium.sys -> peak.sys
 peak.premium.epad -> peak.epad
 peak.modern.sys -> peak.sys
 peak.modern.epad -> peak.epad
-```
-
-For allocation compatibility:
-
-```text
 allocation.peak -> allocation.peak.sys/allocation.peak.epad
 ```
 
@@ -287,8 +432,13 @@ Input canonical rows for one calloff/month:
 
 ```text
 Date = 2027-01-10
+H = 744
+Hp = 320
+Ho = 424
 base.sys.mw = 0.1344086022
 base.epad.mw = 0.1344086022
+allocation.peak.sys.mw = 0.15625
+allocation.peak.epad.mw = 0.15625
 peak.sys.mw = 0.0218413978
 peak.epad.mw = 0.0218413978
 base.sys.price = 70
@@ -297,14 +447,66 @@ peak.sys.price = 20
 peak.epad.price = 2
 ```
 
-Expected row:
+Canonical prices and values:
+
+```text
+CanonicalBasePrice = 85
+CanonicalPeakPrice = 22
+CanonicalBaseMWh = 0.1344086022 * 744 = 100
+CanonicalPeakMWh = 0.0218413978 * 320 = 6.9892473
+CanonicalTotalValue = 100 * 85 + 6.9892473 * 22 = 8653.76344
+```
+
+Projected MW:
+
+```text
+ClassicOffpeakMW = (0.1344086022 * 744 - 0.15625 * 320) / 424
+                 = 0.1179245283
+ClassicPeakMW = 0.15625
+
+ModernBaseMW = 0.1179245283
+ModernPeakMW = 0.15625 - 0.1179245283
+             = 0.0383254717
+```
+
+Classic prices:
+
+```text
+ClassicOffpeakMWh = 0.1179245283 * 424 = 50
+ClassicPeakMWh = 0.15625 * 320 = 50
+ClassicOffpeakPrice = 85
+ClassicPeakPrice = (8653.76344 - 50 * 85) / 50
+                 = 88.0752688
+```
+
+Modern prices:
+
+```text
+ModernBaseMWh = 0.1179245283 * 744 = 87.7358491
+ModernPeakMWh = 0.0383254717 * 320 = 12.2641510
+ModernBasePrice = 85
+ModernPeakPrice = (8653.76344 - 87.7358491 * 85) / 12.2641510
+                = 97.9250000 approximately
+```
+
+Expected Classic row:
+
+```text
+Date          = 2027-01-10
+OffpeakMW     = 0.1179245283
+PeakMW        = 0.15625
+OffpeakPrice  = 85
+PeakPrice     = 88.0752688
+```
+
+Expected Modern row:
 
 ```text
 Date      = 2027-01-10
-BaseMW    = 0.1344086022
-PeakMW    = 0.0218413978
+BaseMW    = 0.1179245283
+PeakMW    = 0.0383254717
 BasePrice = 85
-PeakPrice = 22
+PeakPrice = 97.9250000 approximately
 ```
 
 ## Negative peak example
@@ -312,83 +514,94 @@ PeakPrice = 22
 Input:
 
 ```text
-Date = 2027-01-10
-base.sys.mw = 0.1344086022
-base.epad.mw = 0.1344086022
-peak.sys.mw = -0.0250336022
-peak.epad.mw = -0.0250336022
-base.sys.price = 70
-base.epad.price = 15
-peak.sys.price = 20
-peak.epad.price = 2
+H = 744
+Hp = 320
+Ho = 424
+B = 0.1344086022
+A = 0.109375
+P = -0.0250336022
+CanonicalBasePrice = 85
+CanonicalPeakPrice = 22
 ```
 
-Expected row:
+Projected MW:
 
 ```text
-Date      = 2027-01-10
-BaseMW    = 0.1344086022
-PeakMW    = -0.0250336022
-BasePrice = 85
-PeakPrice = 22
+ClassicOffpeakMW = (B * H - A * Hp) / Ho
+ClassicPeakMW = A
+ModernBaseMW = ClassicOffpeakMW
+ModernPeakMW = A - ModernBaseMW
 ```
 
-Negative PeakMW is valid.
+Expected:
+
+```text
+ModernPeakMW may be negative.
+ClassicPeakMW remains the actual peak level.
+Projection prices must still preserve CanonicalTotalValue.
+```
 
 ## Documentation
 
 Create or update:
 
 ```text
+docs/hedging/peaks_classic_calloff_transaction_list.md
 docs/hedging/peaks_modern_calloff_transaction_list.md
+docs/hedging/projection_mw_and_price_rules.md
 docs/hedging/modern_projection_base_peak_rules.md
+docs/hedging/classic_projection_peak_offpeak_rules.md
 ```
 
 Document:
 
-- Peaks.Modern is a product package under Portfolio Hedging Products,
-- Modern Feature Set presents calloffs in Base/Peak terms,
-- BaseMW comes from base.sys/base.epad,
-- PeakMW comes from peak.sys/peak.epad,
+- canonical model is not the customer projection,
+- Classic projection shows Offpeak/Peak levels,
+- Modern projection shows Base/Peak where Base is offpeak level and Peak is extra above Base,
+- four projected MW calculations,
+- four projected price calculations,
+- value preservation rules,
 - allocation rows are not displayed directly,
-- BasePrice is base.sys + base.epad,
-- PeakPrice is peak.sys + peak.epad,
-- negative PeakMW is valid,
-- multi-month calloffs use hour-/value-weighted aggregation.
+- negative Modern Peak is valid,
+- multi-month calloffs use hour/value weighting.
 
 ## Tests
 
 Add or update tests for:
 
-1. feature is available for `Peaks.Modern`,
-2. feature is not available for `Peaks.Classic`,
-3. one-month calloff shows one row,
-4. required columns exist and are ordered: Date, BaseMW, PeakMW, BasePrice, PeakPrice,
-5. BaseMW uses base.sys/base.epad MW and warns on mismatch,
-6. PeakMW uses peak.sys/peak.epad MW and warns on mismatch,
-7. BasePrice = base.sys.price + base.epad.price,
-8. PeakPrice = peak.sys.price + peak.epad.price,
-9. negative PeakMW is allowed and displayed,
-10. allocation rows are not displayed directly,
-11. adjustment/internal rows are not displayed,
-12. multi-month BaseMW uses hour-weighted aggregation,
-13. multi-month PeakMW uses peak-hour-weighted aggregation,
-14. multi-month BasePrice uses value-weighted aggregation,
-15. multi-month PeakPrice uses value-weighted aggregation,
-16. zero total peak MWh does not divide by zero,
-17. old peak alias rows can be read if old fixtures remain,
-18. new generated rows/docs use `peak.sys` and `peak.epad`.
+1. Classic list is available for `Peaks.Classic`,
+2. Modern list is available for `Peaks.Modern`,
+3. Classic list required columns exist and are ordered: Date, OffpeakMW, PeakMW, OffpeakPrice, PeakPrice,
+4. Modern list required columns exist and are ordered: Date, BaseMW, PeakMW, BasePrice, PeakPrice,
+5. ClassicOffpeakMW formula is correct,
+6. ClassicPeakMW formula is correct,
+7. ModernBaseMW formula is correct,
+8. ModernPeakMW formula is correct,
+9. ClassicOffpeakPrice = CanonicalBasePrice,
+10. ClassicPeakPrice is residual/value-preserving,
+11. ModernBasePrice = CanonicalBasePrice,
+12. ModernPeakPrice is residual/value-preserving,
+13. Classic projected values sum to canonical total value,
+14. Modern projected values sum to canonical total value,
+15. Modern BaseMW is not incorrectly set to canonical base.sys.mw,
+16. Modern PeakMW is not incorrectly set to canonical peak.sys.mw,
+17. negative ModernPeakMW is allowed,
+18. allocation rows are not displayed directly,
+19. internal adjustment rows are not displayed,
+20. multi-month aggregation uses hour/value weighting,
+21. zero denominators do not divide by zero,
+22. warnings appear for mismatched sys/epad MW values,
+23. compatibility aliases can be read if old fixtures remain.
 
 ## Non-goals
 
 Do not implement in this package:
 
-- Legacy Calloff List changes beyond avoiding regressions,
-- Classic Feature Set redesign,
 - market projection changes,
 - settlement,
 - product migration UI,
-- Profiles projections.
+- Profiles projections,
+- new pricing providers.
 
 ## Verification
 
@@ -407,10 +620,11 @@ Update `REPOSITORY_FILES.md` to match `git ls-files`.
 Report:
 
 - files changed,
-- where the Modern Calloff Transaction List was implemented,
+- where Classic and Modern calloff transaction lists were implemented,
 - feature gating behavior,
-- one-month example result,
-- negative peak example result,
+- one-month example result for Classic,
+- one-month example result for Modern,
+- negative peak example behavior,
 - multi-month aggregation behavior,
 - warnings implemented,
 - docs created/updated,
