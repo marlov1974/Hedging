@@ -342,12 +342,12 @@ function parseRequiredNumber(value: string | number | undefined, label: string):
 }
 
 function nextCalloffId(database: PrototypeDatabase): string {
-  return `CALLOFF_FORECAST_HEDGE_${String(database.calloffs.size + 1).padStart(4, "0")}`;
+  return `CAL${String(database.calloffs.size).padStart(2, "0")}`;
 }
 
-function nextTransactionId(database: PrototypeDatabase, calloffId: string, month: string, component: string): string {
-  const sequence = String(database.transactions.size + 1).padStart(5, "0");
-  return `TX_${calloffId}_${month}_${component.replaceAll(".", "_")}_${sequence}`;
+function nextTransactionId(database: PrototypeDatabase, calloffId: string, _month: string, _component: string): string {
+  const calloffTransactionCount = [...database.transactions.values()].filter((transaction) => transaction.calloff_id === calloffId).length;
+  return `${calloffId}-${String(calloffTransactionCount).padStart(3, "0")}`;
 }
 
 function currentIsoDate(): string {

@@ -10,7 +10,7 @@ import { getPortfolioProductComponents, getQFactorValuesBySet, insertCalloff, in
 import { expandPeriodMonths, findPurchasePeriod, type PurchasePeriodOption } from "./periodOptions.ts";
 
 const BASELOADS_PRODUCT_NAME = "Baseloads";
-const BASELOADS_PORTFOLIO_ID = "PORT_BASELOADS";
+const BASELOADS_PORTFOLIO_ID = "CUS00-0";
 const BASELOADS_COMPONENTS = ["base.sys", "base.epad"];
 
 export type BaseloadsPurchaseInput = {
@@ -193,12 +193,12 @@ function getQFactorForComponentMonth(
 }
 
 function nextCalloffId(database: PrototypeDatabase): string {
-  return `CALLOFF_BASELOADS_${String(database.calloffs.size + 1).padStart(4, "0")}`;
+  return `CAL${String(database.calloffs.size).padStart(2, "0")}`;
 }
 
-function nextTransactionId(database: PrototypeDatabase, calloffId: string, month: string, component: string): string {
-  const sequence = String(database.transactions.size + 1).padStart(5, "0");
-  return `TX_${calloffId}_${month}_${component.replaceAll(".", "_")}_${sequence}`;
+function nextTransactionId(database: PrototypeDatabase, calloffId: string, _month: string, _component: string): string {
+  const calloffTransactionCount = [...database.transactions.values()].filter((transaction) => transaction.calloff_id === calloffId).length;
+  return `${calloffId}-${String(calloffTransactionCount).padStart(3, "0")}`;
 }
 
 function currentIsoDate(): string {

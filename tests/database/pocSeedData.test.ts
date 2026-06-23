@@ -77,7 +77,7 @@ describe("P0015 PoC seed data", () => {
 
   it("uses realistic small-industry seasonal forecast profile", () => {
     const database = createPocSeedData();
-    const forecasts = [...database.forecasts.values()].filter((forecast) => forecast.portfolio_id === "PORT_PEAKS_MODERN");
+    const forecasts = [...database.forecasts.values()].filter((forecast) => forecast.portfolio_id === "CUS02-0");
     const byMonth = new Map(forecasts.map((forecast) => [forecast.month, forecast]));
 
     assert.equal(byMonth.get("2027-01")?.mwh, 1230);

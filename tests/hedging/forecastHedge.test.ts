@@ -13,20 +13,20 @@ import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 
 describe("Forecast hedge feature", () => {
   it("PeaksModern feature list includes Hedge Forecast", () => {
-    const features = getApplicationFeaturesForPortfolio(createPocSeedData(), "PORT_PEAKS_MODERN").features;
+    const features = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS02-0").features;
 
     assert.equal(features.some((feature) => feature.feature_id === "forecast-hedge" && feature.available), true);
   });
 
   it("Baseloads feature list does not include Hedge Forecast", () => {
-    const features = getApplicationFeaturesForPortfolio(createPocSeedData(), "PORT_BASELOADS").features;
+    const features = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS00-0").features;
 
     assert.equal(features.some((feature) => feature.feature_id === "forecast-hedge"), false);
   });
 
   it("renders start/end/percentage form", () => {
     const html = renderHedgingTool(createPocSeedData(), {
-      portfolio_id: "PORT_PEAKS_MODERN",
+      portfolio_id: "CUS02-0",
       feature_id: "forecast-hedge",
     });
 
@@ -37,7 +37,7 @@ describe("Forecast hedge feature", () => {
 
   it("generates profile for a 3-month range", () => {
     const profile = buildForecastHedgeProfile(createPocSeedData(), {
-      portfolio_id: "PORT_PEAKS_MODERN",
+      portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-03",
       percentage: "50",
@@ -51,7 +51,7 @@ describe("Forecast hedge feature", () => {
 
   it("hedge_mwh equals forecast_mwh times percentage", () => {
     const row = buildForecastHedgeProfile(createPocSeedData(), {
-      portfolio_id: "PORT_PEAKS_MODERN",
+      portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
@@ -64,7 +64,7 @@ describe("Forecast hedge feature", () => {
 
   it("hedge_mw equals hedge_mwh divided by calendar total_h", () => {
     const row = buildForecastHedgeProfile(createPocSeedData(), {
-      portfolio_id: "PORT_PEAKS_MODERN",
+      portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
@@ -91,24 +91,27 @@ describe("Forecast hedge feature", () => {
     const database = createPocSeedData();
 
     const result = acceptForecastHedgeProfile(database, {
-      portfolio_id: "PORT_PEAKS_MODERN",
+      portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
       date: "2027-01-15",
-      calloff_id: "CALLOFF_TEST",
       rows: [{ month: "2027-01", hedge_mwh: "615" }],
     });
 
-    assert.equal(result.calloff.calloff_id, "CALLOFF_TEST");
+    assert.equal(result.calloff.calloff_id, "CAL00");
     assert.equal(database.calloffs.size, 1);
-    assert.equal(result.calloff.product_id, "PRODUCT_PEAKS_MODERN");
-    assert.equal(result.calloff.portfolio_id, "PORT_PEAKS_MODERN");
+    assert.equal(result.calloff.product_id, "PRO02");
+    assert.equal(result.calloff.portfolio_id, "CUS02-0");
+    assert.deepEqual(
+      result.transactions.map((transaction) => transaction.transaction_id),
+      ["CAL00-000", "CAL00-001"],
+    );
   });
 
   it("accept creates two transactions per month for base.sys and base.epad", () => {
     const result = acceptForecastHedgeProfile(createPocSeedData(), {
-      portfolio_id: "PORT_PEAKS_MODERN",
+      portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-03",
       percentage: "50",
@@ -130,7 +133,7 @@ describe("Forecast hedge feature", () => {
 
   it("q_factor is read from q-factor values", () => {
     const result = acceptForecastHedgeProfile(createPocSeedData(), {
-      portfolio_id: "PORT_PEAKS_MODERN",
+      portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
@@ -147,12 +150,12 @@ describe("Forecast hedge feature", () => {
 
   it("missing q-factor value is rejected", () => {
     const database = createPocSeedData();
-    database.qFactorValues.delete("QFV:QFS:PORT_PEAKS_MODERN:base_sys:2027-01");
+    database.qFactorValues.delete("Q20-00");
 
     assert.throws(
       () =>
         acceptForecastHedgeProfile(database, {
-          portfolio_id: "PORT_PEAKS_MODERN",
+          portfolio_id: "CUS02-0",
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "50",
@@ -166,12 +169,12 @@ describe("Forecast hedge feature", () => {
 
   it("missing forecast row is rejected", () => {
     const database = createPocSeedData();
-    database.forecasts.delete("FORECAST:PORT_PEAKS_MODERN:2027-01");
+    database.forecasts.delete("FOR02-00");
 
     assert.throws(
       () =>
         buildForecastHedgeProfile(database, {
-          portfolio_id: "PORT_PEAKS_MODERN",
+          portfolio_id: "CUS02-0",
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "50",
@@ -187,7 +190,7 @@ describe("Forecast hedge feature", () => {
     assert.throws(
       () =>
         buildForecastHedgeProfile(database, {
-          portfolio_id: "PORT_PEAKS_MODERN",
+          portfolio_id: "CUS02-0",
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "50",
@@ -200,7 +203,7 @@ describe("Forecast hedge feature", () => {
     assert.throws(
       () =>
         buildForecastHedgeProfile(createPocSeedData(), {
-          portfolio_id: "PORT_PEAKS_MODERN",
+          portfolio_id: "CUS02-0",
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "101",
@@ -213,7 +216,7 @@ describe("Forecast hedge feature", () => {
     assert.throws(
       () =>
         buildForecastHedgeProfile(createPocSeedData(), {
-          portfolio_id: "PORT_BASELOADS",
+          portfolio_id: "CUS00-0",
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "50",

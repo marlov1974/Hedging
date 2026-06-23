@@ -10,7 +10,7 @@ import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 
 describe("application configuration", () => {
   it("returns Baseloads features for Baseloads portfolio", () => {
-    const config = getApplicationFeaturesForPortfolio(createPocSeedData(), "PORT_BASELOADS");
+    const config = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS00-0");
 
     assert.equal(config.variant_id, "baseloads");
     assert.deepEqual(
@@ -20,7 +20,7 @@ describe("application configuration", () => {
   });
 
   it("returns PeaksModern features for PeaksModern portfolio", () => {
-    const config = getApplicationFeaturesForPortfolio(createPocSeedData(), "PORT_PEAKS_MODERN");
+    const config = getApplicationFeaturesForPortfolio(createPocSeedData(), "CUS02-0");
 
     assert.equal(config.variant_id, "peaks-modern");
     assert.deepEqual(
@@ -30,11 +30,11 @@ describe("application configuration", () => {
   });
 
   it("detects PeaksModern portfolio", () => {
-    assert.equal(isPeaksModernPortfolio(createPocSeedData(), "PORT_PEAKS_MODERN"), true);
+    assert.equal(isPeaksModernPortfolio(createPocSeedData(), "CUS02-0"), true);
   });
 
   it("PeaksModern does not show Baseloads-only features", () => {
-    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_PEAKS_MODERN" });
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS02-0" });
 
     assert.doesNotMatch(html, /Buy Baseloads/);
     assert.doesNotMatch(html, /Baseloads Calloff List/);
@@ -45,18 +45,18 @@ describe("application configuration", () => {
   it("switching from Baseloads to PeaksModern resets unavailable active feature", () => {
     const database = createPocSeedData();
 
-    assert.equal(resolveActiveFeature(database, "PORT_PEAKS_MODERN", "buy-baseloads"), "portfolio-details");
-    const html = renderHedgingTool(database, { portfolio_id: "PORT_PEAKS_MODERN", feature_id: "buy-baseloads" });
+    assert.equal(resolveActiveFeature(database, "CUS02-0", "buy-baseloads"), "portfolio-details");
+    const html = renderHedgingTool(database, { portfolio_id: "CUS02-0", feature_id: "buy-baseloads" });
     assert.match(html, /Portfolio Details/);
     assert.doesNotMatch(html, /Confirm purchase/);
   });
 
   it("shared feature remains active when switching application variant", () => {
-    assert.equal(resolveActiveFeature(createPocSeedData(), "PORT_PEAKS_MODERN", "portfolio-details"), "portfolio-details");
+    assert.equal(resolveActiveFeature(createPocSeedData(), "CUS02-0", "portfolio-details"), "portfolio-details");
   });
 
   it("changes visible application context text and appearance for PeaksModern", () => {
-    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_PEAKS_MODERN" });
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS02-0" });
 
     assert.match(html, /variant-peaks-modern/);
     assert.match(html, /PeaksModern application/);

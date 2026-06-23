@@ -60,9 +60,7 @@ The Calloffs table shows raw IDs and core fields:
 ```text
 calloff_id
 product_id
-product name
 portfolio_id
-portfolio name
 date
 ```
 
@@ -77,8 +75,6 @@ transaction_id
 calloff_id
 month
 productcomponent_id
-component
-product name
 mw
 q_factor
 ```

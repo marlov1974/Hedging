@@ -12,14 +12,14 @@ import { purchaseBaseloads } from "../../src/purchase/baseloadsPurchase.ts";
 
 describe("Financial Settlement", () => {
   it("feature menu includes Financial Settlement", () => {
-    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_BASELOADS" });
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0" });
 
     assert.match(html, /Financial Settlement/);
   });
 
   it("renders month dropdown", () => {
     const html = renderHedgingTool(createPocSeedData(), {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       feature_id: "financial-settlement",
     });
 
@@ -28,7 +28,7 @@ describe("Financial Settlement", () => {
   });
 
   it("returns settlement months from seeded static range", () => {
-    const months = getFinancialSettlementMonths(createPocSeedData(), "PORT_BASELOADS");
+    const months = getFinancialSettlementMonths(createPocSeedData(), "CUS00-0");
 
     assert.equal(months[0], "2027-01");
     assert.equal(months[35], "2029-12");
@@ -36,7 +36,7 @@ describe("Financial Settlement", () => {
 
   it("uses monthly_average_price from static spot actuals", () => {
     const database = createDatabaseWithJanuaryHedge();
-    const settlement = calculateFinancialSettlementForMonth(database, "PORT_BASELOADS", "2027-01");
+    const settlement = calculateFinancialSettlementForMonth(database, "CUS00-0", "2027-01");
     const spotActual = getMonthlySpotActualForSettlement("2027-01");
 
     assert.equal(settlement.monthly_spot_price, spotActual.monthly_average_price);
@@ -55,21 +55,21 @@ describe("Financial Settlement", () => {
 
   it("does not double-count hedge volume for paired sys and epad rows", () => {
     const database = createDatabaseWithJanuaryHedge();
-    const settlement = calculateFinancialSettlementForMonth(database, "PORT_BASELOADS", "2027-01");
+    const settlement = calculateFinancialSettlementForMonth(database, "CUS00-0", "2027-01");
 
     assert.equal(settlement.rows[0].hedge_volume_mwh, 7440);
   });
 
   it("applies financial settlement sign convention formula", () => {
     const database = createDatabaseWithJanuaryHedge();
-    const row = calculateFinancialSettlementForMonth(database, "PORT_BASELOADS", "2027-01").rows[0];
+    const row = calculateFinancialSettlementForMonth(database, "CUS00-0", "2027-01").rows[0];
 
     assert.equal(row.financial_settlement, row.hedge_volume_mwh * (row.monthly_spot_price - row.hedge_price));
   });
 
   it("renders sign convention text", () => {
     const html = renderHedgingTool(createDatabaseWithJanuaryHedge(), {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       feature_id: "financial-settlement",
       selected_month: "2027-01",
     });
@@ -79,14 +79,14 @@ describe("Financial Settlement", () => {
 
   it("missing spot actual gives a clear error", () => {
     assert.throws(
-      () => calculateFinancialSettlementForMonth(createDatabaseWithJanuaryHedge(), "PORT_BASELOADS", "2031-01"),
+      () => calculateFinancialSettlementForMonth(createDatabaseWithJanuaryHedge(), "CUS00-0", "2031-01"),
       /Missing spot actual for STO 2031-01/,
     );
   });
 
   it("missing hedge transactions gives clear empty state", () => {
     const html = renderHedgingTool(createPocSeedData(), {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       feature_id: "financial-settlement",
       selected_month: "2027-01",
     });
@@ -98,7 +98,7 @@ describe("Financial Settlement", () => {
 function createDatabaseWithJanuaryHedge() {
   const database = createPocSeedData();
   purchaseBaseloads(database, {
-    portfolio_id: "PORT_BASELOADS",
+    portfolio_id: "CUS00-0",
     period_id: "month-2027-01",
     mw: 10,
     date: "2027-01-15",

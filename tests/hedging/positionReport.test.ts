@@ -12,7 +12,7 @@ import { purchaseBaseloads } from "../../src/purchase/baseloadsPurchase.ts";
 describe("Position Report", () => {
   it("renders year dropdown", () => {
     const html = renderHedgingTool(seedQuarterCalloff(), {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       feature_id: "position-report",
     });
 
@@ -23,11 +23,11 @@ describe("Position Report", () => {
   });
 
   it("returns seeded report years", () => {
-    assert.deepEqual(getPositionReportYears(createPocSeedData(), "PORT_BASELOADS"), ["2027", "2028", "2029"]);
+    assert.deepEqual(getPositionReportYears(createPocSeedData(), "CUS00-0"), ["2027", "2028", "2029"]);
   });
 
   it("aggregates by month and component", () => {
-    const rows = getPositionReportRows(seedQuarterCalloff(), "PORT_BASELOADS", "2027");
+    const rows = getPositionReportRows(seedQuarterCalloff(), "CUS00-0", "2027");
 
     assert.equal(rows.length, 6);
     assert.deepEqual(
@@ -37,7 +37,7 @@ describe("Position Report", () => {
   });
 
   it("position report volume is summed MWh", () => {
-    const rows = getPositionReportRows(seedQuarterCalloff(), "PORT_BASELOADS", "2027");
+    const rows = getPositionReportRows(seedQuarterCalloff(), "CUS00-0", "2027");
 
     assert.equal(rows.find((row) => row.month === "2027-01" && row.component === "base.sys")?.volume_mwh, 14880);
     assert.equal(rows.find((row) => row.month === "2027-02" && row.component === "base.sys")?.volume_mwh, 13440);
@@ -45,7 +45,7 @@ describe("Position Report", () => {
   });
 
   it("position report price is volume-weighted average", () => {
-    const rows = getPositionReportRows(seedQuarterCalloff(), "PORT_BASELOADS", "2027");
+    const rows = getPositionReportRows(seedQuarterCalloff(), "CUS00-0", "2027");
 
     assert.equal(rows.find((row) => row.component === "base.sys")?.price, 80);
     assert.equal(rows.find((row) => row.component === "base.epad")?.price, 5);
@@ -69,7 +69,7 @@ describe("Position Report", () => {
 
   it("position report shows empty state for year without positions", () => {
     const html = renderHedgingTool(seedQuarterCalloff(), {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       feature_id: "position-report",
       selected_year: "2028",
     });
@@ -81,7 +81,7 @@ describe("Position Report", () => {
 function seedQuarterCalloff() {
   const database = createPocSeedData();
   purchaseBaseloads(database, {
-    portfolio_id: "PORT_BASELOADS",
+    portfolio_id: "CUS00-0",
     mw: 20,
     period_id: "quarter-2027-q1",
     date: "2027-01-15",

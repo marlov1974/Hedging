@@ -9,7 +9,7 @@ describe("hedging tool shell", () => {
     const html = renderHedgingTool(createPocSeedData());
 
     assert.match(html, /Select portfolio/);
-    assert.match(html, /PORT_BASELOADS/);
+    assert.match(html, /CUS00-0/);
   });
 
   it("large Hedging Tool heading and subtitle are no longer rendered", () => {
@@ -20,7 +20,7 @@ describe("hedging tool shell", () => {
   });
 
   it("selecting a portfolio exposes feature navigation", () => {
-    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_BASELOADS" });
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0" });
 
     assert.match(html, /Feature navigation/);
     assert.match(html, /Buy Baseloads/);
@@ -28,7 +28,7 @@ describe("hedging tool shell", () => {
   });
 
   it("top portfolio selector stays compact and omits inline details", () => {
-    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_BASELOADS", feature_id: "buy-baseloads" });
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0", feature_id: "buy-baseloads" });
 
     assert.match(html, /class="compact-selector"/);
     assert.doesNotMatch(html, /<span>Customer<\/span>/);
@@ -36,7 +36,7 @@ describe("hedging tool shell", () => {
   });
 
   it("omits duplicated selected portfolio text and visual Open control", () => {
-    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_BASELOADS", feature_id: "portfolio-details" });
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0", feature_id: "portfolio-details" });
 
     assert.doesNotMatch(html, /class="selected-name"/);
     assert.doesNotMatch(html, />Open<\/button>/);
@@ -44,34 +44,34 @@ describe("hedging tool shell", () => {
 
   it("shows selected portfolio context", () => {
     const database = createPocSeedData();
-    const portfolio = getPortfolioOptions(database).find((option) => option.portfolio_id === "PORT_BASELOADS");
+    const portfolio = getPortfolioOptions(database).find((option) => option.portfolio_id === "CUS00-0");
 
-    assert.equal(portfolio?.customer_number, "CN_BASELOADS");
+    assert.equal(portfolio?.customer_number, "CUS00");
     assert.equal(portfolio?.price_area, "SE3");
     assert.equal(portfolio?.product_configuration_name, "Baseloads");
   });
 
   it("Buy Baseloads feature is available for Baseloads portfolio", () => {
-    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "PORT_BASELOADS");
+    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "CUS00-0");
 
     assert.equal(features.find((feature) => feature.feature_id === "buy-baseloads")?.available, true);
   });
 
   it("Buy Baseloads feature is not part of PeaksModern application", () => {
-    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "PORT_PEAKS_MODERN");
+    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "CUS02-0");
 
     const feature = features.find((candidate) => candidate.feature_id === "buy-baseloads");
     assert.equal(feature, undefined);
   });
 
   it("Baseloads Calloff List feature is available for Baseloads portfolio", () => {
-    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "PORT_BASELOADS");
+    const features = getAvailableFeaturesForPortfolio(createPocSeedData(), "CUS00-0");
 
     assert.equal(features.find((feature) => feature.feature_id === "baseloads-calloff-list")?.available, true);
   });
 
   it("feature menu includes Portfolio Details, Position Report and Financial Settlement", () => {
-    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "PORT_BASELOADS" });
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0" });
 
     assert.match(html, /Portfolio Details/);
     assert.match(html, /Position Report/);
@@ -80,7 +80,7 @@ describe("hedging tool shell", () => {
 
   it("unavailable active feature resets to a valid selected portfolio feature", () => {
     const html = renderHedgingTool(createPocSeedData(), {
-      portfolio_id: "PORT_PEAKS_MODERN",
+      portfolio_id: "CUS02-0",
       feature_id: "buy-baseloads",
     });
 

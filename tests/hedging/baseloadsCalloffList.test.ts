@@ -9,7 +9,7 @@ import { purchaseBaseloads } from "../../src/purchase/baseloadsPurchase.ts";
 describe("Baseloads calloff list", () => {
   it("empty calloff list renders an empty state", () => {
     const html = renderHedgingTool(createPocSeedData(), {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       feature_id: "baseloads-calloff-list",
     });
 
@@ -18,7 +18,7 @@ describe("Baseloads calloff list", () => {
 
   it("quarter calloff renders one row per component", () => {
     const database = seedQuarterCalloff();
-    const rows = getBaseloadsCalloffListRows(database, "PORT_BASELOADS");
+    const rows = getBaseloadsCalloffListRows(database, "CUS00-0");
 
     assert.equal(rows.length, 2);
     assert.deepEqual(
@@ -29,14 +29,14 @@ describe("Baseloads calloff list", () => {
 
   it("quarter calloff rows aggregate three monthly transactions per component", () => {
     const database = seedQuarterCalloff();
-    const rows = getBaseloadsCalloffListRows(database, "PORT_BASELOADS");
+    const rows = getBaseloadsCalloffListRows(database, "CUS00-0");
 
     assert.ok(rows.every((row) => row.transaction_count === 3));
   });
 
   it("MWh uses transaction MW times calendar total hours", () => {
     const database = seedQuarterCalloff();
-    const rows = getBaseloadsCalloffListRows(database, "PORT_BASELOADS");
+    const rows = getBaseloadsCalloffListRows(database, "CUS00-0");
 
     assert.ok(rows.every((row) => row.mwh === 43200));
   });
@@ -53,7 +53,7 @@ describe("Baseloads calloff list", () => {
 
   it("price is volume-weighted average from linked price components", () => {
     const database = seedQuarterCalloff();
-    const rows = getBaseloadsCalloffListRows(database, "PORT_BASELOADS");
+    const rows = getBaseloadsCalloffListRows(database, "CUS00-0");
 
     assert.equal(rows.find((row) => row.component === "base.sys")?.price, 80);
     assert.equal(rows.find((row) => row.component === "base.epad")?.price, 5);
@@ -84,7 +84,7 @@ describe("Baseloads calloff list", () => {
 
   it("UI shows Datum, Derivatnamn, MWh and Pris columns without visible Component column", () => {
     const html = renderHedgingTool(seedQuarterCalloff(), {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       feature_id: "baseloads-calloff-list",
     });
 
@@ -100,7 +100,7 @@ describe("Baseloads calloff list", () => {
 function seedQuarterCalloff() {
   const database = createPocSeedData();
   purchaseBaseloads(database, {
-    portfolio_id: "PORT_BASELOADS",
+    portfolio_id: "CUS00-0",
     mw: 20,
     period_id: "quarter-2027-q1",
     date: "2027-01-15",

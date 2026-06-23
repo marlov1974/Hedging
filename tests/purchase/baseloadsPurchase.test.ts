@@ -28,21 +28,25 @@ describe("Baseloads purchase flow", () => {
   it("month purchase creates one calloff and two transactions", () => {
     const database = createPocSeedData();
     const result = purchaseBaseloads(database, {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       mw: 15,
       period_id: "month-2027-01",
       date: "2027-01-15",
-      calloff_id: "CALLOFF_TEST_MONTH",
     });
 
+    assert.equal(result.calloff.calloff_id, "CAL00");
     assert.equal(database.calloffs.size, 1);
     assert.equal(result.transactions.length, 2);
+    assert.deepEqual(
+      result.transactions.map((transaction) => transaction.transaction_id),
+      ["CAL00-000", "CAL00-001"],
+    );
   });
 
   it("quarter purchase creates one calloff and six transactions", () => {
     const database = createPocSeedData();
     const result = purchaseBaseloads(database, {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       mw: 20,
       period_id: "quarter-2027-q1",
       date: "2027-01-15",
@@ -56,7 +60,7 @@ describe("Baseloads purchase flow", () => {
   it("year purchase creates one calloff and twenty-four transactions", () => {
     const database = createPocSeedData();
     const result = purchaseBaseloads(database, {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       mw: 25,
       period_id: "year-2027",
       date: "2027-01-15",
@@ -70,7 +74,7 @@ describe("Baseloads purchase flow", () => {
   it("purchases both base.sys and base.epad together", () => {
     const database = createPocSeedData();
     const result = purchaseBaseloads(database, {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       mw: 15,
       period_id: "month-2027-01",
       date: "2027-01-15",
@@ -87,7 +91,7 @@ describe("Baseloads purchase flow", () => {
   it("sets transaction MW equal to input MW", () => {
     const database = createPocSeedData();
     const result = purchaseBaseloads(database, {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       mw: 17.5,
       period_id: "quarter-2027-q1",
       date: "2027-01-15",
@@ -100,7 +104,7 @@ describe("Baseloads purchase flow", () => {
   it("reads q_factor from linked portfolio Q-factor values", () => {
     const database = createPocSeedData();
     const result = purchaseBaseloads(database, {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       mw: 15,
       period_id: "quarter-2027-q1",
       date: "2027-01-15",
@@ -113,7 +117,7 @@ describe("Baseloads purchase flow", () => {
   it("returns calloff with transactions through database repository", () => {
     const database = createPocSeedData();
     purchaseBaseloads(database, {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       mw: 15,
       period_id: "month-2027-01",
       date: "2027-01-15",
@@ -138,7 +142,7 @@ describe("Baseloads purchase flow", () => {
     assert.throws(
       () =>
         purchaseBaseloads(database, {
-          portfolio_id: "PORT_BASELOADS",
+          portfolio_id: "CUS00-0",
           mw: 15,
           period_id: "month-2027-01",
           date: "2027-01-15",
@@ -154,7 +158,7 @@ describe("Baseloads purchase flow", () => {
     assert.throws(
       () =>
         purchaseBaseloads(database, {
-          portfolio_id: "PORT_BASELOADS",
+          portfolio_id: "CUS00-0",
           mw: 0,
           period_id: "month-2027-01",
           date: "2027-01-15",
@@ -169,7 +173,7 @@ describe("Baseloads purchase flow", () => {
     assert.throws(
       () =>
         purchaseBaseloads(database, {
-          portfolio_id: "PORT_PEAKS_CLASSIC",
+          portfolio_id: "CUS01-0",
           mw: 15,
           period_id: "month-2027-01",
           date: "2027-01-15",
@@ -191,7 +195,7 @@ describe("Baseloads purchase flow", () => {
   it("successful purchase view shows calloff id and transaction count", () => {
     const database = createPocSeedData();
     const result = purchaseBaseloads(database, {
-      portfolio_id: "PORT_BASELOADS",
+      portfolio_id: "CUS00-0",
       mw: 20,
       period_id: "quarter-2027-q1",
       date: "2027-01-15",

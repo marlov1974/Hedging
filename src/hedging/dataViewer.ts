@@ -10,9 +10,7 @@ export type DataViewerTable = {
 export type RawCalloffRow = {
   calloff_id: string;
   product_id: string;
-  product_name: string;
   portfolio_id: string;
-  portfolio_name: string;
   date: string;
 };
 
@@ -21,8 +19,6 @@ export type RawTransactionRow = {
   calloff_id: string;
   month: string;
   productcomponent_id: string;
-  component: string;
-  product_name: string;
   mw: number;
   q_factor: number;
 };
@@ -77,18 +73,12 @@ export function getRawCalloffsForPortfolioYear(database: PrototypeDatabase, port
   return getPortfolioCalloffs(database, portfolioId)
     .filter((calloff) => calloff.date.startsWith(`${year}-`))
     .sort((left, right) => left.date.localeCompare(right.date) || left.calloff_id.localeCompare(right.calloff_id))
-    .map((calloff) => {
-      const product = database.productConfigurations.get(calloff.product_id);
-      const portfolio = database.portfolios.get(calloff.portfolio_id);
-      return {
-        calloff_id: calloff.calloff_id,
-        product_id: calloff.product_id,
-        product_name: product?.name ?? "",
-        portfolio_id: calloff.portfolio_id,
-        portfolio_name: portfolio?.name ?? "",
-        date: calloff.date,
-      };
-    });
+    .map((calloff) => ({
+      calloff_id: calloff.calloff_id,
+      product_id: calloff.product_id,
+      portfolio_id: calloff.portfolio_id,
+      date: calloff.date,
+    }));
 }
 
 export function getRawTransactionsForPortfolioYear(database: PrototypeDatabase, portfolioId: string, year: string): RawTransactionRow[] {
@@ -103,20 +93,14 @@ export function getRawTransactionsForPortfolioYear(database: PrototypeDatabase, 
         left.calloff_id.localeCompare(right.calloff_id) ||
         left.transaction_id.localeCompare(right.transaction_id),
     )
-    .map((transaction) => {
-      const productComponent = database.productConfigurationComponents.get(transaction.productcomponent_id);
-      const product = productComponent ? database.productConfigurations.get(productComponent.product_id) : undefined;
-      return {
-        transaction_id: transaction.transaction_id,
-        calloff_id: transaction.calloff_id,
-        month: transaction.month,
-        productcomponent_id: transaction.productcomponent_id,
-        component: productComponent?.component ?? "",
-        product_name: product?.name ?? "",
-        mw: transaction.mw,
-        q_factor: transaction.q_factor,
-      };
-    });
+    .map((transaction) => ({
+      transaction_id: transaction.transaction_id,
+      calloff_id: transaction.calloff_id,
+      month: transaction.month,
+      productcomponent_id: transaction.productcomponent_id,
+      mw: transaction.mw,
+      q_factor: transaction.q_factor,
+    }));
 }
 
 export function getDataViewerRows(

@@ -1,20 +1,32 @@
 # PoC seed data
 
-P0015 creates deterministic, synthetic seed data for component-based product structure testing.
+P0015 creates deterministic PoC seed data for component-based product structure testing.
 
 ## Setup
 
 The seed contains five customers, five portfolios and five product configurations:
 
 ```text
-CUST_BASELOADS         -> PORT_BASELOADS         -> Baseloads
-CUST_PEAKS_CLASSIC     -> PORT_PEAKS_CLASSIC     -> PeaksClassic
-CUST_PEAKS_MODERN      -> PORT_PEAKS_MODERN      -> PeaksModern
-CUST_PROFILES_CLASSIC  -> PORT_PROFILES_CLASSIC  -> ProfilesClassic
-CUST_PROFILES_MODERN   -> PORT_PROFILES_MODERN   -> ProfilesModern
+CUS00         -> CUS00-0         -> Baseloads
+CUS01         -> CUS01-0         -> PeaksClassic
+CUS02         -> CUS02-0         -> PeaksModern
+CUS03         -> CUS03-0         -> ProfilesClassic
+CUS04         -> CUS04-0         -> ProfilesModern
 ```
 
-All examples are synthetic. Price area is `SE3`.
+All examples are public-safe PoC examples. Price area is `SE3`.
+
+Seed IDs use compact demo-friendly formats:
+
+```text
+customer_number: CUS00
+portfolio_id: CUS00-0
+product_id: PRO00
+productcomponent_id: PRO00:base.sys
+forecast_id: FOR00-00
+qfactor_set_id: Q00
+qfactor_value_id: Q00-00
+```
 
 ## Calendar
 

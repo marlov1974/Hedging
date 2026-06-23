@@ -55,47 +55,52 @@ const PRICE_BY_COMPONENT = new Map([
 
 const PRODUCT_SEEDS = [
   {
-    product_id: "PRODUCT_BASELOADS",
+    seed_index: 0,
+    product_id: "PRO00",
     product_name: "Baseloads",
-    customer_id: "CUST_BASELOADS",
-    customer_number: "CN_BASELOADS",
-    portfolio_id: "PORT_BASELOADS",
+    customer_id: "CUS00",
+    customer_number: "CUS00",
+    portfolio_id: "CUS00-0",
     forecast_mwh: 1000,
     peak_pct: 0.5,
   },
   {
-    product_id: "PRODUCT_PEAKS_CLASSIC",
+    seed_index: 1,
+    product_id: "PRO01",
     product_name: "PeaksClassic",
-    customer_id: "CUST_PEAKS_CLASSIC",
-    customer_number: "CN_PEAKS_CLASSIC",
-    portfolio_id: "PORT_PEAKS_CLASSIC",
+    customer_id: "CUS01",
+    customer_number: "CUS01",
+    portfolio_id: "CUS01-0",
     forecast_mwh: 1000,
     peak_pct: 0.5,
   },
   {
-    product_id: "PRODUCT_PEAKS_MODERN",
+    seed_index: 2,
+    product_id: "PRO02",
     product_name: "PeaksModern",
-    customer_id: "CUST_PEAKS_MODERN",
-    customer_number: "CN_PEAKS_MODERN",
-    portfolio_id: "PORT_PEAKS_MODERN",
+    customer_id: "CUS02",
+    customer_number: "CUS02",
+    portfolio_id: "CUS02-0",
     forecast_mwh: 1000,
     peak_pct: 0.5,
   },
   {
-    product_id: "PRODUCT_PROFILES_CLASSIC",
+    seed_index: 3,
+    product_id: "PRO03",
     product_name: "ProfilesClassic",
-    customer_id: "CUST_PROFILES_CLASSIC",
-    customer_number: "CN_PROFILES_CLASSIC",
-    portfolio_id: "PORT_PROFILES_CLASSIC",
+    customer_id: "CUS03",
+    customer_number: "CUS03",
+    portfolio_id: "CUS03-0",
     forecast_mwh: 1000,
     peak_pct: 0.5,
   },
   {
-    product_id: "PRODUCT_PROFILES_MODERN",
+    seed_index: 4,
+    product_id: "PRO04",
     product_name: "ProfilesModern",
-    customer_id: "CUST_PROFILES_MODERN",
-    customer_number: "CN_PROFILES_MODERN",
-    portfolio_id: "PORT_PROFILES_MODERN",
+    customer_id: "CUS04",
+    customer_number: "CUS04",
+    portfolio_id: "CUS04-0",
     forecast_mwh: 1000,
     peak_pct: 0.5,
   },
@@ -118,14 +123,14 @@ export function createPocSeedData(): PrototypeDatabase {
   for (const product of PRODUCT_SEEDS) {
     insertCustomer(database, {
       customer_id: product.customer_id,
-      name: `Synthetic ${product.product_name} Customer`,
+      name: `${product.product_name} Customer`,
       customer_number: product.customer_number,
     });
 
     insertCustomerPortfolio(database, {
       portfolio_id: product.portfolio_id,
       customer_id: product.customer_id,
-      name: `Synthetic ${product.product_name} Portfolio`,
+      name: `${product.product_name} Portfolio`,
       customer_number: product.customer_number,
       price_area: "SE3",
       calendar_id: CALENDAR_SET_ID,
@@ -137,7 +142,7 @@ export function createPocSeedData(): PrototypeDatabase {
     });
 
     const componentCodes = COMPONENTS_BY_PRODUCT.get(product.product_name) ?? [];
-    for (const componentCode of componentCodes) {
+    for (const [componentIndex, componentCode] of componentCodes.entries()) {
       const productComponentId = productComponentIdFor(product.product_id, componentCode);
       insertProductConfigurationComponent(database, {
         productcomponent_id: productComponentId,
@@ -154,12 +159,12 @@ export function createPocSeedData(): PrototypeDatabase {
         currency: "EUR",
       });
 
-      const qFactorSetId = qFactorSetIdFor(product.portfolio_id, componentCode);
+      const qFactorSetId = qFactorSetIdFor(product.seed_index, componentIndex);
       insertQFactorSet(database, {
         qfactor_set_id: qFactorSetId,
-        name: `${product.portfolio_id} ${componentCode} Q-factor`,
+        name: `${qFactorSetId} ${componentCode} Q-factor`,
         component: componentCode,
-        description: `Synthetic deterministic ${componentCode} Q-factor set`,
+        description: `Deterministic ${componentCode} Q-factor set`,
       });
 
       insertPortfolioProductComponent(database, {
@@ -171,7 +176,7 @@ export function createPocSeedData(): PrototypeDatabase {
 
       months.forEach((month, monthIndex) => {
         insertQFactorValue(database, {
-          qfactor_value_id: qFactorValueIdFor(qFactorSetId, month),
+          qfactor_value_id: qFactorValueIdFor(qFactorSetId, monthIndex),
           qfactor_set_id: qFactorSetId,
           month,
           value: qFactorValueFor(componentCode, monthIndex),
@@ -181,7 +186,7 @@ export function createPocSeedData(): PrototypeDatabase {
 
     months.forEach((month, monthIndex) => {
       insertCustomerForecast(database, {
-        forecast_id: forecastIdFor(product.portfolio_id, month),
+        forecast_id: forecastIdFor(product.seed_index, monthIndex),
         portfolio_id: product.portfolio_id,
         month,
         mwh: forecastMwhFor(product.forecast_mwh, monthIndex),
@@ -227,31 +232,27 @@ function calendarIdForMonth(month: string): string {
 }
 
 function productComponentIdFor(productId: string, componentCode: string): string {
-  return `${productId}:${componentSlug(componentCode)}`;
+  return `${productId}:${componentCode}`;
 }
 
 function priceComponentIdFor(productId: string, componentCode: string): string {
-  return `PRICE:${productId}:${componentSlug(componentCode)}`;
+  return `PRI:${productId}:${componentCode}`;
 }
 
 function portfolioProductComponentIdFor(portfolioId: string, componentCode: string): string {
-  return `PPC:${portfolioId}:${componentSlug(componentCode)}`;
+  return `${portfolioId}:${componentCode}`;
 }
 
-function qFactorSetIdFor(portfolioId: string, componentCode: string): string {
-  return `QFS:${portfolioId}:${componentSlug(componentCode)}`;
+function qFactorSetIdFor(productIndex: number, componentIndex: number): string {
+  return `Q${String(productIndex * 10 + componentIndex).padStart(2, "0")}`;
 }
 
-function qFactorValueIdFor(qFactorSetId: string, month: string): string {
-  return `QFV:${qFactorSetId}:${month}`;
+function qFactorValueIdFor(qFactorSetId: string, monthIndex: number): string {
+  return `${qFactorSetId}-${String(monthIndex).padStart(2, "0")}`;
 }
 
-function forecastIdFor(portfolioId: string, month: string): string {
-  return `FORECAST:${portfolioId}:${month}`;
-}
-
-function componentSlug(componentCode: string): string {
-  return componentCode.replaceAll(".", "_");
+function forecastIdFor(productIndex: number, monthIndex: number): string {
+  return `FOR${String(productIndex).padStart(2, "0")}-${String(monthIndex).padStart(2, "0")}`;
 }
 
 function componentDisplayName(productName: string, componentCode: string): string {

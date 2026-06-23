@@ -783,9 +783,7 @@ function renderRawCalloffsTable(rows: RawCalloffRow[]): string {
       <tr>
         <th>calloff_id</th>
         <th>product_id</th>
-        <th>product name</th>
         <th>portfolio_id</th>
-        <th>portfolio name</th>
         <th>date</th>
       </tr>
     </thead>
@@ -795,9 +793,7 @@ function renderRawCalloffsTable(rows: RawCalloffRow[]): string {
           (row) => `<tr>
             <td>${escapeHtml(row.calloff_id)}</td>
             <td>${escapeHtml(row.product_id)}</td>
-            <td>${escapeHtml(row.product_name)}</td>
             <td>${escapeHtml(row.portfolio_id)}</td>
-            <td>${escapeHtml(row.portfolio_name)}</td>
             <td>${escapeHtml(row.date)}</td>
           </tr>`,
         )
@@ -814,8 +810,6 @@ function renderRawTransactionsTable(rows: RawTransactionRow[]): string {
         <th>calloff_id</th>
         <th>month</th>
         <th>productcomponent_id</th>
-        <th>component</th>
-        <th>product name</th>
         <th>mw</th>
         <th>q_factor</th>
       </tr>
@@ -828,8 +822,6 @@ function renderRawTransactionsTable(rows: RawTransactionRow[]): string {
             <td>${escapeHtml(row.calloff_id)}</td>
             <td>${escapeHtml(row.month)}</td>
             <td>${escapeHtml(row.productcomponent_id)}</td>
-            <td>${escapeHtml(row.component)}</td>
-            <td>${escapeHtml(row.product_name)}</td>
             <td class="number">${formatNumber(row.mw)}</td>
             <td class="number">${formatNumber(row.q_factor)}</td>
           </tr>`,
