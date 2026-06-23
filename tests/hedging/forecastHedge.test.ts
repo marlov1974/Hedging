@@ -103,6 +103,8 @@ describe("Forecast hedge feature", () => {
     assert.equal(database.calloffs.size, 1);
     assert.equal(result.calloff.product_id, "PRO02");
     assert.equal(result.calloff.portfolio_id, "CUS02-0");
+    assert.equal(result.calloff.delivery_start_month, "2027-01");
+    assert.equal(result.calloff.delivery_end_month, "2027-01");
     assert.deepEqual(
       result.transactions.map((transaction) => transaction.transaction_id),
       ["CAL00-000", "CAL00-001"],
@@ -125,6 +127,8 @@ describe("Forecast hedge feature", () => {
     });
 
     assert.equal(result.transactions.length, 6);
+    assert.equal(result.calloff.delivery_start_month, "2027-01");
+    assert.equal(result.calloff.delivery_end_month, "2027-03");
     assert.deepEqual(
       [...new Set(result.transactions.map((transaction) => transaction.month))],
       ["2027-01", "2027-02", "2027-03"],

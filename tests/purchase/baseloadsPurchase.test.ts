@@ -36,6 +36,8 @@ describe("Baseloads purchase flow", () => {
 
     assert.equal(result.calloff.calloff_id, "CAL00");
     assert.equal(database.calloffs.size, 1);
+    assert.equal(result.calloff.delivery_start_month, "2027-01");
+    assert.equal(result.calloff.delivery_end_month, "2027-01");
     assert.equal(result.transactions.length, 2);
     assert.deepEqual(
       result.transactions.map((transaction) => transaction.transaction_id),
@@ -54,6 +56,8 @@ describe("Baseloads purchase flow", () => {
     });
 
     assert.equal(database.calloffs.size, 1);
+    assert.equal(result.calloff.delivery_start_month, "2027-01");
+    assert.equal(result.calloff.delivery_end_month, "2027-03");
     assert.equal(result.transactions.length, 6);
   });
 
@@ -68,6 +72,8 @@ describe("Baseloads purchase flow", () => {
     });
 
     assert.equal(database.calloffs.size, 1);
+    assert.equal(result.calloff.delivery_start_month, "2027-01");
+    assert.equal(result.calloff.delivery_end_month, "2027-12");
     assert.equal(result.transactions.length, 24);
   });
 

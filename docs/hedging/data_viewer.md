@@ -51,7 +51,7 @@ The year selector is derived from available calendar years and relevant portfoli
 2029
 ```
 
-Calloffs are filtered by calloff `date` year. Transactions are filtered by transaction `month` year.
+The year selector is a delivery year selector. Calloffs are filtered by `delivery_start_month` year. Transactions are filtered by transaction `month` year.
 
 ## Calloffs Raw View
 
@@ -62,9 +62,13 @@ calloff_id
 product_id
 portfolio_id
 date
+delivery_start_month
+delivery_end_month
 ```
 
-Default sorting is by date ascending, then calloff id ascending.
+`date` is the call-off creation date. It is visible as raw data but is not used for year filtering.
+
+Default sorting is by delivery start month ascending, delivery end month ascending, then calloff id ascending.
 
 ## Transactions Raw View
 

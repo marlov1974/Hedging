@@ -174,6 +174,8 @@ export function acceptForecastHedgeProfile(
   const calloff = createForecastHedgeCalloff(database, {
     portfolio_id: normalized.portfolio_id,
     date: input.date ?? currentIsoDate(),
+    delivery_start_month: normalized.start_month,
+    delivery_end_month: normalized.end_month,
     calloff_id: input.calloff_id,
   });
   const transactions = createForecastHedgeTransactions(database, { calloff, rows: profile.rows });
@@ -183,7 +185,7 @@ export function acceptForecastHedgeProfile(
 
 export function createForecastHedgeCalloff(
   database: PrototypeDatabase,
-  input: { portfolio_id: string; date: string; calloff_id?: string },
+  input: { portfolio_id: string; date: string; delivery_start_month: string; delivery_end_month: string; calloff_id?: string },
 ): Calloff {
   if (!isPeaksModernPortfolio(database, input.portfolio_id)) {
     throw new ForecastHedgeError("invalid_input", "Hedge Forecast is only available for PeaksModern portfolios");
@@ -196,6 +198,8 @@ export function createForecastHedgeCalloff(
       product_id: product.product_id,
       portfolio_id: input.portfolio_id,
       date: input.date,
+      delivery_start_month: input.delivery_start_month,
+      delivery_end_month: input.delivery_end_month,
     }),
   );
 }

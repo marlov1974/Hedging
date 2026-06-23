@@ -755,7 +755,7 @@ function renderDataViewer(database: PrototypeDatabase, selectedPortfolio: Portfo
         </select>
       </label>
       <label>
-        Year
+        Delivery year
         <select name="selected_year" onchange="this.form.submit()">
           ${years.map((year) => `<option value="${escapeHtml(year)}"${year === selectedYear ? " selected" : ""}>${escapeHtml(year)}</option>`).join("")}
         </select>
@@ -785,6 +785,8 @@ function renderRawCalloffsTable(rows: RawCalloffRow[]): string {
         <th>product_id</th>
         <th>portfolio_id</th>
         <th>date</th>
+        <th>delivery_start_month</th>
+        <th>delivery_end_month</th>
       </tr>
     </thead>
     <tbody>
@@ -795,6 +797,8 @@ function renderRawCalloffsTable(rows: RawCalloffRow[]): string {
             <td>${escapeHtml(row.product_id)}</td>
             <td>${escapeHtml(row.portfolio_id)}</td>
             <td>${escapeHtml(row.date)}</td>
+            <td>${escapeHtml(row.delivery_start_month)}</td>
+            <td>${escapeHtml(row.delivery_end_month)}</td>
           </tr>`,
         )
         .join("")}

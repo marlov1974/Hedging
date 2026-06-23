@@ -61,7 +61,7 @@ describe("Data Viewer", () => {
     assert.equal(rows.every((row) => row.portfolio_id === "CUS00-0"), true);
   });
 
-  it("Calloffs table filters by calloff date year", () => {
+  it("Calloffs table filters by delivery start year", () => {
     const rows2028 = getRawCalloffsForPortfolioYear(createDataViewerDatabase(), "CUS00-0", "2028");
 
     assert.deepEqual(
@@ -109,6 +109,8 @@ describe("Data Viewer", () => {
     assert.equal(row.product_id, "PRO00");
     assert.equal(row.portfolio_id, "CUS00-0");
     assert.equal(row.date, "2027-01-15");
+    assert.equal(row.delivery_start_month, "2027-01");
+    assert.equal(row.delivery_end_month, "2027-01");
   });
 
   it("empty state renders when no rows exist", () => {
@@ -163,18 +165,24 @@ function createDataViewerDatabase() {
     product_id: "PRO00",
     portfolio_id: "CUS00-0",
     date: "2027-01-15",
+    delivery_start_month: "2027-01",
+    delivery_end_month: "2027-01",
   });
   insertCalloff(database, {
     calloff_id: "CAL11",
     product_id: "PRO00",
     portfolio_id: "CUS00-0",
-    date: "2028-01-15",
+    date: "2027-01-15",
+    delivery_start_month: "2028-01",
+    delivery_end_month: "2028-01",
   });
   insertCalloff(database, {
     calloff_id: "CAL20",
     product_id: "PRO02",
     portfolio_id: "CUS02-0",
     date: "2027-02-15",
+    delivery_start_month: "2027-02",
+    delivery_end_month: "2027-02",
   });
 
   insertTransaction(database, {

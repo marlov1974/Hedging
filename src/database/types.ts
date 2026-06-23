@@ -74,6 +74,8 @@ export type Calloff = {
   product_id: string;
   portfolio_id: string;
   date: string;
+  delivery_start_month: string;
+  delivery_end_month: string;
 };
 
 export type CustomerTransaction = {

@@ -193,6 +193,12 @@ export function insertCalloff(database: PrototypeDatabase, input: Calloff): Call
   assertRequiredString(input.product_id, "product_id");
   assertRequiredString(input.portfolio_id, "portfolio_id");
   assertDate(input.date, "date");
+  assertMonth(input.delivery_start_month, "delivery_start_month");
+  assertMonth(input.delivery_end_month, "delivery_end_month");
+
+  if (input.delivery_end_month < input.delivery_start_month) {
+    throw new DatabaseError("invalid_input", "delivery_end_month must be greater than or equal to delivery_start_month");
+  }
 
   if (!database.productConfigurations.has(input.product_id)) {
     throw new DatabaseError("not_found", `product_id ${input.product_id} does not exist`);

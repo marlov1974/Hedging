@@ -14,3 +14,9 @@ Implementation assumptions:
 - Data Viewer is a read-only PoC/debug feature.
 - The year selector includes years from relevant raw data plus calendar years, so seed years `2027`, `2028` and `2029` are available even before rows exist.
 - Unknown table names are handled by showing a clear empty/error-style state rather than exposing unscoped data.
+
+Follow-up correction:
+
+- `Calloff.date` is the creation date, not the delivery period.
+- Data Viewer must be scoped by delivery year. Calloffs need explicit delivery start and end months so the Calloffs table can filter by delivery start year.
+- Transactions already have a delivery `month`; transaction filtering should continue to use that field.

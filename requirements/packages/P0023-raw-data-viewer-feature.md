@@ -87,6 +87,8 @@ Calloff.portfolio_id = selected portfolio_id
 
 Filter by year using calloff date.
 
+Follow-up correction: this is a delivery-year selector. Filter calloffs by `delivery_start_month` year, not creation `date` year. Keep creation `date` visible as raw data.
+
 ### Transactions
 
 Show transactions linked through calloff:

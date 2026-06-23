@@ -49,6 +49,15 @@ describe("calloff and transaction database model", () => {
     );
   });
 
+  it("rejects calloff with invalid delivery month range", () => {
+    const database = createSyntheticCustomerProductFixture();
+
+    assert.throws(
+      () => insertCalloff(database, { ...validCalloff(), delivery_start_month: "2027-03", delivery_end_month: "2027-01" }),
+      (error) => error instanceof DatabaseError && error.code === "invalid_input",
+    );
+  });
+
   it("inserts transaction with valid calloff and product component", () => {
     const database = createSyntheticCustomerProductFixture();
     seedCalloff(database);
@@ -172,6 +181,8 @@ function validCalloff() {
     product_id: "product-1",
     portfolio_id: "portfolio-1",
     date: "2027-01-15",
+    delivery_start_month: "2027-01",
+    delivery_end_month: "2027-01",
   };
 }
 

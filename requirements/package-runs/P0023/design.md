@@ -20,6 +20,7 @@ Calloffs are filtered by:
 
 ```text
 calloff.portfolio_id = selected portfolio_id
+calloff.delivery_start_month starts with selected year
 ```
 
 Transactions are filtered by:
@@ -27,13 +28,16 @@ Transactions are filtered by:
 ```text
 transaction.calloff_id -> calloff.calloff_id
 calloff.portfolio_id = selected portfolio_id
+transaction.month starts with selected year
 ```
 
 No transaction row is returned unless its calloff belongs to the selected portfolio.
 
+`calloff.date` is a creation date. It is kept visible as raw data, but it is not used for Data Viewer year filtering.
+
 ## UI behavior
 
-The feature renders table and year selectors. The calloffs table shows raw calloff IDs and core fields. The transactions table shows raw transaction IDs and core fields plus component/product context where available.
+The feature renders table and year selectors. The calloffs table shows raw calloff IDs, creation date and delivery period fields. The transactions table shows raw transaction IDs and delivery month fields.
 
 ## Test strategy
 

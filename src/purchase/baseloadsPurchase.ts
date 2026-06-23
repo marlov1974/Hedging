@@ -42,6 +42,8 @@ export function purchaseBaseloads(database: PrototypeDatabase, input: BaseloadsP
   const calloff = createBaseloadsCalloff(database, {
     portfolio_id: input.portfolio_id,
     date: input.date ?? currentIsoDate(),
+    delivery_start_month: period.start_month,
+    delivery_end_month: period.end_month,
     calloff_id: input.calloff_id,
   });
   const transactions = createBaseloadsTransactions(database, {
@@ -55,7 +57,7 @@ export function purchaseBaseloads(database: PrototypeDatabase, input: BaseloadsP
 
 export function createBaseloadsCalloff(
   database: PrototypeDatabase,
-  input: { portfolio_id: string; date: string; calloff_id?: string },
+  input: { portfolio_id: string; date: string; delivery_start_month: string; delivery_end_month: string; calloff_id?: string },
 ): Calloff {
   const product = getBaseloadsProduct(database);
 
@@ -77,6 +79,8 @@ export function createBaseloadsCalloff(
       product_id: product.product_id,
       portfolio_id: input.portfolio_id,
       date: input.date,
+      delivery_start_month: input.delivery_start_month,
+      delivery_end_month: input.delivery_end_month,
     }),
   );
 }

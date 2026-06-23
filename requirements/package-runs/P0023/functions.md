@@ -20,15 +20,15 @@ Tests: year selector rendering and data-derived years.
 
 ### `getRawCalloffsForPortfolioYear`
 
-Purpose: Return calloffs scoped to selected portfolio and calloff date year.
+Purpose: Return calloffs scoped to selected portfolio and delivery start year.
 Inputs: database, portfolio id, year.
 Outputs: raw calloff rows.
 Side effects: none.
-Tests: portfolio scoping and date-year filtering.
+Tests: portfolio scoping and delivery start-year filtering.
 
 ### `getRawTransactionsForPortfolioYear`
 
-Purpose: Return transactions scoped through selected portfolio calloffs and transaction month year.
+Purpose: Return transactions scoped through selected portfolio calloffs and transaction delivery month year.
 Inputs: database, portfolio id, year.
 Outputs: raw transaction rows.
 Side effects: none.

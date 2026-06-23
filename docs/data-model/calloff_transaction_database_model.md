@@ -13,9 +13,11 @@ calloff_id
 product_id
 portfolio_id
 date
+delivery_start_month
+delivery_end_month
 ```
 
-`product_id` references `Product Configuration`. `portfolio_id` references `Customer Portfolio`. `date` uses `YYYY-MM-DD`.
+`product_id` references `Product Configuration`. `portfolio_id` references `Customer Portfolio`. `date` uses `YYYY-MM-DD` and is the creation date. `delivery_start_month` and `delivery_end_month` use `YYYY-MM` and define the delivery period that the call-off applies to.
 
 ## Transaction
 
@@ -32,7 +34,7 @@ mw
 q_factor
 ```
 
-`calloff_id` references `Calloff`. `productcomponent_id` references `Product Configuration Component`. `month` uses `YYYY-MM`.
+`calloff_id` references `Calloff`. `productcomponent_id` references `Product Configuration Component`. `month` uses `YYYY-MM` and defines the transaction delivery month.
 
 ## Relationships
 

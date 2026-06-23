@@ -12,6 +12,8 @@ export type RawCalloffRow = {
   product_id: string;
   portfolio_id: string;
   date: string;
+  delivery_start_month: string;
+  delivery_end_month: string;
 };
 
 export type RawTransactionRow = {
@@ -53,7 +55,7 @@ export function getDataViewerYears(database: PrototypeDatabase, portfolioId: str
 
   if (tableId === "calloffs") {
     for (const calloff of getPortfolioCalloffs(database, portfolioId)) {
-      years.add(calloff.date.slice(0, 4));
+      years.add(calloff.delivery_start_month.slice(0, 4));
     }
   }
 
@@ -71,13 +73,20 @@ export function getRawCalloffsForPortfolioYear(database: PrototypeDatabase, port
   validateYear(year);
 
   return getPortfolioCalloffs(database, portfolioId)
-    .filter((calloff) => calloff.date.startsWith(`${year}-`))
-    .sort((left, right) => left.date.localeCompare(right.date) || left.calloff_id.localeCompare(right.calloff_id))
+    .filter((calloff) => calloff.delivery_start_month.startsWith(`${year}-`))
+    .sort(
+      (left, right) =>
+        left.delivery_start_month.localeCompare(right.delivery_start_month) ||
+        left.delivery_end_month.localeCompare(right.delivery_end_month) ||
+        left.calloff_id.localeCompare(right.calloff_id),
+    )
     .map((calloff) => ({
       calloff_id: calloff.calloff_id,
       product_id: calloff.product_id,
       portfolio_id: calloff.portfolio_id,
       date: calloff.date,
+      delivery_start_month: calloff.delivery_start_month,
+      delivery_end_month: calloff.delivery_end_month,
     }));
 }
 
