@@ -7,7 +7,8 @@ export type HedgingFeatureId =
   | "portfolio-details"
   | "position-report"
   | "financial-settlement"
-  | "forecast";
+  | "forecast"
+  | "forecast-hedge";
 
 export type ApplicationVariantId = "none" | "baseloads" | "peaks-modern" | "unsupported";
 
@@ -60,7 +61,7 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
       title: "PeaksModern application",
       context: "PeaksModern forecast workspace for total monthly consumption and peak share.",
       accent: "peaks-modern",
-      features: [feature("portfolio-details", "Portfolio Details"), feature("forecast", "Forecast")],
+      features: [feature("portfolio-details", "Portfolio Details"), feature("forecast", "Forecast"), feature("forecast-hedge", "Hedge Forecast")],
     };
   }
 
@@ -72,6 +73,7 @@ export function getApplicationFeaturesForPortfolio(database: PrototypeDatabase, 
     features: [
       feature("portfolio-details", "Portfolio Details"),
       unavailableFeature("forecast", "Forecast", "Selected portfolio does not support Forecast in this PoC."),
+      unavailableFeature("forecast-hedge", "Hedge Forecast", "Selected portfolio does not support Hedge Forecast in this PoC."),
     ],
   };
 }

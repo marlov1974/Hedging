@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createPocSeedData } from "../database/pocSeedData.ts";
 import type { PrototypeDatabase } from "../database/schema.ts";
+import { acceptForecastHedgeProfile, buildForecastHedgeProfile, ForecastHedgeError } from "./forecastHedge.ts";
 import { ForecastFeatureError, updateForecastRows } from "./forecastFeature.ts";
 import { PurchaseError, purchaseBaseloads } from "../purchase/baseloadsPurchase.ts";
 import { renderHedgingTool } from "./HedgingToolView.ts";
@@ -93,6 +94,97 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
             portfolio_id,
             feature_id: "forecast",
             selected_year,
+            error: message,
+          }),
+        );
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/hedging/forecast-hedge/generate") {
+      const body = await readForm(request);
+      const portfolio_id = String(body.get("portfolio_id") ?? "");
+      const start_month = String(body.get("start_month") ?? "");
+      const end_month = String(body.get("end_month") ?? "");
+      const percentage = String(body.get("percentage") ?? "");
+
+      try {
+        const profile = buildForecastHedgeProfile(database, {
+          portfolio_id,
+          start_month,
+          end_month,
+          percentage,
+        });
+        writeHtml(
+          response,
+          200,
+          renderHedgingTool(database, {
+            portfolio_id,
+            feature_id: "forecast-hedge",
+            forecast_hedge_profile: profile,
+          }),
+        );
+      } catch (error) {
+        const message = error instanceof ForecastHedgeError ? error.message : "Forecast hedge profile generation failed";
+        writeHtml(
+          response,
+          400,
+          renderHedgingTool(database, {
+            portfolio_id,
+            feature_id: "forecast-hedge",
+            forecast_hedge_input: { start_month, end_month, percentage },
+            error: message,
+          }),
+        );
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/hedging/forecast-hedge/accept") {
+      const body = await readForm(request);
+      const portfolio_id = String(body.get("portfolio_id") ?? "");
+      const start_month = String(body.get("start_month") ?? "");
+      const end_month = String(body.get("end_month") ?? "");
+      const percentage = String(body.get("percentage") ?? "");
+      const months = body.getAll("month").map((month) => String(month));
+
+      try {
+        const result = acceptForecastHedgeProfile(database, {
+          portfolio_id,
+          start_month,
+          end_month,
+          percentage,
+          rows: months.map((month) => ({
+            month,
+            hedge_mwh: String(body.get(`hedge_mwh_${month}`) ?? ""),
+          })),
+        });
+        writeHtml(
+          response,
+          200,
+          renderHedgingTool(database, {
+            portfolio_id,
+            feature_id: "forecast-hedge",
+            forecast_hedge_profile: result.profile,
+            forecast_hedge_result: result,
+          }),
+        );
+      } catch (error) {
+        const message = error instanceof ForecastHedgeError ? error.message : "Forecast hedge accept failed";
+        let profile;
+        try {
+          profile = buildForecastHedgeProfile(database, { portfolio_id, start_month, end_month, percentage });
+        } catch {
+          profile = undefined;
+        }
+        writeHtml(
+          response,
+          400,
+          renderHedgingTool(database, {
+            portfolio_id,
+            feature_id: "forecast-hedge",
+            forecast_hedge_profile: profile,
+            forecast_hedge_input: { start_month, end_month, percentage },
             error: message,
           }),
         );

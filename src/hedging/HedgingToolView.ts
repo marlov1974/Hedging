@@ -4,6 +4,7 @@ import { getBaseloadsPurchasePeriods } from "../purchase/periodOptions.ts";
 import { getApplicationFeaturesForPortfolio, resolveActiveFeature } from "./applicationConfig.ts";
 import { getBaseloadsCalloffListRows } from "./calloffList.ts";
 import { calculateFinancialSettlementForMonth, getFinancialSettlementMonths } from "./financialSettlement.ts";
+import type { ForecastHedgeAcceptResult, ForecastHedgeProfile } from "./forecastHedge.ts";
 import { getForecastRowsForYear, getForecastYears, type ForecastDisplayRow } from "./forecastFeature.ts";
 import { getPortfolioDetails } from "./portfolioDetails.ts";
 import { getPositionReportRows, getPositionReportYears } from "./positionReport.ts";
@@ -17,6 +18,13 @@ export type HedgingToolState = {
   selected_year?: string;
   selected_month?: string;
   forecast_message?: string;
+  forecast_hedge_input?: {
+    start_month?: string;
+    end_month?: string;
+    percentage?: string;
+  };
+  forecast_hedge_profile?: ForecastHedgeProfile;
+  forecast_hedge_result?: ForecastHedgeAcceptResult;
   error?: string;
   purchase_result?: BaseloadsPurchaseResult;
 };
@@ -218,6 +226,18 @@ export function renderHedgingTool(database: PrototypeDatabase, state: HedgingToo
       padding: 4px 8px;
       border-radius: 6px;
     }
+    .hedge-table {
+      table-layout: fixed;
+    }
+    .hedge-table input {
+      min-height: 32px;
+      padding: 5px 8px;
+    }
+    .hedge-table output {
+      display: block;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
     @media (max-width: 780px) {
       main { width: min(100% - 18px, 1180px); }
       .topbar { display: block; }
@@ -314,6 +334,10 @@ function renderActiveFeature(
 
   if (activeFeature === "forecast") {
     return renderForecastFeature(database, selectedPortfolio, state);
+  }
+
+  if (activeFeature === "forecast-hedge") {
+    return renderForecastHedgeFeature(database, selectedPortfolio, state);
   }
 
   return renderBuyBaseloads(selectedPortfolio, state);
@@ -581,6 +605,109 @@ function renderForecastTable(rows: ForecastDisplayRow[]): string {
         .join("")}
     </tbody>
   </table>`;
+}
+
+function renderForecastHedgeFeature(database: PrototypeDatabase, selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
+  const months = [...database.calendars.values()].map((calendar) => calendar.month).sort();
+  const startMonth =
+    state.forecast_hedge_profile?.start_month ?? state.forecast_hedge_input?.start_month ?? months[0] ?? "";
+  const endMonth =
+    state.forecast_hedge_profile?.end_month ?? state.forecast_hedge_input?.end_month ?? months[Math.min(2, months.length - 1)] ?? "";
+  const percentage =
+    state.forecast_hedge_profile ? String(formatPercentInput(state.forecast_hedge_profile.percentage)) : state.forecast_hedge_input?.percentage ?? "50";
+
+  return `<div class="stack">
+    <div>
+      <h2>Hedge Forecast</h2>
+      <p>Create a monthly hedge profile from a percentage of forecast.</p>
+    </div>
+    ${state.error ? `<div class="notice error">${escapeHtml(state.error)}</div>` : ""}
+    ${
+      state.forecast_hedge_result
+        ? `<div class="notice success">Calloff ${escapeHtml(state.forecast_hedge_result.calloff.calloff_id)} created with ${state.forecast_hedge_result.transactions.length} transactions.</div>`
+        : ""
+    }
+    <form method="post" action="/hedging/forecast-hedge/generate" class="stack">
+      <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+      <div class="form-grid">
+        <label>
+          Start month
+          ${renderMonthSelect("start_month", months, startMonth)}
+        </label>
+        <label>
+          End month
+          ${renderMonthSelect("end_month", months, endMonth)}
+        </label>
+        <label>
+          Percentage
+          <input name="percentage" type="number" min="0" max="100" step="0.001" required value="${escapeHtml(percentage)}">
+        </label>
+      </div>
+      <button type="submit">Build hedge profile</button>
+    </form>
+    ${state.forecast_hedge_profile ? renderForecastHedgeProfile(selectedPortfolio, state.forecast_hedge_profile) : ""}
+  </div>`;
+}
+
+function renderForecastHedgeProfile(selectedPortfolio: PortfolioOption, profile: ForecastHedgeProfile): string {
+  return `<form method="post" action="/hedging/forecast-hedge/accept" class="stack">
+    <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+    <input type="hidden" name="start_month" value="${escapeHtml(profile.start_month)}">
+    <input type="hidden" name="end_month" value="${escapeHtml(profile.end_month)}">
+    <input type="hidden" name="percentage" value="${escapeHtml(String(formatPercentInput(profile.percentage)))}">
+    <table class="hedge-table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Forecast MWh</th>
+          <th>Hedge %</th>
+          <th>Hedge MWh</th>
+          <th>Hedge MW</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${profile.rows
+          .map(
+            (row) => `<tr data-forecast-mwh="${escapeHtml(String(row.forecast_mwh))}" data-calendar-total-h="${escapeHtml(String(row.calendar_total_h))}">
+              <td>
+                ${escapeHtml(row.month)}
+                <input type="hidden" name="month" value="${escapeHtml(row.month)}">
+              </td>
+              <td class="number">${formatNumber(row.forecast_mwh)}</td>
+              <td><output data-role="hedge-percent">${formatNumber(row.percentage * 100)}</output></td>
+              <td><input name="hedge_mwh_${escapeHtml(row.month)}" data-role="hedge-mwh" type="number" min="0" step="0.001" value="${escapeHtml(String(row.hedge_mwh))}"></td>
+              <td><output data-role="hedge-mw">${formatNumber(row.hedge_mw)}</output></td>
+            </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+    <button class="primary" type="submit">Accept hedge profile</button>
+    <script>
+      document.querySelectorAll('[data-role="hedge-mwh"]').forEach((input) => {
+        input.addEventListener('input', () => {
+          const row = input.closest('tr');
+          const forecastMwh = Number(row.dataset.forecastMwh);
+          const calendarTotalH = Number(row.dataset.calendarTotalH);
+          const hedgeMwh = Number(input.value);
+          const hedgeMw = Number.isFinite(hedgeMwh) && calendarTotalH > 0 ? hedgeMwh / calendarTotalH : 0;
+          const hedgePercent = Number.isFinite(hedgeMwh) && forecastMwh > 0 ? (hedgeMwh / forecastMwh) * 100 : 0;
+          row.querySelector('[data-role="hedge-mw"]').value = hedgeMw.toLocaleString('en-US', { maximumFractionDigits: 6 });
+          row.querySelector('[data-role="hedge-percent"]').value = hedgePercent.toLocaleString('en-US', { maximumFractionDigits: 2 });
+        });
+      });
+    </script>
+  </form>`;
+}
+
+function renderMonthSelect(name: string, months: string[], selectedMonth: string): string {
+  return `<select name="${escapeHtml(name)}">
+    ${months.map((month) => `<option value="${escapeHtml(month)}"${month === selectedMonth ? " selected" : ""}>${escapeHtml(month)}</option>`).join("")}
+  </select>`;
+}
+
+function formatPercentInput(value: number): number {
+  return Math.round(value * 100_000) / 1_000;
 }
 
 function formatNumber(value: number): string {
