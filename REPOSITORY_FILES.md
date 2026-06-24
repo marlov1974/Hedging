@@ -234,6 +234,7 @@ requirements/packages/P0041-currency-portfolio-and-forecast-purchase-flow.md
 requirements/packages/P0042-value-unit-views-and-sek-reporting.md
 requirements/packages/P0043-projected-model-report-basis.md
 requirements/packages/P0044-event-detail-area-forecast-model.md
+requirements/packages/P0045-baseloads-rebalance-calloff-and-position-report.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
