@@ -7,6 +7,7 @@ import {
   getModernProjectedModelRowsForPortfolioYear,
   type PeaksProjectedModelTransactionRow,
 } from "./peaksCalloffTransactionList.ts";
+import { resolveTransactionComponentPrice } from "./componentPricing.ts";
 import type { DisplayCurrency } from "./viewEconomics.ts";
 
 export type MonthlyComponentPositionRow = {
@@ -19,10 +20,10 @@ export type MonthlyComponentPositionRow = {
 
 export type BaseloadsPositionReportRow = {
   month: string;
-  base_sys_mwh: number;
-  base_epad_mwh: number;
-  base_sys_price: number;
-  base_epad_price: number;
+  reportable_base_mwh: number;
+  hedge_value: number;
+  effective_month_hedge_price: number | null;
+  transaction_count: number;
 };
 
 export type ClassicPositionReportRow = {
@@ -83,20 +84,56 @@ export function getBaseloadsPositionReportRows(
   portfolioId: string,
   year: string,
 ): BaseloadsPositionReportRow[] {
-  const componentRows = getMonthlyComponentPositionRows(database, portfolioId, year);
-  const months = [...new Set(componentRows.map((row) => row.month))].sort();
+  return buildBaseloadsPositionReportRowsFromTransactions(
+    database,
+    getPortfolioTransactions(database, portfolioId).filter((transaction) => transaction.month.startsWith(`${year}-`)),
+  );
+}
 
-  return months.map((month) => {
-    const baseSys = componentRows.find((row) => row.month === month && row.component === "base.sys");
-    const baseEpad = componentRows.find((row) => row.month === month && row.component === "base.epad");
-    return {
-      month,
-      base_sys_mwh: baseSys?.volume_mwh ?? 0,
-      base_epad_mwh: baseEpad?.volume_mwh ?? 0,
-      base_sys_price: baseSys?.price ?? 0,
-      base_epad_price: baseEpad?.price ?? 0,
+export function buildBaseloadsPositionReportRowsFromTransactions(
+  database: PrototypeDatabase,
+  transactions: CustomerTransaction[],
+): BaseloadsPositionReportRow[] {
+  const groups = new Map<
+    string,
+    {
+      reportable_base_mwh: number;
+      hedge_value: number;
+      transaction_count: number;
+    }
+  >();
+
+  for (const transaction of transactions) {
+    const component = database.productConfigurationComponents.get(transaction.productcomponent_id);
+    if (!component || !isBaseloadsReportComponent(component.component)) {
+      continue;
+    }
+
+    const mwh = calculateTransactionMwhByComponentHours(database, transaction, component.component);
+    const price = resolveTransactionComponentPrice(database, transaction) ?? 0;
+    const aggregate = groups.get(transaction.month) ?? {
+      reportable_base_mwh: 0,
+      hedge_value: 0,
+      transaction_count: 0,
     };
-  });
+
+    if (component.component === "base.sys") {
+      aggregate.reportable_base_mwh += mwh;
+    }
+    aggregate.hedge_value += mwh * price;
+    aggregate.transaction_count += 1;
+    groups.set(transaction.month, aggregate);
+  }
+
+  return [...groups.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([month, aggregate]) => ({
+      month,
+      reportable_base_mwh: round(aggregate.reportable_base_mwh),
+      hedge_value: round(aggregate.hedge_value),
+      effective_month_hedge_price: weightedPrice(aggregate.hedge_value, aggregate.reportable_base_mwh),
+      transaction_count: aggregate.transaction_count,
+    }));
 }
 
 export function getClassicPositionReportRows(
@@ -342,6 +379,31 @@ function weightedPrice(value: number, mwh: number): number | null {
     return null;
   }
   return roundPrice(value / mwh);
+}
+
+function isBaseloadsReportComponent(component: string): boolean {
+  return component.startsWith("base.") || component.startsWith("peak.");
+}
+
+function calculateTransactionMwhByComponentHours(
+  database: PrototypeDatabase,
+  transaction: CustomerTransaction,
+  componentCode: string,
+): number {
+  if (transaction.quantity_type === "EUR") {
+    return 0;
+  }
+
+  const calendar = [...database.calendars.values()].find((candidate) => candidate.month === transaction.month);
+  if (!calendar) {
+    throw new Error(`Missing calendar for ${transaction.month}`);
+  }
+
+  const quantity = transaction.quantity_type === "MW" && transaction.quantity !== undefined ? transaction.quantity : transaction.mw;
+  if (componentCode.startsWith("peak.")) {
+    return quantity * calendar.peak_h;
+  }
+  return quantity * calendar.total_h;
 }
 
 function round(value: number): number {

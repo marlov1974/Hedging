@@ -2,6 +2,7 @@ import type { PrototypeDatabase } from "../database/schema.ts";
 import type { CustomerTransaction, ProductConfigurationComponent } from "../database/types.ts";
 import { formatDerivativeName } from "./derivativeNames.ts";
 import { isBaseloadsPortfolio } from "./features.ts";
+import { resolveTransactionComponentPrice } from "./componentPricing.ts";
 
 export type BaseloadsCalloffListRow = {
   date: string;
@@ -39,7 +40,7 @@ export function getBaseloadsCalloffListRows(database: PrototypeDatabase, portfol
         const mwh = calculateComponentMwh(database, group.transactions);
         return {
           date: calloff.date,
-          synthetic_derivative_name: formatDerivativeName(group.component.component, months, portfolio.price_area),
+          synthetic_derivative_name: resolveSyntheticDerivativeName(group.transactions, group.component.component, months, portfolio.price_area),
           component: group.component.component,
           mwh,
           mw: calculateComponentMw(database, group.transactions, mwh),
@@ -88,15 +89,13 @@ export function calculateWeightedAveragePrice(database: PrototypeDatabase, trans
       throw new Error(`Missing calendar for ${transaction.month}`);
     }
 
-    const priceComponent = [...database.priceComponents.values()].find(
-      (candidate) => candidate.productcomponent_id === transaction.productcomponent_id,
-    );
-    if (!priceComponent) {
+    const price = resolveTransactionComponentPrice(database, transaction);
+    if (price === null) {
       throw new Error(`Missing price component for ${transaction.productcomponent_id}`);
     }
 
     const mwh = transaction.mw * calendar.total_h;
-    weightedPriceSum += mwh * priceComponent.price;
+    weightedPriceSum += mwh * price;
     mwhSum += mwh;
   }
 
@@ -105,6 +104,19 @@ export function calculateWeightedAveragePrice(database: PrototypeDatabase, trans
   }
 
   return weightedPriceSum / mwhSum;
+}
+
+function resolveSyntheticDerivativeName(
+  transactions: CustomerTransaction[],
+  component: string,
+  months: string[],
+  priceArea: string,
+): string {
+  const explicitNames = [...new Set(transactions.map((transaction) => transaction.synthetic_derivative_name).filter(Boolean))];
+  if (explicitNames.length === 1) {
+    return explicitNames[0] ?? formatDerivativeName(component, months, priceArea);
+  }
+  return formatDerivativeName(component, months, priceArea);
 }
 
 function groupTransactionsByComponent(database: PrototypeDatabase, transactions: CustomerTransaction[]) {

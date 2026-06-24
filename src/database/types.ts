@@ -121,6 +121,7 @@ export type CustomerTransaction = {
   calloff_id: string;
   month: string;
   productcomponent_id: string;
+  synthetic_derivative_name?: string;
   price_area?: string | null;
   mw: number;
   q_factor: number;

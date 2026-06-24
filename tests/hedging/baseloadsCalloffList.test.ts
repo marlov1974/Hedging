@@ -4,7 +4,7 @@ import { createPocSeedData } from "../../src/database/pocSeedData.ts";
 import { getBaseloadsCalloffListRows, calculateComponentMwh, calculateComponentMw, calculateWeightedAveragePrice } from "../../src/hedging/calloffList.ts";
 import { formatDerivativeName } from "../../src/hedging/derivativeNames.ts";
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
-import { purchaseBaseloads } from "../../src/purchase/baseloadsPurchase.ts";
+import { purchaseBaseloads, rebalanceBaseloadsToForecast } from "../../src/purchase/baseloadsPurchase.ts";
 
 describe("Baseloads calloff list", () => {
   it("empty calloff list renders an empty state", () => {
@@ -117,6 +117,23 @@ describe("Baseloads calloff list", () => {
       rows.map((row) => row.synthetic_derivative_name).sort(),
       ["Nordic Electricity Base Load Future Quarter 2027-Q1", "Nordic Electricity EPAD SE3 Quarter 2027-Q1"],
     );
+  });
+
+  it("rebalance calloff rows use derivative names assigned at calloff time", () => {
+    const database = createPocSeedData();
+    rebalanceBaseloadsToForecast(database, {
+      portfolio_id: "CUS00-0",
+      period_id: "month-2027-01",
+      price_area: "STO",
+      target_percentage_of_forecast: "50",
+      date: "2027-01-15",
+      calloff_id: "CAL_REBALANCE_NAME",
+    });
+
+    const rows = getBaseloadsCalloffListRows(database, "CUS00-0");
+
+    assert.equal(rows.length, 2);
+    assert.equal(rows.every((row) => row.synthetic_derivative_name === "Baseloads Rebalance Month 2027-01 STO"), true);
   });
 });
 
