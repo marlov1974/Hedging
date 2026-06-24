@@ -10,7 +10,8 @@ This package introduces:
 2. forecast stored as canonical forecast events with event details,
 3. explicit price-area components replacing generic EPAD components,
 4. price area carried on event details/transactions, including SYS purchases,
-5. updated Forecast and Hedge Forecast features built on canonical events and projected Classic/Modern views.
+5. updated Forecast and Hedge Forecast features built on canonical events and projected Classic/Modern views,
+6. forecast power quantities stored as MW, with MWh derived in projections and reports.
 
 This is a larger model refactor package. It should preserve public-safe synthetic data only.
 
@@ -35,6 +36,8 @@ Component
 A forecast is then not a special standalone forecast table and not an initial purchase/calloff. It is an event of type `FORECAST` with component-shaped event details.
 
 Purchases/hedges are also events, but with different event type and usually price/factor fields populated.
+
+Power forecast event details should follow the same canonical quantity principle as other power rows: store MW and derive MWh from the component hour basis and period calendar.
 
 ## Safety boundary
 
@@ -169,6 +172,12 @@ quantity
 quantity_type
 ```
 
+For power forecast event details, the canonical stored quantity must be MW:
+
+```text
+quantity_type = MW
+```
+
 Forecast rows normally do not need:
 
 ```text
@@ -186,7 +195,57 @@ Forecast is not an initial calloff.
 
 Forecast is a source-of-truth exposure estimate event.
 
-## 3. Split EPAD into explicit price-area components
+## 3. Forecast MW storage and MWh derivation
+
+Forecast power quantities must be stored as MW in canonical event details.
+
+MWh must be derived in Classic/Modern forecast projections, reports, coverage calculations and UI displays.
+
+Canonical rule:
+
+```text
+forecast_mwh = forecast_mw * resolved_hours(component.hour_basis, period)
+```
+
+Examples:
+
+```text
+event_type     = FORECAST
+component_code = base.sto
+period         = 202701
+price_area     = STO
+quantity       = 12.5
+quantity_type  = MW
+```
+
+```text
+base_sto_forecast_mwh = 12.5 * total_hours(202701)
+```
+
+For peak components:
+
+```text
+event_type     = FORECAST
+component_code = peak.sto
+period         = 202701
+price_area     = STO
+quantity       = 7.0
+quantity_type  = MW
+```
+
+```text
+peak_sto_forecast_mwh = 7.0 * peak_hours(202701)
+```
+
+UI inputs may continue to show or accept MWh if that is clearer for the user. When saving, the UI must convert MWh to MW using the correct hour basis:
+
+```text
+stored_mw = input_mwh / resolved_hours(component.hour_basis, period)
+```
+
+The source-of-truth event detail should not store forecast MWh for power components unless a compatibility layer is temporarily required. If compatibility is required, it must be documented as derived/legacy and must not become the canonical persisted model.
+
+## 4. Split EPAD into explicit price-area components
 
 Replace generic EPAD components with explicit price-area components.
 
@@ -215,7 +274,7 @@ should be treated as deprecated compatibility names or removed from new seed dat
 
 Do not remove compatibility support aggressively if existing tests/fixtures still require it. Prefer explicit aliases or migration notes.
 
-## 4. Component semantics
+## 5. Component semantics
 
 ### Base area components
 
@@ -262,7 +321,7 @@ peak.sys
 
 But SYS purchase events may still be marked with price area on event details for allocation/reconciliation reasons.
 
-## 5. Price area on event details / transactions
+## 6. Price area on event details / transactions
 
 Add or support a `price_area` field on event details/purchase rows.
 
@@ -288,34 +347,41 @@ Rules:
 - A future design may allow `price_area = null` for truly unallocated SYS events.
 - Reports should distinguish marked SYS rows from unallocated SYS rows if both exist later.
 
-## 6. Price-area forecast model
+## 7. Price-area forecast model
 
 Forecast should have one event detail per price area and component.
 
 Example Forecast event details:
 
 ```text
-base.sto period=202701 price_area=STO quantity=<total/base MW or MWh>
-base.mal period=202701 price_area=MAL quantity=<total/base MW or MWh>
-base.lul period=202701 price_area=LUL quantity=<total/base MW or MWh>
-base.sun period=202701 price_area=SUN quantity=<total/base MW or MWh>
+base.sto period=202701 price_area=STO quantity=<total/base MW> quantity_type=MW
+base.mal period=202701 price_area=MAL quantity=<total/base MW> quantity_type=MW
+base.lul period=202701 price_area=LUL quantity=<total/base MW> quantity_type=MW
+base.sun period=202701 price_area=SUN quantity=<total/base MW> quantity_type=MW
 
-peak.sto period=202701 price_area=STO quantity=<peak MW or MWh>
-peak.mal period=202701 price_area=MAL quantity=<peak MW or MWh>
-peak.lul period=202701 price_area=LUL quantity=<peak MW or MWh>
-peak.sun period=202701 price_area=SUN quantity=<peak MW or MWh>
+peak.sto period=202701 price_area=STO quantity=<peak MW> quantity_type=MW
+peak.mal period=202701 price_area=MAL quantity=<peak MW> quantity_type=MW
+peak.lul period=202701 price_area=LUL quantity=<peak MW> quantity_type=MW
+peak.sun period=202701 price_area=SUN quantity=<peak MW> quantity_type=MW
 ```
 
 SYS forecast should be derived as aggregation of area forecast details:
 
 ```text
-base.sys forecast = sum(base.<area> forecast)
-peak.sys forecast = sum(peak.<area> forecast)
+base.sys forecast_mw = sum(base.<area> forecast_mw)
+peak.sys forecast_mw = sum(peak.<area> forecast_mw)
+```
+
+SYS forecast MWh should be derived from the aggregated MW and the relevant hour basis:
+
+```text
+base.sys forecast_mwh = base.sys forecast_mw * total_h
+peak.sys forecast_mwh = peak.sys forecast_mw * peak_h
 ```
 
 Do not store duplicate SYS forecast source rows unless required for compatibility. If stored temporarily, mark them as derived/compatibility and ensure they reconcile to area rows.
 
-## 7. Forecast feature behavior
+## 8. Forecast feature behavior
 
 Update Forecast feature so it shows Classic/Modern views but stores canonical forecast events.
 
@@ -323,18 +389,22 @@ Rules:
 
 - User may view/edit forecast in Classic or Modern perspective.
 - Stored source-of-truth forecast is a canonical `FORECAST` event with event details.
+- Stored power forecast event details use `quantity_type = MW`.
 - Classic forecast view projects canonical forecast event details into Classic structure.
 - Modern forecast view projects canonical forecast event details into Modern structure.
+- Classic/Modern views may display MWh, but MWh is derived from MW and hours.
+- Saving Classic/Modern MWh inputs must convert to canonical MW before storing.
 - Switching perspective must not create separate source-of-truth forecasts.
 - Data Viewer should be able to show canonical forecast event details and projected Classic/Modern forecast views.
 
-## 8. Hedge Forecast behavior
+## 9. Hedge Forecast behavior
 
 Update Hedge Forecast to use the new event-based forecast.
 
 Rules:
 
 - Hedge Forecast should read forecast from canonical `FORECAST` events.
+- Hedge Forecast should interpret forecast power quantities as MW and derive MWh using the applicable hour basis when needed.
 - Hedge/purchase creation should create `PURCHASE` events with event details.
 - Buying SYS should occur per price area. Buying SYS for all supported areas should create one `base.sys` or `peak.sys` detail per price area.
 - Area purchases should create `base.sto`, `base.mal`, `base.lul`, `base.sun` and/or `peak.*` area details.
@@ -342,7 +412,7 @@ Rules:
 - Different hedge percentages for SYS and area components must be supported.
 - It must be possible to buy 80 percent SYS and 50 percent area components, then later add more area hedges closer to delivery.
 
-## 9. SYS purchase rule
+## 10. SYS purchase rule
 
 Default rule for this package:
 
@@ -376,7 +446,7 @@ Open design reservation:
 The model may later support unmarked/unallocated SYS rows, but that is not the default in this package.
 ```
 
-## 10. Projections and reports
+## 11. Projections and reports
 
 Classic and Modern projected models should carry the new event/event_detail and price-area structure.
 
@@ -394,16 +464,16 @@ Reports should not lose price-area detail.
 Position and coverage reports should be able to show:
 
 ```text
-SYS forecast by area
-SYS hedge by area
-area forecast by area
-area hedge by area
+SYS forecast MW and MWh by area
+SYS hedge MW and MWh by area
+area forecast MW and MWh by area
+area hedge MW and MWh by area
 SYS coverage percent
 area coverage percent
 remaining/unhedged area exposure
 ```
 
-## 11. Documentation updates
+## 12. Documentation updates
 
 Update or create concise documentation, likely:
 
@@ -427,19 +497,22 @@ Add or update tests to validate at least:
 1. event and event_detail structures exist or are represented through compatibility wrappers.
 2. forecast is stored as `FORECAST` event with event details.
 3. forecast event details support `price_area`.
-4. area components `base.sto`, `base.mal`, `base.lul`, `base.sun`, `peak.sto`, `peak.mal`, `peak.lul`, `peak.sun` are recognized.
-5. generic EPAD components are no longer used for new forecast seed data.
-6. Forecast feature can show Classic view while storing canonical forecast events.
-7. Forecast feature can show Modern view while storing canonical forecast events.
-8. Hedge Forecast reads canonical forecast events.
-9. Hedge Forecast creates purchase events/event details.
-10. SYS purchase for all supported areas creates one SYS detail per price area.
-11. SYS details carry `price_area`.
-12. Area purchases create area component details.
-13. Different SYS and area hedge percentages are allowed.
-14. Currency details still work with `currency.eursek`.
-15. Classic/Modern projected models carry price-area detail.
-16. Existing P0037-P0043 tests still pass or are deliberately updated.
+4. forecast power event details store `quantity_type = MW`.
+5. forecast MWh is derived from stored MW and resolved hours.
+6. saving Classic/Modern forecast MWh inputs converts to canonical MW.
+7. area components `base.sto`, `base.mal`, `base.lul`, `base.sun`, `peak.sto`, `peak.mal`, `peak.lul`, `peak.sun` are recognized.
+8. generic EPAD components are no longer used for new forecast seed data.
+9. Forecast feature can show Classic view while storing canonical forecast events.
+10. Forecast feature can show Modern view while storing canonical forecast events.
+11. Hedge Forecast reads canonical forecast events.
+12. Hedge Forecast creates purchase events/event details.
+13. SYS purchase for all supported areas creates one SYS detail per price area.
+14. SYS details carry `price_area`.
+15. Area purchases create area component details.
+16. Different SYS and area hedge percentages are allowed.
+17. Currency details still work with `currency.eursek`.
+18. Classic/Modern projected models carry price-area detail.
+19. Existing P0037-P0043 tests still pass or are deliberately updated.
 
 Prefer focused model/function tests over brittle full UI snapshots.
 
@@ -455,12 +528,16 @@ Do not implement unallocated SYS rows as default behavior in this package.
 
 Do not redesign currency semantics from P0041/P0042.
 
+Do not keep MWh as the canonical stored power forecast quantity, except as temporary documented compatibility.
+
 ## Expected result
 
 After this package:
 
 - source-of-truth data uses or clearly moves toward event/event_detail terminology,
 - forecast is represented as canonical forecast events with event details,
+- forecast power quantities are stored as MW,
+- forecast MWh is derived in Classic/Modern views and reports,
 - EPAD generic components are replaced by explicit price-area components,
 - forecast is modeled per price area,
 - SYS forecast can be derived from area forecast,
@@ -489,6 +566,7 @@ Report:
 - files changed,
 - event/event_detail implementation approach,
 - forecast event implementation,
+- forecast MW storage and MWh derivation behavior,
 - area component implementation,
 - EPAD compatibility behavior,
 - Forecast feature Classic/Modern projection behavior,
