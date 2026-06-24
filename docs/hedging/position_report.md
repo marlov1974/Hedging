@@ -2,6 +2,7 @@
 
 P0018 added a monthly position report to the hedging tool shell. P0040 makes it a customer-facing monthly report instead of a raw component dump.
 P0044 adds `event` and `event_detail` source rows for forecasts and purchase mirrors; existing Position Report rows still consume projected transaction model rows.
+P0045 compresses the Baseloads view into one effective monthly hedge row.
 
 ## Purpose
 
@@ -35,10 +36,10 @@ Baseloads columns:
 
 ```text
 Month
-Base SYS MWh
-Base EPAD MWh
-Base SYS Price
-Base EPAD Price
+Reportable Base MWh
+Hedge Value
+Effective Hedge Price
+Rows
 ```
 
 Classic columns:
@@ -67,7 +68,15 @@ Currency rows such as `currency.eursek` are not summed as MW or MWh in the norma
 
 ## Aggregation
 
-Baseloads rows are grouped by month and projected into the SYS and EPAD price dimensions.
+Baseloads rows are grouped by month and projected into one report row. Reportable volume is the signed `base.sys` volume. Hedge value includes signed base and peak component value. Peak volume is not counted as reportable Baseloads volume.
+
+Baseloads effective price is calculated last:
+
+```text
+reportable_base_volume = sum(signed base.sys volume)
+hedge_value = sum(signed base volume * base price) + sum(signed peak volume * peak price)
+effective_month_hedge_price = hedge_value / reportable_base_volume
+```
 
 Classic and Modern rows are aggregated from the shared Classic/Modern projected model rows. This keeps Position Report aligned with Calloff List projection semantics and avoids a separate raw-canonical reinterpretation inside the report.
 

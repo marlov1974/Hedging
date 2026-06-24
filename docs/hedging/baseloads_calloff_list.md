@@ -1,6 +1,7 @@
 # Baseloads calloff list
 
 P0017 adds a Baseloads calloff list feature inside the hedging tool shell.
+P0045 adds Baseloads rebalance calloffs with explicit synthetic rebalance derivative names.
 
 ## Purpose
 
@@ -73,7 +74,7 @@ For flat Baseloads purchases this returns the original purchased MW.
 
 ## Weighted Average Price
 
-Transactions do not store price yet. P0017 therefore uses linked `PriceComponent` values.
+When a transaction carries a price, the list uses that transaction price. Otherwise it falls back to linked `PriceComponent` values.
 
 Formula:
 
@@ -107,8 +108,15 @@ Nordic Electricity Base Load Future Year 2027
 
 The naming is synthetic and intentionally avoids real exchange product codes. The terminology follows public Nordic power concepts such as base load futures and EPAD area-differential contracts.
 
+P0045 rebalance calloffs receive explicit names at calloff time, for example:
+
+```text
+Baseloads Rebalance Month 2027-01 STO
+```
+
+This name is used directly for the generated rebalance rows instead of deriving only from component plus period.
+
 ## Known PoC Limitations
 
 - Missing calendar data causes a clear calculation error.
-- Transaction-level prices are not stored yet.
 - The list is computed from the in-memory database at render time.

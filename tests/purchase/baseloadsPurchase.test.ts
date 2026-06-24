@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { createPocSeedData } from "../../src/database/pocSeedData.ts";
 import { getCalloffWithTransactions } from "../../src/database/repository.ts";
 import { renderBaseloadsPurchaseForm } from "../../src/purchase/BaseloadsPurchaseView.ts";
-import { PurchaseError, purchaseBaseloads } from "../../src/purchase/baseloadsPurchase.ts";
+import { PurchaseError, purchaseBaseloads, rebalanceBaseloadsToForecast } from "../../src/purchase/baseloadsPurchase.ts";
 import { expandPeriodMonths, getBaseloadsPurchasePeriods } from "../../src/purchase/periodOptions.ts";
 
 describe("Baseloads purchase flow", () => {
@@ -212,6 +212,85 @@ describe("Baseloads purchase flow", () => {
 
     assert.match(html, /CALLOFF_TEST_RESULT/);
     assert.match(html, /6 transactions/);
+  });
+
+  it("rebalance requires target percentage and price area", () => {
+    const database = createPocSeedData();
+
+    assert.throws(
+      () =>
+        rebalanceBaseloadsToForecast(database, {
+          portfolio_id: "CUS00-0",
+          period_id: "month-2027-01",
+          price_area: "STO",
+        }),
+      (error) => error instanceof PurchaseError && /target_percentage_of_forecast/.test(error.message),
+    );
+    assert.throws(
+      () =>
+        rebalanceBaseloadsToForecast(database, {
+          portfolio_id: "CUS00-0",
+          period_id: "month-2027-01",
+          target_percentage_of_forecast: "50",
+        }),
+      (error) => error instanceof PurchaseError && /price_area/.test(error.message),
+    );
+  });
+
+  it("rebalance uses selected-area base forecast only and creates positive signed details", () => {
+    const database = createPocSeedData();
+    const result = rebalanceBaseloadsToForecast(database, {
+      portfolio_id: "CUS00-0",
+      period_id: "month-2027-01",
+      price_area: "STO",
+      target_percentage_of_forecast: "50",
+      date: "2027-01-15",
+      calloff_id: "CAL_REBALANCE_POSITIVE",
+    });
+
+    assert.equal(result.calloff?.calloff_id, "CAL_REBALANCE_POSITIVE");
+    assert.deepEqual(result.rows, [
+      {
+        month: "2027-01",
+        target_base_mwh: 246,
+        current_base_mwh: 0,
+        rebalance_delta_mwh: 246,
+        derivative_name: "Baseloads Rebalance Month 2027-01 STO",
+      },
+    ]);
+    assert.equal(result.transactions.length, 2);
+    assert.equal(result.transactions.every((transaction) => transaction.price_area === "STO"), true);
+    assert.equal(result.transactions.every((transaction) => transaction.synthetic_derivative_name === "Baseloads Rebalance Month 2027-01 STO"), true);
+    assert.deepEqual(
+      result.transactions.map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component),
+      ["base.sys", "base.epad"],
+    );
+    assert.equal(result.transactions[0].mw, 0.330645);
+  });
+
+  it("rebalance can create negative signed details when current base exceeds target", () => {
+    const database = createPocSeedData();
+    purchaseBaseloads(database, {
+      portfolio_id: "CUS00-0",
+      mw: 1,
+      period_id: "month-2027-01",
+      date: "2027-01-10",
+      calloff_id: "CAL_EXISTING_BASE",
+    });
+    const result = rebalanceBaseloadsToForecast(database, {
+      portfolio_id: "CUS00-0",
+      period_id: "month-2027-01",
+      price_area: "STO",
+      target_percentage_of_forecast: "50",
+      date: "2027-01-15",
+      calloff_id: "CAL_REBALANCE_NEGATIVE",
+    });
+
+    assert.equal(result.rows[0].current_base_mwh, 744);
+    assert.equal(result.rows[0].target_base_mwh, 246);
+    assert.equal(result.rows[0].rebalance_delta_mwh, -498);
+    assert.equal(result.transactions.length, 2);
+    assert.equal(result.transactions.every((transaction) => transaction.mw === -0.669355), true);
   });
 });
 

@@ -212,6 +212,9 @@ requirements/package-runs/P0043/review.md
 requirements/package-runs/P0044/design.md
 requirements/package-runs/P0044/functions.md
 requirements/package-runs/P0044/review.md
+requirements/package-runs/P0045/design.md
+requirements/package-runs/P0045/functions.md
+requirements/package-runs/P0045/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -259,6 +262,7 @@ requirements/packages/P0042-public-market-price-fixtures.md
 requirements/packages/P0042-value-unit-views-and-sek-reporting.md
 requirements/packages/P0043-projected-model-report-basis.md
 requirements/packages/P0044-event-detail-area-forecast-model.md
+requirements/packages/P0045-baseloads-rebalance-calloff-and-position-report.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/eventForecasts.ts

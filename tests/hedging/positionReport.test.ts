@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { createPocSeedData } from "../../src/database/pocSeedData.ts";
 import { insertCalloff, insertTransaction } from "../../src/database/repository.ts";
 import {
+  buildBaseloadsPositionReportRowsFromTransactions,
   buildModernPositionReportRowsFromProjectedModelRows,
   calculateMonthlyComponentPosition,
   getClassicPositionReportRows,
@@ -41,16 +42,47 @@ describe("Position Report", () => {
     );
   });
 
-  it("Baseloads Position Report exposes base SYS and EPAD columns", () => {
+  it("Baseloads Position Report exposes compressed effective hedge rows", () => {
     const row = getPositionReportRows(seedQuarterCalloff(), "CUS00-0", "2027", "baseloads")[0];
 
     assert.deepEqual(row, {
       month: "2027-01",
-      base_sys_mwh: 14880,
-      base_epad_mwh: 14880,
-      base_sys_price: 45.73,
-      base_epad_price: -2.2,
+      reportable_base_mwh: 14880,
+      hedge_value: 647726.4,
+      effective_month_hedge_price: 43.53,
+      transaction_count: 2,
     });
+  });
+
+  it("Baseloads Position Report counts peak value but not peak volume in effective hedge price", () => {
+    const database = createPocSeedData();
+    const januaryCalendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
+    assert.ok(januaryCalendar);
+    januaryCalendar.total_h = 1;
+    januaryCalendar.peak_h = 1;
+    insertCalloff(database, {
+      calloff_id: "CAL_EFFECTIVE",
+      product_id: "PRO02",
+      portfolio_id: "CUS00-0",
+      date: "2027-01-20",
+      delivery_start_month: "2027-01",
+      delivery_end_month: "2027-01",
+    });
+    const transactions = [
+      insertPricedTransaction(database, "CAL_EFFECTIVE-000", "CAL_EFFECTIVE", "PRO02:base.sys", 100, 100),
+      insertPricedTransaction(database, "CAL_EFFECTIVE-001", "CAL_EFFECTIVE", "PRO02:peak.sys", 50, 110),
+      insertPricedTransaction(database, "CAL_EFFECTIVE-002", "CAL_EFFECTIVE", "PRO02:peak.sys", -50, 55),
+    ];
+
+    assert.deepEqual(buildBaseloadsPositionReportRowsFromTransactions(database, transactions), [
+      {
+        month: "2027-01",
+        reportable_base_mwh: 100,
+        hedge_value: 12750,
+        effective_month_hedge_price: 127.5,
+        transaction_count: 3,
+      },
+    ]);
   });
 
   it("Classic Position Report returns one row per month with offpeak and peak EPAD fields", () => {
@@ -292,6 +324,30 @@ function addCurrencyTransaction(
     price_type: "SEK_PER_EUR",
     factor: null,
     factor_type: null,
+  });
+}
+
+function insertPricedTransaction(
+  database: ReturnType<typeof createPocSeedData>,
+  transactionId: string,
+  calloffId: string,
+  productComponentId: string,
+  mw: number,
+  price: number,
+) {
+  return insertTransaction(database, {
+    transaction_id: transactionId,
+    calloff_id: calloffId,
+    month: "2027-01",
+    productcomponent_id: productComponentId,
+    mw,
+    q_factor: 1,
+    quantity: mw,
+    quantity_type: "MW",
+    price,
+    price_type: "EUR_PER_MWH",
+    factor: 1,
+    factor_type: "Q_FACTOR",
   });
 }
 

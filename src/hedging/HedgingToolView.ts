@@ -687,10 +687,10 @@ function renderBaseloadsPositionReportRows(rows: BaseloadsPositionReportRow[]): 
     <thead>
       <tr>
         <th>Month</th>
-        <th>Base SYS MWh</th>
-        <th>Base EPAD MWh</th>
-        <th>Base SYS Price</th>
-        <th>Base EPAD Price</th>
+        <th>Reportable Base MWh</th>
+        <th>Hedge Value</th>
+        <th>Effective Hedge Price</th>
+        <th>Rows</th>
       </tr>
     </thead>
     <tbody>
@@ -698,10 +698,10 @@ function renderBaseloadsPositionReportRows(rows: BaseloadsPositionReportRow[]): 
         .map(
           (row) => `<tr>
             <td>${escapeHtml(row.month)}</td>
-            <td class="number">${formatNumber(row.base_sys_mwh)}</td>
-            <td class="number">${formatNumber(row.base_epad_mwh)}</td>
-            <td class="number">${formatNumber(row.base_sys_price)}</td>
-            <td class="number">${formatNumber(row.base_epad_price)}</td>
+            <td class="number">${formatNumber(row.reportable_base_mwh)}</td>
+            <td class="number">${formatNumber(row.hedge_value)}</td>
+            <td class="number">${formatOptionalNumber(row.effective_month_hedge_price)}</td>
+            <td class="number">${formatNumber(row.transaction_count)}</td>
           </tr>`,
         )
         .join("")}
