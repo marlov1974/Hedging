@@ -9,7 +9,8 @@ import {
   getClassicProjectedForecastForPortfolioYear,
   getBaseloadsProjectedTransactionsForPortfolioYear,
   getModernProjectedForecastForPortfolioYear,
-  getRawForecastEventDetailsForPortfolioYear,
+  getRawEventDetailsForPortfolioYear,
+  getRawEventsForPortfolioYear,
   getClassicProjectedCalloffsForPortfolioYear,
   getMarketProjectionRowsForPortfolioYear,
   getModernProjectedCalloffsForPortfolioYear,
@@ -37,9 +38,11 @@ describe("Data Viewer", () => {
 
     assert.match(html, /Data Viewer perspective/);
     assert.match(html, /name="selected_table"/);
-    assert.match(html, /Canonical Raw Calloffs/);
-    assert.match(html, /Canonical Raw Transactions/);
-    assert.match(html, /Market Projection/);
+    assert.match(html, /Canonical Events/);
+    assert.match(html, /Canonical Event Details/);
+    assert.doesNotMatch(html, /Canonical Raw Calloffs/);
+    assert.doesNotMatch(html, /Canonical Raw Transactions/);
+    assert.doesNotMatch(html, /Market Projection/);
     assert.match(html, /raw canonical rows and derived projected views/);
     assert.doesNotMatch(html, /Baseloads Projected Transactions/);
     assert.doesNotMatch(html, /Classic Projected Calloffs/);
@@ -85,9 +88,8 @@ describe("Data Viewer", () => {
     assert.deepEqual(
       getDataViewerTables().map((table) => table.table_id),
       [
-        "calloffs",
-        "transactions",
-        "forecast-event-details",
+        "events",
+        "event-details",
         "classic-projected-forecast",
         "modern-projected-forecast",
         "baseloads-projected-transactions",
@@ -170,8 +172,18 @@ describe("Data Viewer", () => {
     assert.equal(row?.mwh, 7440);
   });
 
-  it("Canonical forecast event details expose price-area source forecast rows", () => {
-    const rows = getRawForecastEventDetailsForPortfolioYear(createPocSeedData(), "CUS02-0", "2027");
+  it("Canonical Events exposes source events instead of raw calloffs and transactions", () => {
+    const rows = getRawEventsForPortfolioYear(createPocSeedData(), "CUS02-0", "2027");
+
+    assert.equal(rows.length, 12);
+    assert.equal(rows[0].event_id, "EVT:FORECAST:CUS02-0:2027-01");
+    assert.equal(rows[0].event_type, "FORECAST");
+    assert.equal(rows[0].period_start, "2027-01");
+    assert.equal(rows[0].detail_count, 8);
+  });
+
+  it("Canonical event details expose price-area source forecast rows", () => {
+    const rows = getRawEventDetailsForPortfolioYear(createPocSeedData(), "CUS02-0", "2027");
 
     assert.equal(rows.length, 96);
     assert.equal(rows[0].event_type, "FORECAST");
@@ -424,7 +436,8 @@ describe("Data Viewer", () => {
     const html = renderHedgingTool(createDataViewerDatabase(), {
       portfolio_id: "CUS02-0",
       feature_id: "data-viewer",
-      selected_table: "calloffs",
+      selected_view: "modern",
+      selected_table: "modern-projected-transactions",
       selected_year: "2029",
     });
 
@@ -436,23 +449,23 @@ describe("Data Viewer", () => {
     const html = renderHedgingTool(database, {
       portfolio_id: "CUS02-0",
       feature_id: "data-viewer",
-      selected_table: "calloffs",
+      selected_table: "events",
       selected_year: "2027",
     });
 
-    assert.match(html, /CAL10/);
-    assert.doesNotMatch(html, /CAL20/);
+    assert.match(html, /EVT:FORECAST:CUS00-0:2027-01/);
+    assert.doesNotMatch(html, /EVT:FORECAST:CUS02-0:2027-01/);
   });
 
   it("no rows from other portfolios leak into the table", () => {
-    const result = getDataViewerRows(createDataViewerDatabase(), "CUS02-0", "transactions", "2027");
-    const transactionRows = result.rows;
+    const result = getDataViewerRows(createDataViewerDatabase(), "CUS02-0", "event-details", "2027");
+    const eventDetailRows = result.rows;
 
-    assert.equal(transactionRows.some((row) => "calloff_id" in row && row.calloff_id === "CAL10"), false);
+    assert.equal(eventDetailRows.some((row) => "event_id" in row && row.event_id.includes("CUS00-0")), false);
   });
 
   it("returns data-derived years plus seed years", () => {
-    assert.deepEqual(getDataViewerYears(createDataViewerDatabase(), "CUS00-0", "calloffs"), ["2027", "2028", "2029"]);
+    assert.deepEqual(getDataViewerYears(createDataViewerDatabase(), "CUS00-0", "events"), ["2027", "2028", "2029"]);
     assert.deepEqual(getDataViewerYears(createDataViewerDatabase(), "CUS01-0", "modern-projected-transactions"), ["2027", "2028", "2029"]);
   });
 });

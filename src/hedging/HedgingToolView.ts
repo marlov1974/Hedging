@@ -25,7 +25,8 @@ import {
   type ModernProjectedCalloffRow,
   type ModernProjectedTransactionRow,
   type RawCalloffRow,
-  type RawForecastEventDetailRow,
+  type RawEventDetailRow,
+  type RawEventRow,
   type RawTransactionRow,
 } from "./dataViewer.ts";
 import { calculateFinancialSettlementForMonth, getFinancialSettlementMonths } from "./financialSettlement.ts";
@@ -1205,7 +1206,8 @@ function renderDataViewerRows(
   rows:
     | RawCalloffRow[]
     | RawTransactionRow[]
-    | RawForecastEventDetailRow[]
+    | RawEventRow[]
+    | RawEventDetailRow[]
     | ClassicProjectedForecastRow[]
     | ModernProjectedForecastRow[]
     | BaseloadsProjectedTransactionRow[]
@@ -1219,16 +1221,16 @@ function renderDataViewerRows(
     return `<div class="notice"><p>No rows for selected portfolio and year.</p></div>`;
   }
 
-  if (tableId === "calloffs") {
-    return renderRawCalloffsTable(rows as RawCalloffRow[]);
+  if (tableId === "events") {
+    return renderRawEventsTable(rows as RawEventRow[]);
   }
 
   if (tableId === "modern-projected-calloffs") {
     return renderModernProjectedCalloffsTable(rows as ModernProjectedCalloffRow[]);
   }
 
-  if (tableId === "forecast-event-details") {
-    return renderRawForecastEventDetailsTable(rows as RawForecastEventDetailRow[]);
+  if (tableId === "event-details") {
+    return renderRawEventDetailsTable(rows as RawEventDetailRow[]);
   }
 
   if (tableId === "classic-projected-forecast") {
@@ -1259,31 +1261,39 @@ function renderDataViewerRows(
     return renderMarketProjectionTable(rows as DataViewerMarketProjectionRow[]);
   }
 
-  return renderRawTransactionsTable(rows as RawTransactionRow[]);
+  return renderMarketProjectionTable(rows as DataViewerMarketProjectionRow[]);
 }
 
-function renderRawCalloffsTable(rows: RawCalloffRow[]): string {
+function renderRawEventsTable(rows: RawEventRow[]): string {
   return `<table>
     <thead>
       <tr>
-        <th>calloff_id</th>
-        <th>product_id</th>
+        <th>event_id</th>
         <th>portfolio_id</th>
-        <th>date</th>
-        <th>delivery_start_month</th>
-        <th>delivery_end_month</th>
+        <th>event_type</th>
+        <th>version</th>
+        <th>created_at</th>
+        <th>source</th>
+        <th>status</th>
+        <th>period_start</th>
+        <th>period_end</th>
+        <th>detail_count</th>
       </tr>
     </thead>
     <tbody>
       ${rows
         .map(
           (row) => `<tr>
-            <td>${escapeHtml(row.calloff_id)}</td>
-            <td>${escapeHtml(row.product_id)}</td>
+            <td>${escapeHtml(row.event_id)}</td>
             <td>${escapeHtml(row.portfolio_id)}</td>
-            <td>${escapeHtml(row.date)}</td>
-            <td>${escapeHtml(row.delivery_start_month)}</td>
-            <td>${escapeHtml(row.delivery_end_month)}</td>
+            <td>${escapeHtml(row.event_type)}</td>
+            <td class="number">${formatNumber(row.version)}</td>
+            <td>${escapeHtml(row.created_at)}</td>
+            <td>${escapeHtml(row.source)}</td>
+            <td>${escapeHtml(row.status)}</td>
+            <td>${escapeHtml(row.period_start)}</td>
+            <td>${escapeHtml(row.period_end)}</td>
+            <td class="number">${formatNumber(row.detail_count)}</td>
           </tr>`,
         )
         .join("")}
@@ -1348,7 +1358,7 @@ function renderRawTransactionsTable(rows: RawTransactionRow[]): string {
   </table>`;
 }
 
-function renderRawForecastEventDetailsTable(rows: RawForecastEventDetailRow[]): string {
+function renderRawEventDetailsTable(rows: RawEventDetailRow[]): string {
   return `<table>
     <thead>
       <tr>
@@ -1361,6 +1371,10 @@ function renderRawForecastEventDetailsTable(rows: RawForecastEventDetailRow[]): 
         <th>price_area</th>
         <th>quantity</th>
         <th>quantity_type</th>
+        <th>price</th>
+        <th>price_type</th>
+        <th>factor</th>
+        <th>factor_type</th>
       </tr>
     </thead>
     <tbody>
@@ -1376,6 +1390,10 @@ function renderRawForecastEventDetailsTable(rows: RawForecastEventDetailRow[]): 
             <td>${escapeHtml(row.price_area ?? "")}</td>
             <td class="number">${formatNumber(row.quantity)}</td>
             <td>${escapeHtml(row.quantity_type)}</td>
+            <td class="number">${formatOptionalNumber(row.price)}</td>
+            <td>${escapeHtml(row.price_type ?? "")}</td>
+            <td class="number">${formatOptionalNumber(row.factor)}</td>
+            <td>${escapeHtml(row.factor_type ?? "")}</td>
           </tr>`,
         )
         .join("")}
@@ -1726,12 +1744,12 @@ function defaultTableForDataViewerPerspective(view: DataViewerPerspectiveId): Da
   if (view === "modern") {
     return "modern-projected-transactions";
   }
-  return "calloffs";
+  return "events";
 }
 
 function tableBelongsToDataViewerPerspective(tableId: DataViewerTableId, view: DataViewerPerspectiveId): boolean {
   if (view === "canonical") {
-    return tableId === "calloffs" || tableId === "transactions" || tableId === "forecast-event-details" || tableId === "market-projection";
+    return tableId === "events" || tableId === "event-details";
   }
   if (view === "baseloads") {
     return tableId === "baseloads-projected-transactions";

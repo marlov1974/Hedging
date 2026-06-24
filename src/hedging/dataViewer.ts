@@ -1,7 +1,7 @@
 import { canonicalProductPackageName, componentCodeConcept, type ComponentCodeConcept } from "../database/canonicalComponents.ts";
 import { getCanonicalForecasts, getEventDetails } from "../database/eventForecasts.ts";
 import type { PrototypeDatabase } from "../database/schema.ts";
-import type { Calloff, ComponentCategory, CustomerTransaction } from "../database/types.ts";
+import type { Calloff, ComponentCategory, CustomerTransaction, HedgingEvent } from "../database/types.ts";
 import { deriveClassicFromForecast } from "./classicProjection.ts";
 import { deriveModernFromForecast } from "./modernProjection.ts";
 import { getMarketProjectionRows } from "./marketProjection.ts";
@@ -17,9 +17,8 @@ import { getCalloffCurrencyCoverage, getTransactionViewEconomics } from "./viewE
 const EPSILON = 0.000001;
 
 export type DataViewerTableId =
-  | "calloffs"
-  | "transactions"
-  | "forecast-event-details"
+  | "events"
+  | "event-details"
   | "classic-projected-forecast"
   | "modern-projected-forecast"
   | "baseloads-projected-transactions"
@@ -74,7 +73,21 @@ export type RawTransactionRow = {
   coverage_pct: number | null;
 };
 
-export type RawForecastEventDetailRow = {
+export type RawEventRow = {
+  event_id: string;
+  portfolio_id: string;
+  event_type: string;
+  version: number;
+  created_at: string;
+  created_order: number;
+  source: string;
+  status: string;
+  period_start: string;
+  period_end: string;
+  detail_count: number;
+};
+
+export type RawEventDetailRow = {
   event_id: string;
   event_detail_id: string;
   event_type: string;
@@ -84,6 +97,10 @@ export type RawForecastEventDetailRow = {
   price_area: string | null;
   quantity: number;
   quantity_type: string;
+  price: number | null;
+  price_type: string | null;
+  factor: number | null;
+  factor_type: string | null;
 };
 
 export type ClassicProjectedForecastRow = {
@@ -146,9 +163,10 @@ export type DataViewerMarketProjectionRow = {
 export type DataViewerRows = {
   table_id: DataViewerTableId;
   rows:
+    | RawEventRow[]
+    | RawEventDetailRow[]
     | RawCalloffRow[]
     | RawTransactionRow[]
-    | RawForecastEventDetailRow[]
     | ClassicProjectedForecastRow[]
     | ModernProjectedForecastRow[]
     | BaseloadsProjectedTransactionRow[]
@@ -170,27 +188,20 @@ export class DataViewerError extends Error {
 }
 
 export function getDataViewerTables(): DataViewerTable[] {
-  const rawDescription = "Stored source-of-truth rows and model inputs.";
+  const rawDescription = "Stored source-of-truth events and event details.";
   const projectedDescription = "Derived customer-facing views built from canonical rows.";
   const marketDescription = "Derived market/internal rows; sys and epad are price dimensions, not additive physical volume.";
   return [
     {
-      table_id: "calloffs",
-      label: "Canonical Raw Calloffs",
+      table_id: "events",
+      label: "Canonical Events",
       view_group_id: "raw-canonical",
       view_group_label: "Raw canonical",
       description: rawDescription,
     },
     {
-      table_id: "transactions",
-      label: "Canonical Raw Transactions",
-      view_group_id: "raw-canonical",
-      view_group_label: "Raw canonical",
-      description: rawDescription,
-    },
-    {
-      table_id: "forecast-event-details",
-      label: "Canonical Forecast Event Details",
+      table_id: "event-details",
+      label: "Canonical Event Details",
       view_group_id: "raw-canonical",
       view_group_label: "Raw canonical",
       description: rawDescription,
@@ -260,9 +271,18 @@ export function getDataViewerYears(database: PrototypeDatabase, portfolioId: str
 
   const years = new Set([...database.calendars.values()].map((calendar) => calendar.month.slice(0, 4)));
 
-  const forecastTable =
-    tableId === "forecast-event-details" || tableId === "classic-projected-forecast" || tableId === "modern-projected-forecast";
+  const forecastTable = tableId === "classic-projected-forecast" || tableId === "modern-projected-forecast";
+  const eventTable = tableId === "events" || tableId === "event-details";
   const transactionMonthTable = tableId === "transactions" || tableId === "market-projection";
+
+  if (eventTable) {
+    for (const event of getPortfolioEvents(database, portfolioId)) {
+      for (const period of eventPeriods(database, event)) {
+        years.add(period.slice(0, 4));
+      }
+      years.add(event.created_at.slice(0, 4));
+    }
+  }
 
   if (forecastTable) {
     for (const forecast of getCanonicalForecasts(database, portfolioId)) {
@@ -350,16 +370,45 @@ export function getRawTransactionsForPortfolioYear(database: PrototypeDatabase, 
     });
 }
 
-export function getRawForecastEventDetailsForPortfolioYear(
-  database: PrototypeDatabase,
-  portfolioId: string,
-  year: string,
-): RawForecastEventDetailRow[] {
+export function getRawEventsForPortfolioYear(database: PrototypeDatabase, portfolioId: string, year: string): RawEventRow[] {
   validatePortfolio(database, portfolioId);
   validateYear(year);
 
-  return [...database.events.values()]
-    .filter((event) => event.portfolio_id === portfolioId && event.event_type === "FORECAST" && event.status === "active")
+  return getPortfolioEvents(database, portfolioId)
+    .filter((event) => event.created_at.startsWith(`${year}-`) || eventPeriods(database, event).some((period) => period.startsWith(`${year}-`)))
+    .map((event) => {
+      const periods = eventPeriods(database, event);
+      return {
+        event_id: event.event_id,
+        portfolio_id: event.portfolio_id,
+        event_type: event.event_type,
+        version: event.version,
+        created_at: event.created_at,
+        created_order: event.created_order,
+        source: event.source,
+        status: event.status,
+        period_start: periods[0] ?? "",
+        period_end: periods[periods.length - 1] ?? "",
+        detail_count: getEventDetails(database, event.event_id).length,
+      };
+    })
+    .sort(
+      (left, right) =>
+        left.period_start.localeCompare(right.period_start) ||
+        left.created_order - right.created_order ||
+        left.event_id.localeCompare(right.event_id),
+    );
+}
+
+export function getRawEventDetailsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): RawEventDetailRow[] {
+  validatePortfolio(database, portfolioId);
+  validateYear(year);
+
+  return getPortfolioEvents(database, portfolioId)
     .flatMap((event) =>
       getEventDetails(database, event.event_id)
         .filter((detail) => detail.period.startsWith(`${year}-`))
@@ -373,6 +422,10 @@ export function getRawForecastEventDetailsForPortfolioYear(
           price_area: detail.price_area,
           quantity: detail.quantity,
           quantity_type: detail.quantity_type,
+          price: detail.price,
+          price_type: detail.price_type,
+          factor: detail.factor,
+          factor_type: detail.factor_type,
         })),
     )
     .sort(
@@ -577,17 +630,17 @@ export function getDataViewerRows(
 ): DataViewerRows {
   validateTableId(tableId);
 
-  if (tableId === "calloffs") {
+  if (tableId === "events") {
     return {
       table_id: tableId,
-      rows: getRawCalloffsForPortfolioYear(database, portfolioId, year),
+      rows: getRawEventsForPortfolioYear(database, portfolioId, year),
     };
   }
 
-  if (tableId === "forecast-event-details") {
+  if (tableId === "event-details") {
     return {
       table_id: tableId,
-      rows: getRawForecastEventDetailsForPortfolioYear(database, portfolioId, year),
+      rows: getRawEventDetailsForPortfolioYear(database, portfolioId, year),
     };
   }
 
@@ -654,7 +707,7 @@ export function getDataViewerRows(
 }
 
 export function parseDataViewerTableId(value: string | undefined): DataViewerTableId {
-  const tableId = (value ?? "calloffs").trim();
+  const tableId = (value ?? "events").trim();
   if (!getDataViewerTables().some((table) => table.table_id === tableId)) {
     throw new DataViewerError("invalid_input", `unknown Data Viewer table ${tableId}`);
   }
@@ -742,6 +795,16 @@ function getPortfolioCalloffs(database: PrototypeDatabase, portfolioId: string) 
 function getPortfolioTransactions(database: PrototypeDatabase, portfolioId: string) {
   const calloffIds = new Set(getPortfolioCalloffs(database, portfolioId).map((calloff) => calloff.calloff_id));
   return [...database.transactions.values()].filter((transaction) => calloffIds.has(transaction.calloff_id));
+}
+
+function getPortfolioEvents(database: PrototypeDatabase, portfolioId: string): HedgingEvent[] {
+  return [...database.events.values()]
+    .filter((event) => event.portfolio_id === portfolioId)
+    .sort((left, right) => left.created_order - right.created_order || left.event_id.localeCompare(right.event_id));
+}
+
+function eventPeriods(database: PrototypeDatabase, event: HedgingEvent): string[] {
+  return [...new Set(getEventDetails(database, event.event_id).map((detail) => detail.period))].sort();
 }
 
 function getCalendar(database: PrototypeDatabase, month: string) {

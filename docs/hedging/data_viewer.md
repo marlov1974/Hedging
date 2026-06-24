@@ -4,7 +4,7 @@ For canonical versus projected component-name rules, see [Component Catalog](com
 
 ## Purpose
 
-`Data Viewer` is a read-only PoC transparency feature for inspecting the same portfolio-linked canonical data through raw, projected customer and market/internal views.
+`Data Viewer` is a read-only PoC transparency feature for inspecting the same portfolio-linked canonical event data through raw event/detail rows and derived projected customer views.
 
 Projected rows are model/output rows. They are not persisted source-of-truth transactions.
 
@@ -22,15 +22,13 @@ The supported table groups are:
 ```text
 Raw canonical
 Projected customer models
-Market/internal views
 ```
 
 The supported tables are:
 
 ```text
-Canonical Raw Calloffs
-Canonical Raw Transactions
-Canonical Forecast Event Details
+Canonical Events
+Canonical Event Details
 Classic Projected Forecast
 Modern Projected Forecast
 Baseloads Projected Transactions
@@ -38,24 +36,21 @@ Classic Projected Calloffs
 Classic Projected Transactions
 Modern Projected Calloffs
 Modern Projected Transactions
-Market Projection
 ```
 
 ## Portfolio Scoping
 
-All rows are scoped to the selected portfolio.
-
-Calloffs are included only when:
+All rows are scoped to the selected portfolio. Canonical event rows are included only when:
 
 ```text
-Calloff.portfolio_id = selected portfolio_id
+Event.portfolio_id = selected portfolio_id
 ```
 
-Transactions are included only through selected portfolio calloffs:
+Event detail rows are included only through selected portfolio events:
 
 ```text
-Transaction.calloff_id -> Calloff.calloff_id
-Calloff.portfolio_id = selected portfolio_id
+EventDetail.event_id -> Event.event_id
+Event.portfolio_id = selected portfolio_id
 ```
 
 This prevents rows from other portfolios from appearing in the selected portfolio view.
@@ -65,9 +60,8 @@ This prevents rows from other portfolios from appearing in the selected portfoli
 The table selector supports:
 
 ```text
-calloffs
-transactions
-forecast-event-details
+events
+event-details
 classic-projected-forecast
 modern-projected-forecast
 baseloads-projected-transactions
@@ -75,7 +69,6 @@ classic-projected-calloffs
 classic-projected-transactions
 modern-projected-calloffs
 modern-projected-transactions
-market-projection
 ```
 
 Unknown table values are handled as invalid input.
@@ -90,59 +83,30 @@ The year selector is derived from available calendar years and relevant portfoli
 2029
 ```
 
-The year selector is a delivery year selector. Calloffs are filtered by `delivery_start_month` year. Transactions are filtered by transaction `month` year.
+The year selector is a delivery/period year selector for canonical event detail data. Events are included when their details contain a selected-year period or when `created_at` is in the selected year.
 
-Modern projection views are filtered by calloff `delivery_start_month` year.
+Projection views are filtered by the same period/delivery year used by their source rows.
 
-## Calloffs Raw View
+## Events Raw View
 
-The Calloffs table shows raw IDs and core fields:
+The Canonical Events table shows event headers:
 
 ```text
-calloff_id
-product_id
+event_id
 portfolio_id
-date
-delivery_start_month
-delivery_end_month
+event_type
+version
+created_at
+source
+status
+period_start
+period_end
+detail_count
 ```
 
-`date` is the call-off creation date. It is visible as raw data but is not used for year filtering.
+## Event Details Raw View
 
-Default sorting is by delivery start month ascending, delivery end month ascending, then calloff id ascending.
-
-## Transactions Raw View
-
-The Transactions table shows raw IDs and core fields:
-
-```text
-transaction_id
-calloff_id
-month
-productcomponent_id
-component
-component_concept
-mw
-q_factor
-```
-
-The `component_concept` column uses the canonical component code classifier:
-
-```text
-canonical
-projected
-compatibility_alias
-reserved
-unknown_adjustment
-```
-
-Raw canonical rows must not present `modern.*` or `classic.*` component names as persisted source-of-truth rows.
-
-Default sorting is by month ascending, then calloff id ascending, then transaction id ascending.
-
-## Forecast Event Detail Raw View
-
-The Forecast Event Details table shows canonical `FORECAST` event details:
+The Canonical Event Details table shows all source event details for selected portfolio/year, including both `FORECAST` and `PURCHASE` event details:
 
 ```text
 event_id
@@ -154,9 +118,15 @@ component_concept
 price_area
 quantity
 quantity_type
+price
+price_type
+factor
+factor_type
 ```
 
 Forecast event details use explicit price-area components such as `base.sto` and `peak.sto`. Generic EPAD forecast details are not written for new seed data.
+
+Legacy calloff and transaction rows remain in the compatibility layer for older purchase/report code, but they are not canonical Data Viewer tables.
 
 ## Projected Forecast Views
 
