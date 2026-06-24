@@ -1,5 +1,6 @@
 import type { PrototypeDatabase } from "../database/schema.ts";
 import type { CustomerForecast } from "../database/types.ts";
+import { getCanonicalForecasts, syncForecastEventDetails } from "../database/eventForecasts.ts";
 import type { PerspectiveId } from "./applicationConfig.ts";
 import { ClassicProjectionError, convertClassicForecastToStored, deriveClassicFromForecast } from "./classicProjection.ts";
 import { convertModernForecastToStored, deriveModernFromForecast, ModernProjectionError } from "./modernProjection.ts";
@@ -104,13 +105,16 @@ export function updateForecastRows(database: PrototypeDatabase, input: ForecastR
 export function updateForecastRow(database: PrototypeDatabase, input: ForecastUpdateInput): CustomerForecast {
   const update = validateForecastUpdate(database, input);
 
-  const forecast = getPortfolioForecasts(database, update.portfolio_id).find((candidate) => candidate.month === update.month);
+  const forecast = [...database.forecasts.values()].find(
+    (candidate) => candidate.portfolio_id === update.portfolio_id && candidate.month === update.month,
+  );
   if (!forecast) {
     throw new ForecastFeatureError("not_found", `Forecast row does not exist for ${update.portfolio_id} ${update.month}`);
   }
 
   forecast.mwh = update.mwh;
   forecast.peak_pct = update.peak_pct;
+  syncForecastEventDetails(database, forecast);
   return forecast;
 }
 
@@ -186,7 +190,13 @@ export function validateForecastUpdate(database: PrototypeDatabase, input: Forec
 }
 
 function getPortfolioForecasts(database: PrototypeDatabase, portfolioId: string): CustomerForecast[] {
-  return [...database.forecasts.values()].filter((forecast) => forecast.portfolio_id === portfolioId);
+  return getCanonicalForecasts(database, portfolioId).map((forecast) => ({
+    forecast_id: forecast.forecast_id,
+    portfolio_id: forecast.portfolio_id,
+    month: forecast.month,
+    mwh: forecast.mwh,
+    peak_pct: forecast.peak_pct,
+  }));
 }
 
 function getCalendar(database: PrototypeDatabase, month: string) {

@@ -5,9 +5,10 @@ import { isBaseloadsPortfolio } from "./features.ts";
 
 export type BaseloadsCalloffListRow = {
   date: string;
-  derivative_name: string;
+  synthetic_derivative_name: string;
   component: string;
   mwh: number;
+  mw: number;
   price: number;
   calloff_id: string;
   transaction_count: number;
@@ -35,11 +36,13 @@ export function getBaseloadsCalloffListRows(database: PrototypeDatabase, portfol
       const transactions = [...database.transactions.values()].filter((transaction) => transaction.calloff_id === calloff.calloff_id);
       return groupTransactionsByComponent(database, transactions).map((group) => {
         const months = group.transactions.map((transaction) => transaction.month);
+        const mwh = calculateComponentMwh(database, group.transactions);
         return {
           date: calloff.date,
-          derivative_name: formatDerivativeName(group.component.component, months, portfolio.price_area),
+          synthetic_derivative_name: formatDerivativeName(group.component.component, months, portfolio.price_area),
           component: group.component.component,
-          mwh: calculateComponentMwh(database, group.transactions),
+          mwh,
+          mw: calculateComponentMw(database, group.transactions, mwh),
           price: calculateWeightedAveragePrice(database, group.transactions),
           calloff_id: calloff.calloff_id,
           transaction_count: group.transactions.length,
@@ -57,6 +60,22 @@ export function calculateComponentMwh(database: PrototypeDatabase, transactions:
 
     return sum + transaction.mw * calendar.total_h;
   }, 0);
+}
+
+export function calculateComponentMw(database: PrototypeDatabase, transactions: CustomerTransaction[], mwh?: number): number {
+  const hours = transactions.reduce((sum, transaction) => {
+    const calendar = findCalendarForMonth(database, transaction.month);
+    if (!calendar) {
+      throw new Error(`Missing calendar for ${transaction.month}`);
+    }
+    return sum + calendar.total_h;
+  }, 0);
+
+  if (hours === 0) {
+    return 0;
+  }
+
+  return (mwh ?? calculateComponentMwh(database, transactions)) / hours;
 }
 
 export function calculateWeightedAveragePrice(database: PrototypeDatabase, transactions: CustomerTransaction[]): number {

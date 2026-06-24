@@ -6,8 +6,12 @@ import {
   getDataViewerRows,
   getDataViewerTables,
   getDataViewerYears,
+  getClassicProjectedForecastForPortfolioYear,
   getBaseloadsProjectedTransactionsForPortfolioYear,
+  getModernProjectedForecastForPortfolioYear,
+  getRawForecastEventDetailsForPortfolioYear,
   getClassicProjectedCalloffsForPortfolioYear,
+  getMarketProjectionRowsForPortfolioYear,
   getModernProjectedCalloffsForPortfolioYear,
   getModernProjectedTransactionsForPortfolioYear,
   getRawCalloffsForPortfolioYear,
@@ -35,6 +39,8 @@ describe("Data Viewer", () => {
     assert.match(html, /name="selected_table"/);
     assert.match(html, /Canonical Raw Calloffs/);
     assert.match(html, /Canonical Raw Transactions/);
+    assert.match(html, /Market Projection/);
+    assert.match(html, /raw canonical rows and derived projected views/);
     assert.doesNotMatch(html, /Baseloads Projected Transactions/);
     assert.doesNotMatch(html, /Classic Projected Calloffs/);
     assert.doesNotMatch(html, /Modern Projected Calloffs/);
@@ -81,11 +87,23 @@ describe("Data Viewer", () => {
       [
         "calloffs",
         "transactions",
+        "forecast-event-details",
+        "classic-projected-forecast",
+        "modern-projected-forecast",
         "baseloads-projected-transactions",
         "classic-projected-calloffs",
+        "classic-projected-transactions",
         "modern-projected-calloffs",
         "modern-projected-transactions",
+        "market-projection",
       ],
+    );
+  });
+
+  it("returns distinguishable Data Viewer view groups", () => {
+    assert.deepEqual(
+      [...new Set(getDataViewerTables().map((table) => table.view_group_id))].sort(),
+      ["market-internal", "projected-customer", "raw-canonical"],
     );
   });
 
@@ -136,8 +154,65 @@ describe("Data Viewer", () => {
     assert.equal(row?.calloff_id, "CAL10");
     assert.equal(row?.month, "2027-01");
     assert.equal(row?.productcomponent_id, "PRO00:base.sys");
+    assert.equal(row?.component, "base.sys");
+    assert.equal(row?.component_code, "base.sys");
+    assert.equal(row?.component_category, "base");
+    assert.equal(row?.component_concept, "canonical");
+    assert.equal(row?.period, "2027-01");
     assert.equal(row?.mw, 10);
     assert.equal(row?.q_factor, 1);
+    assert.equal(row?.quantity, 10);
+    assert.equal(row?.quantity_type, "MW");
+    assert.equal(row?.price_type, "EUR_PER_MWH");
+    assert.equal(row?.factor, 1);
+    assert.equal(row?.factor_type, "Q_FACTOR");
+    assert.equal(row?.hours, 744);
+    assert.equal(row?.mwh, 7440);
+  });
+
+  it("Canonical forecast event details expose price-area source forecast rows", () => {
+    const rows = getRawForecastEventDetailsForPortfolioYear(createPocSeedData(), "CUS02-0", "2027");
+
+    assert.equal(rows.length, 96);
+    assert.equal(rows[0].event_type, "FORECAST");
+    assert.equal(rows.some((row) => row.component_code === "base.sto" && row.price_area === "STO"), true);
+    assert.equal(rows.some((row) => row.component_code === "base.epad"), false);
+  });
+
+  it("Classic and Modern forecast Data Viewer projections use canonical forecast events", () => {
+    const database = createPocSeedData();
+    const classic = getClassicProjectedForecastForPortfolioYear(database, "CUS02-0", "2027")[0];
+    const modern = getModernProjectedForecastForPortfolioYear(database, "CUS02-0", "2027")[0];
+
+    assert.equal(classic.source_event_id, "EVT:FORECAST:CUS02-0:2027-01");
+    assert.equal(classic.offpeak_mwh, 615);
+    assert.equal(classic.peak_mwh, 615);
+    assert.equal(modern.source_event_id, "EVT:FORECAST:CUS02-0:2027-01");
+    assert.equal(modern.base_mwh, 1121.470588);
+    assert.equal(modern.peak_mwh, 108.529412);
+  });
+
+  it("Raw Transactions show currency rows with currency units instead of power units", () => {
+    const database = createDataViewerDatabase();
+    addCurrencyTransaction(database, "PRO01", "CAL30", 9094.086022, 11.25);
+    const row = getRawTransactionsForPortfolioYear(database, "CUS01-0", "2027").find(
+      (candidate) => candidate.component_code === "currency.eursek",
+    );
+
+    assert.equal(row?.quantity_type, "EUR");
+    assert.equal(row?.price_type, "SEK_PER_EUR");
+    assert.equal(row?.mwh, null);
+    assert.equal(row?.hours, null);
+    assert.equal(row?.value_sek, 102308.467747);
+    assert.equal(row?.coverage_pct, 1);
+  });
+
+  it("Raw Transactions do not emit projected-only component names as source rows", () => {
+    const rows = getRawTransactionsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
+
+    assert.equal(rows.some((row) => row.component.startsWith("modern.") || row.component.startsWith("classic.")), false);
+    assert.equal(rows.some((row) => row.component === "allocation.peak.sys"), true);
+    assert.equal(rows.every((row) => row.component_concept === "canonical"), true);
   });
 
   it("Modern Projected Calloffs aggregates projected modern transactions", () => {
@@ -153,8 +228,8 @@ describe("Data Viewer", () => {
     assert.equal(rows[0].base_mwh, 87.735849);
     assert.equal(rows[0].peak_mwh, 12.264151);
     assert.equal(rows[0].base_price, 85);
-    assert.equal(rows[0].peak_price, 97.537634);
-    assert.equal(rows[0].total_value, 8653.763441);
+    assert.equal(rows[0].peak_price, 133.44086);
+    assert.equal(rows[0].total_value, 9094.086022);
   });
 
   it("Baseloads Projected Transactions shows derived base rows without becoming raw canonical data", () => {
@@ -164,6 +239,7 @@ describe("Data Viewer", () => {
       rows.map((row) => row.component),
       ["baseloads.base.epad", "baseloads.base.sys"],
     );
+    assert.equal(rows.every((row) => row.component_concept === "projected"), true);
     assert.deepEqual(
       rows.map((row) => row.source_component).sort(),
       ["base.epad", "base.sys"],
@@ -189,9 +265,43 @@ describe("Data Viewer", () => {
     );
     assert.equal(rows.every((row) => row.calloff_id === "CAL30"), true);
     assert.equal(rows.every((row) => row.month === "2027-01"), true);
+    assert.equal(rows.every((row) => row.component_concept === "projected"), true);
     assert.equal(rows.some((row) => row.component === "base.sys" as never), false);
     assert.equal(rows.some((row) => row.component === "peak.sys" as never), false);
     assert.equal(rows.some((row) => row.component === "allocation.peak.sys" as never), false);
+  });
+
+  it("Classic and Modern Projected Transactions include currency rows without renaming them", () => {
+    const database = createDataViewerDatabase();
+    addCurrencyTransaction(database, "PRO01", "CAL30", 9094.086022, 11.25);
+
+    const classicRows = getDataViewerRows(database, "CUS01-0", "classic-projected-transactions", "2027").rows;
+    const modernRows = getModernProjectedTransactionsForPortfolioYear(database, "CUS01-0", "2027");
+
+    assert.equal(classicRows.some((row) => "component" in row && row.component === "currency.eursek"), true);
+    assert.equal(modernRows.some((row) => row.component === "currency.eursek"), true);
+    assert.equal(modernRows.find((row) => row.component === "currency.eursek")?.quantity_type, "EUR");
+    assert.equal(modernRows.find((row) => row.component === "currency.eursek")?.price_type, "SEK_PER_EUR");
+    assert.equal(modernRows.some((row) => row.component === "modern.currency.eursek"), false);
+  });
+
+  it("Classic Projected Transactions use month-level EUR projection values", () => {
+    const database = createDataViewerDatabase();
+    addSecondClassicMonth(database);
+
+    const rows = getDataViewerRows(database, "CUS01-0", "classic-projected-transactions", "2027").rows;
+    const januaryOffpeak = rows.find(
+      (row) => "component" in row && row.month === "2027-01" && row.component === "classic.offpeak.sys",
+    );
+    const februaryOffpeak = rows.find(
+      (row) => "component" in row && row.month === "2027-02" && row.component === "classic.offpeak.sys",
+    );
+
+    assert.equal(januaryOffpeak && "mwh" in januaryOffpeak ? januaryOffpeak.mwh : undefined, 50);
+    assert.equal(januaryOffpeak && "price" in januaryOffpeak ? januaryOffpeak.price : undefined, 85);
+    assert.equal(januaryOffpeak && "value_eur" in januaryOffpeak ? januaryOffpeak.value_eur : undefined, 4250);
+    assert.equal(februaryOffpeak && "mwh" in februaryOffpeak ? februaryOffpeak.mwh : undefined, 100);
+    assert.equal(februaryOffpeak && "value_eur" in februaryOffpeak ? februaryOffpeak.value_eur : undefined, 8500);
   });
 
   it("Modern Projected Transactions calculates MW and prices per dimension", () => {
@@ -209,10 +319,10 @@ describe("Data Viewer", () => {
     assert.notEqual(peakSys?.mw, round(0.15625 - 100 / 744));
     assert.equal(baseSys?.price, 70);
     assert.equal(baseEpad?.price, 15);
-    assert.equal(peakSys?.price, 81.397849);
-    assert.equal(peakEpad?.price, 16.139785);
-    assert.equal(round((baseSys?.value ?? 0) + (peakSys?.value ?? 0)), 7139.784946);
-    assert.equal(round((baseEpad?.value ?? 0) + (peakEpad?.value ?? 0)), 1513.978495);
+    assert.equal(peakSys?.price, 109.892473);
+    assert.equal(peakEpad?.price, 23.548387);
+    assert.equal(round((baseSys?.value ?? 0) + (peakSys?.value ?? 0)), 7489.247312);
+    assert.equal(round((baseEpad?.value ?? 0) + (peakEpad?.value ?? 0)), 1604.83871);
   });
 
   it("Modern Projected Transactions allows negative modern peak MW", () => {
@@ -224,6 +334,18 @@ describe("Data Viewer", () => {
     assert.ok(peakSys);
     assert.ok((peakSys.mw ?? 0) < 0);
     assert.ok(peakSys.price !== null);
+  });
+
+  it("Market Projection excludes allocation and marks sys/epad as non-additive price dimensions", () => {
+    const rows = getMarketProjectionRowsForPortfolioYear(createDataViewerDatabase(), "CUS01-0", "2027");
+
+    assert.deepEqual(
+      rows.map((row) => row.component),
+      ["base.sys", "base.epad", "peak.sys", "peak.epad"],
+    );
+    assert.equal(rows.some((row) => row.component.startsWith("allocation.")), false);
+    assert.equal(rows.every((row) => row.component_concept === "canonical"), true);
+    assert.equal(rows.every((row) => row.dimension_note.includes("not additive physical volume")), true);
   });
 
   it("Modern Projected Transactions warns instead of dividing by zero", () => {
@@ -284,6 +406,7 @@ describe("Data Viewer", () => {
     assert.match(baseloadsHtml, /baseloads\.base\.sys/);
     assert.match(classicHtml, /offpeak_mwh[\s\S]*peak_mwh/);
     assert.match(classicHtml, /CAL30/);
+    assert.match(classicHtml, /Classic Projected Transactions/);
   });
 
   it("Calloffs table includes raw calloff columns", () => {
@@ -431,6 +554,57 @@ function createDataViewerDatabase(
   }
 
   return database;
+}
+
+function addCurrencyTransaction(
+  database: ReturnType<typeof createPocSeedData>,
+  productId: string,
+  calloffId: string,
+  eurAmount: number,
+  fxRate: number,
+): void {
+  insertTransaction(database, {
+    transaction_id: `${calloffId}-006`,
+    calloff_id: calloffId,
+    month: "2027-01",
+    productcomponent_id: `${productId}:currency.eursek`,
+    mw: 0,
+    q_factor: 0,
+    quantity: eurAmount,
+    quantity_type: "EUR",
+    price: fxRate,
+    price_type: "SEK_PER_EUR",
+    factor: null,
+    factor_type: null,
+  });
+}
+
+function addSecondClassicMonth(database: ReturnType<typeof createPocSeedData>): void {
+  const februaryCalendar = [...database.calendars.values()].find((row) => row.month === "2027-02");
+  assert.ok(februaryCalendar);
+  februaryCalendar.total_h = 744;
+  februaryCalendar.peak_h = 320;
+  const calloff = database.calloffs.get("CAL30");
+  assert.ok(calloff);
+  calloff.delivery_end_month = "2027-02";
+
+  for (const [index, component, mw, qFactor] of [
+    [10, "allocation.peak.sys", 100 / 320, 0],
+    [11, "allocation.peak.epad", 100 / 320, 0],
+    [12, "base.sys", 200 / 744, 1],
+    [13, "base.epad", 200 / 744, 1],
+    [14, "peak.sys", 100 / 320 - 200 / 744, 1],
+    [15, "peak.epad", 100 / 320 - 200 / 744, 1],
+  ] as const) {
+    insertTransaction(database, {
+      transaction_id: `CAL30-${String(index).padStart(3, "0")}`,
+      calloff_id: "CAL30",
+      month: "2027-02",
+      productcomponent_id: `PRO01:${component}`,
+      mw,
+      q_factor: qFactor,
+    });
+  }
 }
 
 function setPeaksClassicPrices(database: ReturnType<typeof createPocSeedData>): void {

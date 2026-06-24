@@ -22,7 +22,7 @@ describe("application configuration", () => {
     assert.equal(config.title, "Universal model demo");
     assert.deepEqual(
       config.features.map((feature) => feature.feature_id),
-      ["portfolio-details", "forecast", "forecast-hedge", "calloff-list", "position-report", "position", "data-viewer", "buy-baseloads"],
+      ["portfolio-details", "forecast", "forecast-hedge", "calloff-list", "position-report", "data-viewer", "buy-baseloads"],
     );
   });
 

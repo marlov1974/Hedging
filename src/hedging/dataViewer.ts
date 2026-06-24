@@ -1,21 +1,42 @@
-import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
+import { canonicalProductPackageName, componentCodeConcept, type ComponentCodeConcept } from "../database/canonicalComponents.ts";
+import { getCanonicalForecasts, getEventDetails } from "../database/eventForecasts.ts";
 import type { PrototypeDatabase } from "../database/schema.ts";
-import type { Calloff, CustomerTransaction } from "../database/types.ts";
-import { getPeaksClassicCalloffTransactionRows, type PeaksClassicCalloffTransactionRow } from "./peaksCalloffTransactionList.ts";
+import type { Calloff, ComponentCategory, CustomerTransaction } from "../database/types.ts";
+import { deriveClassicFromForecast } from "./classicProjection.ts";
+import { deriveModernFromForecast } from "./modernProjection.ts";
+import { getMarketProjectionRows } from "./marketProjection.ts";
+import {
+  getClassicProjectedModelRowsForPortfolioYear,
+  getPeaksClassicCalloffTransactionRows,
+  getModernProjectedModelRowsForPortfolioYear,
+  type PeaksClassicCalloffTransactionRow,
+  type PeaksProjectedModelTransactionRow,
+} from "./peaksCalloffTransactionList.ts";
+import { getCalloffCurrencyCoverage, getTransactionViewEconomics } from "./viewEconomics.ts";
 
 const EPSILON = 0.000001;
 
 export type DataViewerTableId =
   | "calloffs"
   | "transactions"
+  | "forecast-event-details"
+  | "classic-projected-forecast"
+  | "modern-projected-forecast"
   | "baseloads-projected-transactions"
   | "classic-projected-calloffs"
+  | "classic-projected-transactions"
   | "modern-projected-calloffs"
-  | "modern-projected-transactions";
+  | "modern-projected-transactions"
+  | "market-projection";
+
+export type DataViewerViewGroupId = "raw-canonical" | "projected-customer" | "market-internal";
 
 export type DataViewerTable = {
   table_id: DataViewerTableId;
   label: string;
+  view_group_id: DataViewerViewGroupId;
+  view_group_label: string;
+  description: string;
 };
 
 export type RawCalloffRow = {
@@ -32,8 +53,55 @@ export type RawTransactionRow = {
   calloff_id: string;
   month: string;
   productcomponent_id: string;
+  component: string;
+  component_code: string;
+  component_category: ComponentCategory;
+  component_concept: ComponentCodeConcept;
+  period: string;
   mw: number;
   q_factor: number;
+  quantity: number | null;
+  quantity_type: "MW" | "EUR" | null;
+  price: number | null;
+  price_type: "EUR_PER_MWH" | "SEK_PER_EUR" | null;
+  factor: number | null;
+  factor_type: "Q_FACTOR" | null;
+  hours: number | null;
+  mwh: number | null;
+  value_eur: number | null;
+  q_value_eur: number | null;
+  value_sek: number | null;
+  coverage_pct: number | null;
+};
+
+export type RawForecastEventDetailRow = {
+  event_id: string;
+  event_detail_id: string;
+  event_type: string;
+  period: string;
+  component_code: string;
+  component_concept: ComponentCodeConcept;
+  price_area: string | null;
+  quantity: number;
+  quantity_type: string;
+};
+
+export type ClassicProjectedForecastRow = {
+  month: string;
+  offpeak_mwh: number;
+  peak_mwh: number;
+  offpeak_mw: number;
+  peak_mw: number;
+  source_event_id: string;
+};
+
+export type ModernProjectedForecastRow = {
+  month: string;
+  base_mwh: number;
+  peak_mwh: number;
+  base_mw: number;
+  peak_mw: number;
+  source_event_id: string;
 };
 
 export type ModernProjectedCalloffRow = {
@@ -55,22 +123,24 @@ export type BaseloadsProjectedTransactionRow = {
   calloff_id: string;
   month: string;
   component: "baseloads.base.sys" | "baseloads.base.epad";
+  component_concept: "projected";
   mwh: number;
   price: number | null;
   value: number;
   source_component: string;
 };
 
-export type ModernProjectedTransactionRow = {
-  calloff_id: string;
+export type ModernProjectedTransactionRow = PeaksProjectedModelTransactionRow;
+export type ClassicProjectedTransactionRow = PeaksProjectedModelTransactionRow;
+
+export type DataViewerMarketProjectionRow = {
+  transaction_id: string;
   month: string;
-  component: "modern.base.sys" | "modern.base.epad" | "modern.peak.sys" | "modern.peak.epad";
-  mw: number | null;
-  price: number | null;
-  mwh: number;
-  value: number;
-  source_components: string;
-  warnings: string[];
+  component: string;
+  component_concept: ComponentCodeConcept;
+  market_mw: number;
+  market_mwh: number;
+  dimension_note: string;
 };
 
 export type DataViewerRows = {
@@ -78,10 +148,15 @@ export type DataViewerRows = {
   rows:
     | RawCalloffRow[]
     | RawTransactionRow[]
+    | RawForecastEventDetailRow[]
+    | ClassicProjectedForecastRow[]
+    | ModernProjectedForecastRow[]
     | BaseloadsProjectedTransactionRow[]
     | PeaksClassicCalloffTransactionRow[]
+    | ClassicProjectedTransactionRow[]
     | ModernProjectedCalloffRow[]
-    | ModernProjectedTransactionRow[];
+    | ModernProjectedTransactionRow[]
+    | DataViewerMarketProjectionRow[];
 };
 
 export class DataViewerError extends Error {
@@ -95,13 +170,87 @@ export class DataViewerError extends Error {
 }
 
 export function getDataViewerTables(): DataViewerTable[] {
+  const rawDescription = "Stored source-of-truth rows and model inputs.";
+  const projectedDescription = "Derived customer-facing views built from canonical rows.";
+  const marketDescription = "Derived market/internal rows; sys and epad are price dimensions, not additive physical volume.";
   return [
-    { table_id: "calloffs", label: "Canonical Raw Calloffs" },
-    { table_id: "transactions", label: "Canonical Raw Transactions" },
-    { table_id: "baseloads-projected-transactions", label: "Baseloads Projected Transactions" },
-    { table_id: "classic-projected-calloffs", label: "Classic Projected Calloffs" },
-    { table_id: "modern-projected-calloffs", label: "Modern Projected Calloffs" },
-    { table_id: "modern-projected-transactions", label: "Modern Projected Transactions" },
+    {
+      table_id: "calloffs",
+      label: "Canonical Raw Calloffs",
+      view_group_id: "raw-canonical",
+      view_group_label: "Raw canonical",
+      description: rawDescription,
+    },
+    {
+      table_id: "transactions",
+      label: "Canonical Raw Transactions",
+      view_group_id: "raw-canonical",
+      view_group_label: "Raw canonical",
+      description: rawDescription,
+    },
+    {
+      table_id: "forecast-event-details",
+      label: "Canonical Forecast Event Details",
+      view_group_id: "raw-canonical",
+      view_group_label: "Raw canonical",
+      description: rawDescription,
+    },
+    {
+      table_id: "classic-projected-forecast",
+      label: "Classic Projected Forecast",
+      view_group_id: "projected-customer",
+      view_group_label: "Projected customer views",
+      description: projectedDescription,
+    },
+    {
+      table_id: "modern-projected-forecast",
+      label: "Modern Projected Forecast",
+      view_group_id: "projected-customer",
+      view_group_label: "Projected customer views",
+      description: projectedDescription,
+    },
+    {
+      table_id: "baseloads-projected-transactions",
+      label: "Baseloads Projected Transactions",
+      view_group_id: "projected-customer",
+      view_group_label: "Projected customer views",
+      description: projectedDescription,
+    },
+    {
+      table_id: "classic-projected-calloffs",
+      label: "Classic Projected Calloffs",
+      view_group_id: "projected-customer",
+      view_group_label: "Projected customer views",
+      description: projectedDescription,
+    },
+    {
+      table_id: "classic-projected-transactions",
+      label: "Classic Projected Transactions",
+      view_group_id: "projected-customer",
+      view_group_label: "Projected customer views",
+      description: projectedDescription,
+    },
+    {
+      table_id: "modern-projected-calloffs",
+      label: "Modern Projected Calloffs",
+      view_group_id: "projected-customer",
+      view_group_label: "Projected customer views",
+      description: projectedDescription,
+    },
+    {
+      table_id: "modern-projected-transactions",
+      label: "Modern Projected Transactions",
+      view_group_id: "projected-customer",
+      view_group_label: "Projected customer views",
+      description: projectedDescription,
+    },
+    {
+      table_id: "market-projection",
+      label: "Market Projection",
+      view_group_id: "market-internal",
+      view_group_label: "Market/internal views",
+      description: marketDescription,
+    },
   ];
 }
 
@@ -111,13 +260,23 @@ export function getDataViewerYears(database: PrototypeDatabase, portfolioId: str
 
   const years = new Set([...database.calendars.values()].map((calendar) => calendar.month.slice(0, 4)));
 
-  if (tableId !== "transactions") {
+  const forecastTable =
+    tableId === "forecast-event-details" || tableId === "classic-projected-forecast" || tableId === "modern-projected-forecast";
+  const transactionMonthTable = tableId === "transactions" || tableId === "market-projection";
+
+  if (forecastTable) {
+    for (const forecast of getCanonicalForecasts(database, portfolioId)) {
+      years.add(forecast.month.slice(0, 4));
+    }
+  }
+
+  if (!transactionMonthTable) {
     for (const calloff of getPortfolioCalloffs(database, portfolioId)) {
       years.add(calloff.delivery_start_month.slice(0, 4));
     }
   }
 
-  if (tableId === "transactions") {
+  if (transactionMonthTable) {
     for (const transaction of getPortfolioTransactions(database, portfolioId)) {
       years.add(transaction.month.slice(0, 4));
     }
@@ -160,14 +319,126 @@ export function getRawTransactionsForPortfolioYear(database: PrototypeDatabase, 
         left.calloff_id.localeCompare(right.calloff_id) ||
         left.transaction_id.localeCompare(right.transaction_id),
     )
-    .map((transaction) => ({
-      transaction_id: transaction.transaction_id,
-      calloff_id: transaction.calloff_id,
-      month: transaction.month,
-      productcomponent_id: transaction.productcomponent_id,
-      mw: transaction.mw,
-      q_factor: transaction.q_factor,
-    }));
+    .map((transaction) => {
+      const component = database.productConfigurationComponents.get(transaction.productcomponent_id)?.component ?? transaction.productcomponent_id;
+      const economics = getTransactionViewEconomics(database, transaction);
+      return {
+        transaction_id: transaction.transaction_id,
+        calloff_id: transaction.calloff_id,
+        month: transaction.month,
+        productcomponent_id: transaction.productcomponent_id,
+        component,
+        component_code: economics.component_code,
+        component_category: economics.component_category,
+        component_concept: componentCodeConcept(component),
+        period: economics.period,
+        mw: transaction.mw,
+        q_factor: transaction.q_factor,
+        quantity: economics.quantity,
+        quantity_type: economics.quantity_type,
+        price: economics.price,
+        price_type: economics.price_type,
+        factor: economics.factor,
+        factor_type: economics.factor_type,
+        hours: economics.hours,
+        mwh: economics.mwh,
+        value_eur: economics.value_eur,
+        q_value_eur: economics.q_value_eur,
+        value_sek: economics.value_sek,
+        coverage_pct: rawTransactionCoveragePct(database, transaction),
+      };
+    });
+}
+
+export function getRawForecastEventDetailsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): RawForecastEventDetailRow[] {
+  validatePortfolio(database, portfolioId);
+  validateYear(year);
+
+  return [...database.events.values()]
+    .filter((event) => event.portfolio_id === portfolioId && event.event_type === "FORECAST" && event.status === "active")
+    .flatMap((event) =>
+      getEventDetails(database, event.event_id)
+        .filter((detail) => detail.period.startsWith(`${year}-`))
+        .map((detail) => ({
+          event_id: event.event_id,
+          event_detail_id: detail.event_detail_id,
+          event_type: event.event_type,
+          period: detail.period,
+          component_code: detail.component_code,
+          component_concept: componentCodeConcept(detail.component_code),
+          price_area: detail.price_area,
+          quantity: detail.quantity,
+          quantity_type: detail.quantity_type,
+        })),
+    )
+    .sort(
+      (left, right) =>
+        left.period.localeCompare(right.period) ||
+        (left.price_area ?? "").localeCompare(right.price_area ?? "") ||
+        left.component_code.localeCompare(right.component_code),
+    );
+}
+
+export function getClassicProjectedForecastForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): ClassicProjectedForecastRow[] {
+  validatePortfolio(database, portfolioId);
+  validateYear(year);
+
+  return getCanonicalForecasts(database, portfolioId)
+    .filter((forecast) => forecast.month.startsWith(`${year}-`))
+    .map((forecast) => {
+      const calendar = getCalendar(database, forecast.month);
+      const classic = deriveClassicFromForecast({
+        total_mwh: forecast.mwh,
+        peak_pct: forecast.peak_pct,
+        total_h: calendar.total_h,
+        peak_h: calendar.peak_h,
+      });
+      return {
+        month: forecast.month,
+        offpeak_mwh: classic.classic_offpeak_mwh,
+        peak_mwh: classic.classic_peak_mwh,
+        offpeak_mw: classic.classic_offpeak_mw,
+        peak_mw: classic.classic_peak_mw,
+        source_event_id: forecast.forecast_id,
+      };
+    });
+}
+
+export function getModernProjectedForecastForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): ModernProjectedForecastRow[] {
+  validatePortfolio(database, portfolioId);
+  validateYear(year);
+
+  return getCanonicalForecasts(database, portfolioId)
+    .filter((forecast) => forecast.month.startsWith(`${year}-`))
+    .map((forecast) => {
+      const calendar = getCalendar(database, forecast.month);
+      const modern = deriveModernFromForecast({
+        total_mwh: forecast.mwh,
+        peak_pct: forecast.peak_pct,
+        total_h: calendar.total_h,
+        peak_h: calendar.peak_h,
+      });
+      return {
+        month: forecast.month,
+        base_mwh: modern.modern_base_mwh,
+        peak_mwh: modern.modern_peak_mwh,
+        base_mw: modern.modern_base_mw,
+        peak_mw: modern.modern_peak_mw,
+        source_event_id: forecast.forecast_id,
+      };
+    });
 }
 
 export function getModernProjectedCalloffsForPortfolioYear(
@@ -177,9 +448,10 @@ export function getModernProjectedCalloffsForPortfolioYear(
 ): ModernProjectedCalloffRow[] {
   validatePortfolio(database, portfolioId);
   validateYear(year);
+  const projectedRows = getModernProjectedModelRowsForPortfolioYear(database, portfolioId, year);
 
   return getProjectedPeaksCalloffs(database, portfolioId, year).map((calloff) => {
-    const rows = projectCalloffMonths(database, calloff);
+    const rows = projectedRows.filter((row) => row.calloff_id === calloff.calloff_id);
     const baseSysRows = rows.filter((row) => row.component === "modern.base.sys");
     const baseEpadRows = rows.filter((row) => row.component === "modern.base.epad");
     const peakSysRows = rows.filter((row) => row.component === "modern.peak.sys");
@@ -248,6 +520,17 @@ export function getClassicProjectedCalloffsForPortfolioYear(
   return getPeaksClassicCalloffTransactionRows(database, portfolioId).filter((row) => row.period.startsWith(year));
 }
 
+export function getClassicProjectedTransactionsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): ClassicProjectedTransactionRow[] {
+  validatePortfolio(database, portfolioId);
+  validateYear(year);
+
+  return getClassicProjectedModelRowsForPortfolioYear(database, portfolioId, year);
+}
+
 export function getModernProjectedTransactionsForPortfolioYear(
   database: PrototypeDatabase,
   portfolioId: string,
@@ -256,7 +539,34 @@ export function getModernProjectedTransactionsForPortfolioYear(
   validatePortfolio(database, portfolioId);
   validateYear(year);
 
-  return getProjectedPeaksCalloffs(database, portfolioId, year).flatMap((calloff) => projectCalloffMonths(database, calloff));
+  return getModernProjectedModelRowsForPortfolioYear(database, portfolioId, year);
+}
+
+export function getMarketProjectionRowsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): DataViewerMarketProjectionRow[] {
+  validatePortfolio(database, portfolioId);
+  validateYear(year);
+
+  const transactions = getPortfolioTransactions(database, portfolioId).filter((transaction) => transaction.month.startsWith(`${year}-`));
+  return getMarketProjectionRows(database, transactions)
+    .map((row) => ({
+      transaction_id: row.transaction_id,
+      month: row.month,
+      component: row.component,
+      component_concept: componentCodeConcept(row.component),
+      market_mw: row.market_mw,
+      market_mwh: row.market_mwh,
+      dimension_note: "sys and epad are price dimensions, not additive physical volume",
+    }))
+    .sort(
+      (left, right) =>
+        left.month.localeCompare(right.month) ||
+        left.transaction_id.localeCompare(right.transaction_id) ||
+        left.component.localeCompare(right.component),
+    );
 }
 
 export function getDataViewerRows(
@@ -271,6 +581,27 @@ export function getDataViewerRows(
     return {
       table_id: tableId,
       rows: getRawCalloffsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "forecast-event-details") {
+    return {
+      table_id: tableId,
+      rows: getRawForecastEventDetailsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "classic-projected-forecast") {
+    return {
+      table_id: tableId,
+      rows: getClassicProjectedForecastForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "modern-projected-forecast") {
+    return {
+      table_id: tableId,
+      rows: getModernProjectedForecastForPortfolioYear(database, portfolioId, year),
     };
   }
 
@@ -295,10 +626,24 @@ export function getDataViewerRows(
     };
   }
 
+  if (tableId === "classic-projected-transactions") {
+    return {
+      table_id: tableId,
+      rows: getClassicProjectedTransactionsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
   if (tableId === "modern-projected-transactions") {
     return {
       table_id: tableId,
       rows: getModernProjectedTransactionsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "market-projection") {
+    return {
+      table_id: tableId,
+      rows: getMarketProjectionRowsForPortfolioYear(database, portfolioId, year),
     };
   }
 
@@ -346,6 +691,7 @@ function projectBaseloadsTransaction(
       calloff_id: transaction.calloff_id,
       month: transaction.month,
       component: `baseloads.${component.component}`,
+      component_concept: "projected",
       mwh,
       price: price === null ? null : roundProjection(price),
       value: price === null ? 0 : roundProjection(mwh * price),
@@ -363,187 +709,30 @@ function isPeaksCalloff(database: PrototypeDatabase, calloff: Calloff): boolean 
   return productPackage === "Peaks.Classic" || productPackage === "Peaks.Modern";
 }
 
-function projectCalloffMonths(database: PrototypeDatabase, calloff: Calloff): ModernProjectedTransactionRow[] {
-  const transactions = getCalloffTransactions(database, calloff.calloff_id);
-  const months = [...new Set(transactions.map((transaction) => transaction.month))].sort();
-  if (months.length === 0) {
-    return projectModernMonth(database, calloff, calloff.delivery_start_month, []);
-  }
-  return months.flatMap((month) =>
-    projectModernMonth(
-      database,
-      calloff,
-      month,
-      transactions.filter((transaction) => transaction.month === month),
-    ),
-  );
-}
-
-function projectModernMonth(
-  database: PrototypeDatabase,
-  calloff: Calloff,
-  month: string,
-  transactions: CustomerTransaction[],
-): ModernProjectedTransactionRow[] {
-  const calendar = [...database.calendars.values()].find((candidate) => candidate.month === month);
-  if (!calendar) {
-    return emptyModernRows(calloff.calloff_id, month, "missing calendar");
-  }
-
-  const offpeakH = calendar.total_h - calendar.peak_h;
-  if (calendar.peak_h === 0 || offpeakH === 0) {
-    return emptyModernRows(calloff.calloff_id, month, "zero peak or offpeak hours");
-  }
-
-  return [
-    ...projectModernDimension(database, calloff.calloff_id, month, transactions, "sys", calendar.total_h, calendar.peak_h, offpeakH),
-    ...projectModernDimension(database, calloff.calloff_id, month, transactions, "epad", calendar.total_h, calendar.peak_h, offpeakH),
-  ].sort((left, right) => componentSort(left.component) - componentSort(right.component));
-}
-
-function projectModernDimension(
-  database: PrototypeDatabase,
-  calloffId: string,
-  month: string,
-  transactions: CustomerTransaction[],
-  dimension: "sys" | "epad",
-  totalH: number,
-  peakH: number,
-  offpeakH: number,
-): ModernProjectedTransactionRow[] {
-  const warnings: string[] = [];
-  const base = findComponentTransaction(database, transactions, `base.${dimension}`);
-  const allocation = findComponentTransaction(database, transactions, `allocation.peak.${dimension}`);
-  const peak = findComponentTransaction(database, transactions, `peak.${dimension}`);
-  if (!base) {
-    warnings.push(`missing base.${dimension}`);
-  }
-  if (!allocation) {
-    warnings.push(`missing allocation.peak.${dimension}`);
-  }
-  if (!peak) {
-    warnings.push(`missing peak.${dimension}`);
-  }
-
-  const basePrice = findComponentPrice(database, `base.${dimension}`, transactions, warnings);
-  const peakPrice = findComponentPrice(database, `peak.${dimension}`, transactions, warnings);
-
-  if (!base || !allocation || !peak || basePrice === null || peakPrice === null) {
-    return emptyModernRows(calloffId, month, warnings.join("; "), dimension);
-  }
-
-  const baseMw = (base.mw * totalH - allocation.mw * peakH) / offpeakH;
-  const modernPeakMw = allocation.mw - baseMw;
-  const baseMwh = baseMw * totalH;
-  const peakMwh = modernPeakMw * peakH;
-  const canonicalValue = base.mw * totalH * basePrice + peak.mw * peakH * peakPrice;
-  const baseValue = baseMwh * basePrice;
-  const projectedPeakPrice = divideOrNull(canonicalValue - baseValue, peakMwh);
-  if (projectedPeakPrice === null) {
-    warnings.push(`zero modern peak ${dimension} MWh`);
-  }
-  const peakValue = projectedPeakPrice === null ? 0 : canonicalValue - baseValue;
-
-  return [
-    {
-      calloff_id: calloffId,
-      month,
-      component: `modern.base.${dimension}`,
-      mw: roundProjection(baseMw),
-      price: roundProjection(basePrice),
-      mwh: roundProjection(baseMwh),
-      value: roundProjection(baseValue),
-      source_components: `base.${dimension}, allocation.peak.${dimension}`,
-      warnings,
-    },
-    {
-      calloff_id: calloffId,
-      month,
-      component: `modern.peak.${dimension}`,
-      mw: roundProjection(modernPeakMw),
-      price: projectedPeakPrice,
-      mwh: roundProjection(peakMwh),
-      value: roundProjection(peakValue),
-      source_components: `base.${dimension}, allocation.peak.${dimension}, peak.${dimension}`,
-      warnings,
-    },
-  ];
-}
-
 function getCalloffTransactions(database: PrototypeDatabase, calloffId: string): CustomerTransaction[] {
   return [...database.transactions.values()].filter((transaction) => transaction.calloff_id === calloffId);
 }
 
-function findComponentTransaction(
-  database: PrototypeDatabase,
-  transactions: CustomerTransaction[],
-  componentCode: string,
-): CustomerTransaction | undefined {
-  return transactions.find(
-    (transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component === componentCode,
-  );
-}
-
-function findComponentPrice(
-  database: PrototypeDatabase,
-  componentCode: string,
-  transactions: CustomerTransaction[],
-  warnings: string[],
-): number | null {
-  const component = transactions
-    .map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id))
-    .find((candidate) => candidate?.component === componentCode);
-  if (!component) {
-    warnings.push(`missing ${componentCode} price source`);
-    return null;
-  }
-  const price = [...database.priceComponents.values()].find((candidate) => candidate.productcomponent_id === component.productcomponent_id);
-  if (!price) {
-    warnings.push(`missing ${componentCode} price`);
-    return null;
-  }
-  return price.price;
-}
-
-function emptyModernRows(
-  calloffId: string,
-  month: string,
-  warning: string,
-  dimension?: "sys" | "epad",
-): ModernProjectedTransactionRow[] {
-  const dimensions = dimension ? [dimension] : (["sys", "epad"] as const);
-  return dimensions.flatMap((candidate) => [
-    emptyModernRow(calloffId, month, `modern.base.${candidate}`, warning),
-    emptyModernRow(calloffId, month, `modern.peak.${candidate}`, warning),
-  ]);
-}
-
-function emptyModernRow(
-  calloffId: string,
-  month: string,
-  component: ModernProjectedTransactionRow["component"],
-  warning: string,
-): ModernProjectedTransactionRow {
-  return {
-    calloff_id: calloffId,
-    month,
-    component,
-    mw: null,
-    price: null,
-    mwh: 0,
-    value: 0,
-    source_components: "",
-    warnings: [warning].filter(Boolean),
-  };
-}
-
-function componentSort(component: ModernProjectedTransactionRow["component"]): number {
-  return ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad"].indexOf(component);
-}
-
 function mwhMismatch(leftRows: ModernProjectedTransactionRow[], rightRows: ModernProjectedTransactionRow[]): boolean {
   const byMonth = new Map(rightRows.map((row) => [row.month, row.mwh]));
-  return leftRows.some((row) => Math.abs(row.mwh - (byMonth.get(row.month) ?? row.mwh)) > EPSILON);
+  return leftRows.some((row) => Math.abs((row.mwh ?? 0) - (byMonth.get(row.month) ?? row.mwh ?? 0)) > EPSILON);
+}
+
+function rawTransactionCoveragePct(database: PrototypeDatabase, transaction: CustomerTransaction): number | null {
+  const component = database.productConfigurationComponents.get(transaction.productcomponent_id);
+  if (component?.component !== "currency.eursek") {
+    return null;
+  }
+  const calloff = database.calloffs.get(transaction.calloff_id);
+  if (!calloff) {
+    return null;
+  }
+  const scopedTransactions = getCalloffTransactions(database, transaction.calloff_id).filter((row) => row.month === transaction.month);
+  const powerValueEur = scopedTransactions.reduce((sum, row) => {
+    const economics = getTransactionViewEconomics(database, row);
+    return economics.component_category === "currency" ? sum : sum + (economics.q_value_eur ?? 0);
+  }, 0);
+  return getCalloffCurrencyCoverage(database, { calloff, transactions: scopedTransactions, powerValueEur }).coverage_pct;
 }
 
 function getPortfolioCalloffs(database: PrototypeDatabase, portfolioId: string) {
@@ -553,6 +742,14 @@ function getPortfolioCalloffs(database: PrototypeDatabase, portfolioId: string) 
 function getPortfolioTransactions(database: PrototypeDatabase, portfolioId: string) {
   const calloffIds = new Set(getPortfolioCalloffs(database, portfolioId).map((calloff) => calloff.calloff_id));
   return [...database.transactions.values()].filter((transaction) => calloffIds.has(transaction.calloff_id));
+}
+
+function getCalendar(database: PrototypeDatabase, month: string) {
+  const calendar = [...database.calendars.values()].find((candidate) => candidate.month === month);
+  if (!calendar) {
+    throw new DataViewerError("not_found", `missing calendar row for ${month}`);
+  }
+  return calendar;
 }
 
 function divideOrNull(numerator: number, denominator: number): number | null {

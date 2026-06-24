@@ -4,12 +4,15 @@ import { createPocSeedData } from "../../src/database/pocSeedData.ts";
 import {
   acceptForecastHedgeProfile,
   buildForecastHedgeProfile,
+  createExplicitClassicHedgePurchase,
+  createExplicitModernHedgePurchase,
   ForecastHedgeError,
   getForecastHedgeMonthRange,
   updateForecastHedgeProfileRow,
 } from "../../src/hedging/forecastHedge.ts";
 import { getApplicationFeaturesForPortfolio } from "../../src/hedging/applicationConfig.ts";
-import { getModernProjectedTransactionsForPortfolioYear } from "../../src/hedging/dataViewer.ts";
+import { getModernProjectedTransactionsForPortfolioYear, getRawTransactionsForPortfolioYear } from "../../src/hedging/dataViewer.ts";
+import { getEventDetails } from "../../src/database/eventForecasts.ts";
 import { getPeaksClassicCalloffTransactionRows } from "../../src/hedging/peaksCalloffTransactionList.ts";
 import { getMarketProjectionRows } from "../../src/hedging/marketProjection.ts";
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
@@ -298,11 +301,11 @@ describe("Forecast hedge feature", () => {
     assert.equal(result.calloff.delivery_end_month, "2027-01");
     assert.deepEqual(
       result.transactions.map((transaction) => transaction.transaction_id),
-      ["CAL00-000", "CAL00-001", "CAL00-002", "CAL00-003", "CAL00-004", "CAL00-005"],
+      ["CAL00-000", "CAL00-001", "CAL00-002", "CAL00-003", "CAL00-004", "CAL00-005", "CAL00-006"],
     );
   });
 
-  it("accept creates six transactions per month for allocation, base and peak components", () => {
+  it("accept creates six power transactions and one currency transaction per month", () => {
     const database = createPocSeedData();
     const rows = buildForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
@@ -320,18 +323,63 @@ describe("Forecast hedge feature", () => {
       rows,
     });
 
-    assert.equal(result.transactions.length, 18);
+    assert.equal(result.transactions.length, 21);
     assert.equal(result.calloff.delivery_start_month, "2027-01");
     assert.equal(result.calloff.delivery_end_month, "2027-03");
     assert.deepEqual(
       [...new Set(result.transactions.map((transaction) => transaction.month))],
       ["2027-01", "2027-02", "2027-03"],
     );
+    const powerTransactions = result.transactions.filter((transaction) => transaction.quantity_type === "MW");
+    const currencyTransactions = result.transactions.filter((transaction) => transaction.quantity_type === "EUR");
     assert.deepEqual(
-      result.transactions.slice(0, 5).map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component),
+      powerTransactions.slice(0, 5).map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component),
       ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys"],
     );
-    assert.equal(database.productConfigurationComponents.get(result.transactions[5].productcomponent_id)?.component, "peak.epad");
+    assert.equal(database.productConfigurationComponents.get(powerTransactions[5].productcomponent_id)?.component, "peak.epad");
+    assert.deepEqual(
+      currencyTransactions.map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component),
+      ["currency.eursek", "currency.eursek", "currency.eursek"],
+    );
+  });
+
+  it("accept mirrors a PURCHASE event with SYS details per price area and area component details", () => {
+    const database = createPocSeedData();
+    const rows = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+    }).rows.map(toAcceptRow);
+
+    acceptForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      date: "2027-01-15",
+      calloff_id: "CAL_EVENT",
+      rows,
+    });
+
+    const event = database.events.get("EVT:PURCHASE:CAL_EVENT");
+    assert.ok(event);
+    assert.equal(event.event_type, "PURCHASE");
+
+    const details = getEventDetails(database, event.event_id);
+    const baseSys = details.filter((detail) => detail.component_code === "base.sys");
+    const peakSys = details.filter((detail) => detail.component_code === "peak.sys");
+    const areaBase = details.filter((detail) => /^base\.(sto|mal|lul|sun)$/.test(detail.component_code));
+    const areaPeak = details.filter((detail) => /^peak\.(sto|mal|lul|sun)$/.test(detail.component_code));
+    const currency = details.find((detail) => detail.component_code === "currency.eursek");
+
+    assert.deepEqual(baseSys.map((detail) => detail.price_area).sort(), ["LUL", "MAL", "STO", "SUN"]);
+    assert.deepEqual(peakSys.map((detail) => detail.price_area).sort(), ["LUL", "MAL", "STO", "SUN"]);
+    assert.equal(areaBase.length, 4);
+    assert.equal(areaPeak.length, 4);
+    assert.ok(currency);
+    assert.equal(currency.price_area, null);
+    assert.equal(currency.quantity_type, "EUR");
   });
 
   it("base and peak transactions use separate MW formulas and q-factor values", () => {
@@ -371,6 +419,8 @@ describe("Forecast hedge feature", () => {
     assert.equal(rowsByComponent.get("base.epad")?.q_factor, 1);
     assert.equal(rowsByComponent.get("peak.sys")?.q_factor, 1.2);
     assert.equal(rowsByComponent.get("peak.epad")?.q_factor, 1.2);
+    assert.equal(rowsByComponent.get("peak.sys")?.price, 54.876);
+    assert.equal(rowsByComponent.get("peak.epad")?.price, -2.64);
     assert.equal([...rowsByComponent.keys()].some((component) => String(component).startsWith("modern.")), false);
   });
 
@@ -396,7 +446,7 @@ describe("Forecast hedge feature", () => {
     const projected = getModernProjectedTransactionsForPortfolioYear(database, "CUS02-0", "2027");
     assert.deepEqual(
       projected.map((row) => row.component),
-      ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad"],
+      ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad", "currency.eursek"],
     );
     assert.equal(projected.find((row) => row.component === "modern.base.sys")?.mwh, 560.735163);
     assert.equal(projected.find((row) => row.component === "modern.peak.sys")?.mwh, 54.264909);
@@ -467,6 +517,115 @@ describe("Forecast hedge feature", () => {
     assert.equal(projectionRows.find((row) => row.component === "peak.sys")?.market_mw, 0.106279);
   });
 
+  it("market projection excludes currency rows from explicit Modern purchases", () => {
+    const database = createPocSeedData();
+    const result = createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      fx_rate: 11.25,
+      date: "2027-01-15",
+      calloff_id: "CALFX",
+    });
+
+    const projectionRows = getMarketProjectionRows(database, result.transactions);
+
+    assert.equal(result.transactions.some((transaction) => transaction.quantity_type === "EUR"), true);
+    assert.equal(projectionRows.some((row) => row.component === "currency.eursek"), false);
+  });
+
+  it("standard Forecast Hedge accept creates a EUR/SEK currency leg visible in raw Data Viewer rows", () => {
+    const database = createPocSeedData();
+    const rows = buildForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+    }).rows.map(toAcceptRow);
+    const result = acceptForecastHedgeProfile(database, {
+      portfolio_id: "CUS02-0",
+      start_month: "2027-01",
+      end_month: "2027-01",
+      percentage: "50",
+      date: "2027-01-15",
+      calloff_id: "CALFX",
+      rows,
+    });
+    const currency = result.transactions.find(
+      (transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component === "currency.eursek",
+    );
+    const rawRows = getRawTransactionsForPortfolioYear(database, "CUS02-0", "2027");
+
+    assert.equal(result.transactions.length, 7);
+    assert.equal(currency?.transaction_id, "CALFX-006");
+    assert.equal(currency?.month, "2027-01");
+    assert.equal(currency?.quantity_type, "EUR");
+    assert.equal(currency?.price_type, "SEK_PER_EUR");
+    assert.equal(currency?.price, 11.25);
+    assert.equal(currency?.mw, 0);
+    assert.equal(currency?.q_factor, 0);
+    assert.ok((currency?.quantity ?? 0) > 0);
+    assert.equal(rawRows.some((row) => row.component === "currency.eursek"), true);
+  });
+
+  it("explicit Modern purchase creates power rows and a EUR/SEK currency leg for SEK portfolios", () => {
+    const database = createPocSeedData();
+    const result = createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      fx_rate: 11.25,
+      date: "2027-01-15",
+      calloff_id: "CALFX",
+    });
+    const currency = result.transactions.find(
+      (transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component === "currency.eursek",
+    );
+    const base = result.transactions.find(
+      (transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component === "base.sys",
+    );
+
+    assert.equal(result.transactions.length, 7);
+    assert.equal(base?.quantity_type, "MW");
+    assert.equal(base?.price_type, "EUR_PER_MWH");
+    assert.equal(base?.factor_type, "Q_FACTOR");
+    assert.equal(currency?.quantity_type, "EUR");
+    assert.equal(currency?.price_type, "SEK_PER_EUR");
+    assert.equal(currency?.quantity, 4620);
+    assert.equal(currency?.price, 11.25);
+    assert.equal(currency?.mw, 0);
+    assert.equal(currency?.q_factor, 0);
+  });
+
+  it("explicit Classic purchase allows partial currency coverage", () => {
+    const database = createPocSeedData();
+    const result = createExplicitClassicHedgePurchase(database, {
+      portfolio_id: "CUS01-0",
+      month: "2027-01",
+      offpeak_mwh: 80,
+      peak_mwh: 20,
+      offpeak_price_eur_per_mwh: 40,
+      peak_price_eur_per_mwh: 15,
+      fx_rate: 11.2,
+      currency_quantity_eur: 1000,
+      date: "2027-01-15",
+      calloff_id: "CALFX",
+    });
+    const currency = result.transactions.find(
+      (transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component === "currency.eursek",
+    );
+
+    assert.equal(result.transactions.length, 7);
+    assert.equal(currency?.quantity, 1000);
+    assert.equal(currency?.price, 11.2);
+  });
+
   it("missing q-factor value is rejected", () => {
     const database = createPocSeedData();
     database.qFactorValues.delete("Q20-00");
@@ -518,6 +677,12 @@ describe("Forecast hedge feature", () => {
   it("missing forecast row is rejected", () => {
     const database = createPocSeedData();
     database.forecasts.delete("FOR02-00");
+    database.events.delete("EVT:FORECAST:CUS02-0:2027-01");
+    for (const detail of [...database.eventDetails.values()]) {
+      if (detail.event_id === "EVT:FORECAST:CUS02-0:2027-01") {
+        database.eventDetails.delete(detail.event_detail_id);
+      }
+    }
 
     assert.throws(
       () =>
@@ -580,10 +745,10 @@ describe("Forecast hedge feature", () => {
 
     assert.equal(result.calloff.portfolio_id, "CUS00-0");
     assert.equal(result.calloff.product_id, "PRO02");
-    assert.equal(result.transactions.length, 6);
+    assert.equal(result.transactions.length, 7);
     assert.deepEqual(
       getModernProjectedTransactionsForPortfolioYear(database, "CUS00-0", "2027").map((row) => row.component),
-      ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad"],
+      ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad", "currency.eursek"],
     );
   });
 

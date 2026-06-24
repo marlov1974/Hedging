@@ -4,6 +4,9 @@
 
 `Hedge Forecast` is a Peaks.Modern feature for creating a hedge profile from monthly forecast values.
 
+For portfolio currency and `currency.eursek` semantics, see [Currency Component Model](currency_component_model.md).
+For purchase events and event details, see [Event Detail Model](event_detail_model.md).
+
 The customer-facing profile uses Modern Projection terms:
 
 ```text
@@ -12,6 +15,7 @@ Modern Peak MWh
 ```
 
 Persistence remains canonical. Accepting a hedge writes canonical component transactions only.
+P0044 also mirrors the accepted hedge as a `PURCHASE` event with event details.
 
 ## Input Fields
 
@@ -28,6 +32,16 @@ The percentage scales both forecast modern values:
 ```text
 hedge_modern_base_mwh = forecast_modern_base_mwh * percentage
 hedge_modern_peak_mwh = forecast_modern_peak_mwh * percentage
+```
+
+P0041 also adds model-level explicit purchase helpers for Modern inputs:
+
+```text
+base_mwh
+peak_mwh
+base_price_eur_per_mwh
+peak_price_eur_per_mwh
+fx_rate when portfolio currency is SEK
 ```
 
 ## Editable Profile
@@ -78,6 +92,10 @@ modern.peak.epad
 ```
 
 Modern projected Data Viewer rows can still show `modern.*` rows after accept because those rows are derived from canonical transactions.
+
+For SEK portfolios, explicit purchase helpers also add a `currency.eursek` transaction carrying EUR quantity and SEK_PER_EUR rate.
+
+SYS purchase event details are split by supported price area. Area-side purchase details use explicit area components such as `base.sto` and `peak.sto`.
 
 ## Q-Factor Usage
 

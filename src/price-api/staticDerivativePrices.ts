@@ -13,15 +13,15 @@ import {
   type PriceBlock,
 } from "./types.ts";
 
-const STATIC_RETRIEVED_AT = "2026-06-22T00:00:00.000Z";
-const STATIC_SOURCE_NAME = "synthetic-static-derivative-poc";
+const STATIC_RETRIEVED_AT = "2026-06-24T00:00:00.000Z";
+const STATIC_SOURCE_NAME = "euronext-public-power-futures-snapshot";
 const STATIC_PRICE_AREA: PriceArea = "STO";
 
 const ANNUAL_BASE_PRICES: Record<string, Record<EnergyComponentCode, number>> = {
-  "2027": { "base.sys": 54.2, "base.epad": 5.4 },
-  "2028": { "base.sys": 55.1, "base.epad": 5.7 },
-  "2029": { "base.sys": 56.0, "base.epad": 6.0 },
-  "2030": { "base.sys": 57.4, "base.epad": 6.3 },
+  "2027": { "base.sys": 45.73, "base.epad": -2.2 },
+  "2028": { "base.sys": 43.1, "base.epad": -0.35 },
+  "2029": { "base.sys": 42.9, "base.epad": -0.6 },
+  "2030": { "base.sys": 45.35, "base.epad": 1.1 },
 };
 
 const STATIC_CURRENCY_RATES: Record<string, number> = {
@@ -31,14 +31,27 @@ const STATIC_CURRENCY_RATES: Record<string, number> = {
   "2030": 11.65,
 };
 
-const QUARTER_ADJUSTMENTS: Record<string, number> = {
-  Q1: 1.08,
-  Q2: 0.96,
-  Q3: 0.92,
-  Q4: 1.04,
+export const ANNUAL_TO_MONTH_FACTORS: Record<string, number> = {
+  "01": 1.12,
+  "02": 1.08,
+  "03": 1.02,
+  "04": 0.94,
+  "05": 0.9,
+  "06": 0.88,
+  "07": 0.91,
+  "08": 1.08,
+  "09": 1.14,
+  "10": 1.03,
+  "11": 0.97,
+  "12": 0.93,
 };
 
-const MONTH_ADJUSTMENTS = [1.14, 1.1, 1.03, 0.97, 0.94, 0.9, 0.88, 0.91, 0.95, 1.0, 1.06, 1.12];
+const QUARTER_ADJUSTMENTS: Record<string, number> = {
+  Q1: averageFactors(["01", "02", "03"]),
+  Q2: averageFactors(["04", "05", "06"]),
+  Q3: averageFactors(["07", "08", "09"]),
+  Q4: averageFactors(["10", "11", "12"]),
+};
 
 export class StaticDerivativePriceProvider implements FuturesPriceProvider, BlockPriceProvider {
   private readonly blocks: NormalizedMarketPriceBlock[];
@@ -149,7 +162,8 @@ export function createStaticDerivativePriceBlocks(): NormalizedMarketPriceBlock[
   for (const year of ["2027", "2028", "2029"]) {
     for (let monthNumber = 1; monthNumber <= 12; monthNumber += 1) {
       const month = `${year}-${String(monthNumber).padStart(2, "0")}`;
-      const adjustment = MONTH_ADJUSTMENTS[monthNumber - 1];
+      const monthKey = String(monthNumber).padStart(2, "0");
+      const adjustment = ANNUAL_TO_MONTH_FACTORS[monthKey];
       for (const component of energyComponents()) {
         blocks.push(
           createBlock({
@@ -205,6 +219,10 @@ function createBlock(input: {
 
 function energyComponents(): EnergyComponentCode[] {
   return ["base.sys", "base.epad"];
+}
+
+function averageFactors(months: string[]): number {
+  return months.reduce((sum, month) => sum + ANNUAL_TO_MONTH_FACTORS[month], 0) / months.length;
 }
 
 function quarterMonthRange(year: string, quarter: string): [string, string] {

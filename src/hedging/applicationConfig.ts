@@ -104,7 +104,6 @@ export function getApplicationFeaturesForPortfolio(
       feature("forecast-hedge", "Hedge Forecast"),
       feature("calloff-list", "Calloff List"),
       feature("position-report", "Position Report"),
-      feature("position", "Position"),
       feature("data-viewer", "Data Viewer"),
       feature("buy-baseloads", "Hedge Baseload"),
     ],

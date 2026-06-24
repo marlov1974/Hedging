@@ -6,6 +6,14 @@ P0032 defines Modern projection views as read-only compatibility projections fro
 
 Canonical rows remain the source of truth. The raw Data Viewer `Transactions` table continues to show canonical component rows and MW values. The Modern projected views expose derived rows with explicit projected component names so a user can inspect how the same canonical calloff can be viewed as a Peaks.Modern model.
 
+P0043 makes this an explicit report contract:
+
+```text
+canonical rows -> Modern projected model -> Modern reports/views
+```
+
+Modern Calloff List and Modern Position Report consume Modern projected model rows. They should not independently reinterpret raw canonical rows when the projected model already exposes the needed quantities, prices, values, currency rows and warnings.
+
 ## Projected Components
 
 Modern projected transaction rows use exactly these component values:

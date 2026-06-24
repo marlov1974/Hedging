@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createPriceApiFromProviderMode } from "../../src/price-api/providerMode.ts";
-import { createStaticDerivativePriceBlocks, StaticDerivativePriceProvider } from "../../src/price-api/staticDerivativePrices.ts";
+import {
+  ANNUAL_TO_MONTH_FACTORS,
+  createStaticDerivativePriceBlocks,
+  StaticDerivativePriceProvider,
+} from "../../src/price-api/staticDerivativePrices.ts";
 
 describe("static derivative price list", () => {
   it("contains year, quarter and month blocks", () => {
@@ -22,12 +26,22 @@ describe("static derivative price list", () => {
     assert.equal(components.has("base.epad"), true);
   });
 
+  it("uses 12 annual-to-month distribution keys with annual average 100 percent", () => {
+    const factors = Object.values(ANNUAL_TO_MONTH_FACTORS);
+    const annualAverage = factors.reduce((sum, factor) => sum + factor, 0) / factors.length;
+    const q3Average = (ANNUAL_TO_MONTH_FACTORS["07"] + ANNUAL_TO_MONTH_FACTORS["08"] + ANNUAL_TO_MONTH_FACTORS["09"]) / 3;
+
+    assert.equal(factors.length, 12);
+    assert.equal(round(annualAverage), 1);
+    assert.equal(round(q3Average), 1.043333);
+  });
+
   it("exposes annual and block prices through the static provider", () => {
     const provider = new StaticDerivativePriceProvider();
 
-    assert.equal(provider.getAnnualPrice("2029", "STO")?.["base.sys"], 56);
-    assert.equal(provider.getBlock("base.epad", "STO", "quarter", "2028-Q2")?.price, 5.47);
-    assert.equal(provider.getBlock("base.sys", "STO", "month", "2029-12")?.price, 62.72);
+    assert.equal(provider.getAnnualPrice("2029", "STO")?.["base.sys"], 42.9);
+    assert.equal(provider.getBlock("base.epad", "STO", "quarter", "2028-Q2")?.price, -0.32);
+    assert.equal(provider.getBlock("base.sys", "STO", "month", "2029-12")?.price, 39.9);
   });
 
   it("lets the Price API use static provider mode", async () => {
@@ -36,9 +50,20 @@ describe("static derivative price list", () => {
 
     assert.deepEqual(response.rows[0], {
       month: "2029-01",
-      "base.sys": 56,
-      "base.epad": 6,
+      "base.sys": 48.05,
+      "base.epad": -0.67,
       "currency.sek": 11.5,
     });
   });
+
+  it("lets the Price API return seasonal monthly prices from annual static prices", async () => {
+    const api = await createPriceApiFromProviderMode({ env: { PRICE_PROVIDER_MODE: "static" } });
+    const response = api.getMonthlyPrices({ start_month: "2027-07", end_month: "2027-09" });
+
+    assert.deepEqual(response.rows.map((row) => row["base.sys"]), [41.61, 49.39, 52.13]);
+  });
 });
+
+function round(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}

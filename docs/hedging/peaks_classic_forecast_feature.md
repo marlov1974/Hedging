@@ -1,6 +1,7 @@
 # Peaks.Classic Forecast Feature
 
 For projected Classic names and canonical storage rules, see [Component Catalog](component_catalog.md).
+For forecast event storage, see [Event Detail Model](event_detail_model.md).
 
 ## Purpose
 
@@ -13,7 +14,7 @@ Offpeak MWh
 Peak MWh
 ```
 
-The database still stores the existing internal forecast fields:
+The source model stores forecast as a canonical `FORECAST` event with price-area event details. The compatibility database layer still keeps the existing internal forecast fields:
 
 ```text
 mwh
@@ -52,6 +53,8 @@ Then it stores:
 CustomerForecast.mwh = total_mwh
 CustomerForecast.peak_pct = peak_pct
 ```
+
+The saved compatibility row is synced back to canonical forecast event details.
 
 ## Validation
 

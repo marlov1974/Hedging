@@ -49,7 +49,7 @@ describe("Financial Settlement", () => {
     const combined = combineSysAndEpadHedgePrice(database, januaryTransactions);
 
     assert.deepEqual(combined.components, ["base.epad", "base.sys"]);
-    assert.equal(combined.hedge_price, 85);
+    assert.equal(combined.hedge_price, 43.53);
     assert.equal(combined.component_group, "base.sys + base.epad");
   });
 

@@ -36,7 +36,25 @@ describe("customer and product database structure", () => {
     });
 
     assert.equal(portfolio.portfolio_id, "portfolio-1");
+    assert.equal(portfolio.currency, "EUR");
     assert.equal(database.portfolios.size, 1);
+  });
+
+  it("stores portfolio currency when provided", () => {
+    const database = createSchema();
+    seedCustomerAndCalendar(database);
+
+    const portfolio = insertCustomerPortfolio(database, {
+      portfolio_id: "portfolio-1",
+      customer_id: "customer-1",
+      name: "Synthetic Portfolio",
+      customer_number: "C-1000",
+      price_area: "STO",
+      calendar_id: "calendar-1",
+      currency: "SEK",
+    });
+
+    assert.equal(portfolio.currency, "SEK");
   });
 
   it("rejects duplicate customer number", () => {

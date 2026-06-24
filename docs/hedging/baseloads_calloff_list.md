@@ -18,10 +18,11 @@ base.epad
 The UI table shows:
 
 ```text
-Datum
-Derivatnamn
+Date
+Synthetic Derivative
 MWh
-Pris
+MW
+Price
 ```
 
 The component is no longer shown as a separate visible column. Component distinction is carried in `Derivatnamn`.
@@ -60,6 +61,16 @@ MWh = sum(transaction.mw * calendar.total_h)
 
 Baseloads uses total hours because its components cover all hours.
 
+## MW Aggregation
+
+The calloff row MW is derived from the aggregated MWh and the total hours covered by the row:
+
+```text
+MW = MWh / sum(calendar.total_h)
+```
+
+For flat Baseloads purchases this returns the original purchased MW.
+
 ## Weighted Average Price
 
 Transactions do not store price yet. P0017 therefore uses linked `PriceComponent` values.
@@ -78,21 +89,23 @@ The deterministic helper is:
 formatDerivativeName(component, months, priceArea)
 ```
 
-It uses this documented PoC convention:
+P0040 changed the display names to public-market-style synthetic Nordic power terminology:
 
 ```text
-<price area> <component> <period>
+Nordic Electricity Base Load Future <period type> <period>
+Nordic Electricity EPAD <price area> <period type> <period>
 ```
 
 Examples:
 
 ```text
-SE3 base.sys Jan-27
-SE3 base.sys Q1-27
-SE3 base.sys YR-27
+Nordic Electricity Base Load Future Month 2027-01
+Nordic Electricity EPAD SE3 Month 2027-01
+Nordic Electricity Base Load Future Quarter 2027-Q1
+Nordic Electricity Base Load Future Year 2027
 ```
 
-This is market-style naming, not a claim to exact public exchange naming. The helper isolates the formatting so it can be replaced later.
+The naming is synthetic and intentionally avoids real exchange product codes. The terminology follows public Nordic power concepts such as base load futures and EPAD area-differential contracts.
 
 ## Known PoC Limitations
 

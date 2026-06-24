@@ -31,8 +31,16 @@ export const TARGET_CANONICAL_PEAKS_COMPONENT_CODES = [
   "allocation.peak.epad",
   "base.sys",
   "base.epad",
+  "base.sto",
+  "base.mal",
+  "base.lul",
+  "base.sun",
   "peak.sys",
   "peak.epad",
+  "peak.sto",
+  "peak.mal",
+  "peak.lul",
+  "peak.sun",
 ] as const;
 
 export const PROJECTED_ONLY_COMPONENT_CODES = [
@@ -73,6 +81,7 @@ export const RESERVED_COMPONENT_CODES = [
   "fixed",
   "calendar",
   "currency.sek",
+  "currency.eursek",
 ] as const;
 
 const COMPONENT_METADATA = new Map<string, ComponentMetadata>([
@@ -82,6 +91,10 @@ const COMPONENT_METADATA = new Map<string, ComponentMetadata>([
   ["base", { component_category: "base", hour_basis: "total_h" }],
   ["base.sys", { component_category: "base", hour_basis: "total_h" }],
   ["base.epad", { component_category: "base", hour_basis: "total_h" }],
+  ["base.sto", { component_category: "base", hour_basis: "total_h" }],
+  ["base.mal", { component_category: "base", hour_basis: "total_h" }],
+  ["base.lul", { component_category: "base", hour_basis: "total_h" }],
+  ["base.sun", { component_category: "base", hour_basis: "total_h" }],
   ["base.classic.sys", { component_category: "base", hour_basis: "total_h" }],
   ["base.classic.epad", { component_category: "base", hour_basis: "total_h" }],
   ["peak", { component_category: "peak", hour_basis: "peak_h" }],
@@ -90,6 +103,10 @@ const COMPONENT_METADATA = new Map<string, ComponentMetadata>([
   ["peak.classic.epad", { component_category: "peak", hour_basis: "peak_h" }],
   ["peak.sys", { component_category: "peak", hour_basis: "peak_h" }],
   ["peak.epad", { component_category: "peak", hour_basis: "peak_h" }],
+  ["peak.sto", { component_category: "peak", hour_basis: "peak_h" }],
+  ["peak.mal", { component_category: "peak", hour_basis: "peak_h" }],
+  ["peak.lul", { component_category: "peak", hour_basis: "peak_h" }],
+  ["peak.sun", { component_category: "peak", hour_basis: "peak_h" }],
   ["profile.peak", { component_category: "profile", hour_basis: "peak_h" }],
   ["profile.15m", { component_category: "profile", hour_basis: "total_h" }],
   ["profile.sys", { component_category: "profile", hour_basis: "total_h" }],
@@ -99,6 +116,7 @@ const COMPONENT_METADATA = new Map<string, ComponentMetadata>([
   ["fixed", { component_category: "adjustment", hour_basis: "none" }],
   ["calendar", { component_category: "adjustment", hour_basis: "none" }],
   ["currency.sek", { component_category: "currency", hour_basis: "none" }],
+  ["currency.eursek", { component_category: "currency", hour_basis: "none" }],
 ]);
 
 export function canonicalProductPackageName(name: string): string {

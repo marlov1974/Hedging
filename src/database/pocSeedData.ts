@@ -12,13 +12,14 @@ import {
   insertQFactorValue,
 } from "./repository.ts";
 import { getComponentMetadata } from "./canonicalComponents.ts";
+import { createForecastEventDetailsForForecast } from "./eventForecasts.ts";
 
 export const CALENDAR_SET_ID = "CAL_SE_TRADING";
 
 export const COMPONENTS_BY_PRODUCT = new Map([
   ["Baseloads", ["base.sys", "base.epad"]],
-  ["Peaks.Classic", ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys", "peak.epad"]],
-  ["Peaks.Modern", ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys", "peak.epad"]],
+  ["Peaks.Classic", ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys", "peak.epad", "currency.eursek"]],
+  ["Peaks.Modern", ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys", "peak.epad", "currency.eursek"]],
   [
     "Profiles.Classic",
     ["base.classic.sys", "base.classic.epad", "peak.classic.sys", "peak.classic.epad", "profile.sys", "profile.epad", "volume"],
@@ -48,16 +49,17 @@ export const Q_FACTOR_RANGES = new Map([
   ["profile.sys", [1.03, 1.09]],
   ["profile.epad", [1.03, 1.09]],
   ["volume", [0, 0]],
+  ["currency.eursek", [0, 0]],
 ]);
 
 const PRICE_BY_COMPONENT = new Map([
   ["allocation.peak", 0],
   ["allocation.peak.sys", 0],
   ["allocation.peak.epad", 0],
-  ["base.sys", 80],
-  ["base.epad", 5],
-  ["base.classic.sys", 80],
-  ["base.classic.epad", 5],
+  ["base.sys", 45.73],
+  ["base.epad", -2.2],
+  ["base.classic.sys", 45.73],
+  ["base.classic.epad", -2.2],
   ["peak.classic.sys", 20],
   ["peak.classic.epad", 3],
   ["peak.modern.sys", 12],
@@ -69,6 +71,7 @@ const PRICE_BY_COMPONENT = new Map([
   ["profile.sys", 7],
   ["profile.epad", 2],
   ["volume", 4],
+  ["currency.eursek", 11.25],
 ]);
 
 const PRODUCT_SEEDS = [
@@ -152,6 +155,7 @@ export function createPocSeedData(): PrototypeDatabase {
       customer_number: product.customer_number,
       price_area: "SE3",
       calendar_id: CALENDAR_SET_ID,
+      currency: "SEK",
     });
 
     insertProductConfiguration(database, {
@@ -175,7 +179,7 @@ export function createPocSeedData(): PrototypeDatabase {
         pricecomponent_id: priceComponentIdFor(product.product_id, componentCode),
         productcomponent_id: productComponentId,
         price: PRICE_BY_COMPONENT.get(componentCode) ?? 0,
-        currency: "EUR",
+        currency: componentCode === "currency.eursek" ? "SEK" : "EUR",
       });
 
       const qFactorSetId = qFactorSetIdFor(product.seed_index, componentIndex);
@@ -204,13 +208,14 @@ export function createPocSeedData(): PrototypeDatabase {
     }
 
     months.forEach((month, monthIndex) => {
-      insertCustomerForecast(database, {
+      const forecast = insertCustomerForecast(database, {
         forecast_id: forecastIdFor(product.seed_index, monthIndex),
         portfolio_id: product.portfolio_id,
         month,
         mwh: forecastMwhFor(product.forecast_mwh, monthIndex),
         peak_pct: forecastPeakPctFor(product.peak_pct, monthIndex),
       });
+      createForecastEventDetailsForForecast(database, forecast);
     });
   }
 

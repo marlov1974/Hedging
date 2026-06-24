@@ -1,13 +1,11 @@
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 export function formatDerivativeName(component: string, months: string[], priceArea: string): string {
   const sortedMonths = [...months].sort();
   if (sortedMonths.length === 0) {
-    return `${priceArea} ${component} Unknown`;
+    return `${instrumentName(component, priceArea)} Unknown`;
   }
 
   const periodLabel = formatPeriod(sortedMonths);
-  return `${priceArea} ${component} ${periodLabel}`;
+  return `${instrumentName(component, priceArea)} ${periodLabel}`;
 }
 
 function formatPeriod(months: string[]): string {
@@ -15,18 +13,18 @@ function formatPeriod(months: string[]): string {
   const last = parseMonth(months[months.length - 1]);
 
   if (months.length === 1) {
-    return `${MONTH_NAMES[first.month - 1]}-${shortYear(first.year)}`;
+    return `Month ${months[0]}`;
   }
 
   if (months.length === 3 && first.year === last.year && first.month % 3 === 1 && last.month === first.month + 2) {
-    return `Q${Math.floor((first.month - 1) / 3) + 1}-${shortYear(first.year)}`;
+    return `Quarter ${first.year}-Q${Math.floor((first.month - 1) / 3) + 1}`;
   }
 
   if (months.length === 12 && first.year === last.year && first.month === 1 && last.month === 12) {
-    return `YR-${shortYear(first.year)}`;
+    return `Year ${first.year}`;
   }
 
-  return `${MONTH_NAMES[first.month - 1]}-${shortYear(first.year)}..${MONTH_NAMES[last.month - 1]}-${shortYear(last.year)}`;
+  return `Period ${months[0]}..${months[months.length - 1]}`;
 }
 
 function parseMonth(month: string): { year: number; month: number } {
@@ -34,6 +32,12 @@ function parseMonth(month: string): { year: number; month: number } {
   return { year: Number(yearText), month: Number(monthText) };
 }
 
-function shortYear(year: number): string {
-  return String(year).slice(2);
+function instrumentName(component: string, priceArea: string): string {
+  if (component === "base.sys") {
+    return "Nordic Electricity Base Load Future";
+  }
+  if (component === "base.epad") {
+    return `Nordic Electricity EPAD ${priceArea}`;
+  }
+  return `${priceArea} ${component}`;
 }

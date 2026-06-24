@@ -8,7 +8,7 @@ It presents canonical Peaks calloffs as Offpeak and Peak customer rows at callof
 
 ## Inputs
 
-The list uses the shared canonical Peaks projection engine and reads:
+The list uses Classic projected model rows produced from the shared canonical Peaks projection engine. The projected model reads:
 
 ```text
 base.sys
@@ -20,6 +20,8 @@ allocation.peak.epad
 ```
 
 Compatibility aliases are read only when older fixture rows remain.
+
+The customer-facing calloff list aggregates Classic projected model rows; it should not duplicate the Classic projection formulas locally.
 
 ## Projection
 
@@ -62,3 +64,7 @@ Multi-month calloffs show one calloff-level row. Monthly values are projected fi
 ## Raw Data
 
 Raw canonical rows remain visible in Data Viewer. The customer-facing list hides allocation rows and internal adjustment rows.
+
+## P0042 Currency Display
+
+Rows expose EUR value, display currency, display value, FX rate and coverage percentage. For SEK portfolios, the matching `currency.eursek` transaction supplies the display FX rate. Missing or partial coverage is shown as a warning.

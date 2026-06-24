@@ -1,10 +1,19 @@
 # Position report
 
-P0018 adds a monthly position report to the hedging tool shell.
+P0018 added a monthly position report to the hedging tool shell. P0040 makes it a customer-facing monthly report instead of a raw component dump.
+P0044 adds `event` and `event_detail` source rows for forecasts and purchase mirrors; existing Position Report rows still consume projected transaction model rows.
 
 ## Purpose
 
-The report shows positions for the selected portfolio in monthly resolution by component.
+The report shows one row per month for the selected portfolio and perspective.
+
+The supported perspectives are:
+
+```text
+Baseloads
+Classic
+Modern
+```
 
 ## Year Selection
 
@@ -22,36 +31,55 @@ If the selected year has no positions, the UI shows an empty state.
 
 ## Columns
 
-The report table shows:
+Baseloads columns:
 
 ```text
-Månad
-Volym
-Pris
-Component
+Month
+Base SYS MWh
+Base EPAD MWh
+Base SYS Price
+Base EPAD Price
 ```
+
+Classic columns:
+
+```text
+Month
+Offpeak MWh
+Peak EPAD MWh
+Offpeak Price
+Peak Price
+```
+
+Modern columns:
+
+```text
+Month
+Base MWh
+Peak EPAD MWh
+Base Price
+Peak Price
+```
+
+The normal report view does not show raw canonical component rows such as `allocation.peak.sys`.
+
+Currency rows such as `currency.eursek` are not summed as MW or MWh in the normal Position Report. See [Currency Component Model](currency_component_model.md).
 
 ## Aggregation
 
-Rows are grouped by:
+Baseloads rows are grouped by month and projected into the SYS and EPAD price dimensions.
 
-```text
-portfolio_id
-month
-component
-```
-
-The current implementation derives the selected portfolio from the calloff that owns each transaction.
+Classic and Modern rows are aggregated from the shared Classic/Modern projected model rows. This keeps Position Report aligned with Calloff List projection semantics and avoids a separate raw-canonical reinterpretation inside the report.
 
 ## MWh Calculation
 
 For this PoC:
 
 ```text
-Volym = sum(transaction.mw * calendar.total_h)
+MWh = sum(transaction.mw * calendar hours for the relevant dimension)
 ```
 
-Total monthly hours are used for Baseloads/base components.
+Total monthly hours are used for Baseloads/base components. Peak-hour dimensions use the existing Peaks projection helpers.
 
 ## Weighted Average Price
 
@@ -68,5 +96,20 @@ If price data is missing, the calculation raises a clear missing-price error rat
 ## Known PoC Limitations
 
 - Transaction-level prices are not stored yet.
-- Component-specific hour rules are not implemented yet.
 - The report is calculated from the in-memory database at render time.
+- Classic/Modern `Peak EPAD MWh` is a customer-facing area-dimension report field derived from the projected peak MWh level.
+
+## P0042 Currency Display
+
+Classic and Modern rows keep EUR power value fields and add display currency fields. For SEK portfolios, matching `currency.eursek` rows supply FX rate and coverage. Missing or partial coverage is shown as report warnings instead of being treated as fully covered.
+
+## P0043 Projected Model Input
+
+Position Report consumes projected model rows:
+
+```text
+Classic projected model rows -> Classic Position Report
+Modern projected model rows  -> Modern Position Report
+```
+
+Currency rows remain `currency.eursek` in the projected model input. They are used for SEK display and coverage, but are not counted as MW or MWh.

@@ -12,10 +12,12 @@ import { getPortfolioProductComponents, getQFactorValuesBySet } from "../../src/
 import {
   canonicalComponentCode,
   canonicalProductPackageName,
+  componentCodeConcept,
   isCustomerProjectionComponent,
   isInternalProjectionComponent,
   isMarketProjectionComponent,
 } from "../../src/database/canonicalComponents.ts";
+import { getEventDetails } from "../../src/database/eventForecasts.ts";
 
 describe("P0015 PoC seed data", () => {
   it("creates five customers, five portfolios and five product configurations", () => {
@@ -24,6 +26,7 @@ describe("P0015 PoC seed data", () => {
     assert.equal(database.customers.size, 5);
     assert.equal(database.portfolios.size, 5);
     assert.equal(database.productConfigurations.size, 5);
+    assert.ok([...database.portfolios.values()].every((portfolio) => portfolio.currency === "SEK"));
   });
 
   it("creates all expected product components for each product configuration", () => {
@@ -80,6 +83,25 @@ describe("P0015 PoC seed data", () => {
       assert.ok(forecasts.every((forecast) => forecast.mwh > 0));
       assert.ok(forecasts.every((forecast) => forecast.peak_pct > 0 && forecast.peak_pct < 1));
     }
+  });
+
+  it("stores forecast source data as FORECAST events with price-area event details", () => {
+    const database = createPocSeedData();
+    const forecastEvents = [...database.events.values()].filter((event) => event.event_type === "FORECAST");
+    const januaryEvent = forecastEvents.find((event) => event.portfolio_id === "CUS02-0" && event.event_id.endsWith("2027-01"));
+    assert.ok(januaryEvent);
+
+    const details = getEventDetails(database, januaryEvent.event_id);
+    assert.equal(forecastEvents.length, database.forecasts.size);
+    assert.equal(details.length, 8);
+    assert.deepEqual([...new Set(details.map((detail) => detail.price_area))].sort(), ["LUL", "MAL", "STO", "SUN"]);
+    assert.equal(details.every((detail) => detail.quantity_type === "MWh"), true);
+    assert.equal(details.some((detail) => detail.component_code === "base.epad" || detail.component_code === "peak.epad"), false);
+    assert.equal(details.every((detail) => componentCodeConcept(detail.component_code) === "canonical"), true);
+    assert.equal(
+      details.filter((detail) => detail.component_code.startsWith("base.")).reduce((sum, detail) => sum + detail.quantity, 0),
+      1230,
+    );
   });
 
   it("uses realistic small-industry seasonal forecast profile", () => {
@@ -233,6 +255,7 @@ describe("P0015 PoC seed data", () => {
     assert.ok(peaksClassic.has("base.epad"));
     assert.ok(peaksClassic.has("peak.sys"));
     assert.ok(peaksClassic.has("peak.epad"));
+    assert.ok(peaksClassic.has("currency.eursek"));
     assert.ok(!peaksClassic.has("peak.premium.sys"));
     assert.ok(!peaksClassic.has("peak.modern.sys"));
     assert.ok(peaksModern.has("allocation.peak.sys"));
@@ -240,6 +263,7 @@ describe("P0015 PoC seed data", () => {
     assert.ok(!peaksModern.has("allocation.peak"));
     assert.ok(peaksModern.has("peak.sys"));
     assert.ok(peaksModern.has("peak.epad"));
+    assert.ok(peaksModern.has("currency.eursek"));
     assert.ok(!peaksModern.has("peak.premium.sys"));
     assert.ok(!peaksModern.has("peak.modern.sys"));
     assert.ok(profilesClassic.has("profile.sys"));
@@ -267,7 +291,10 @@ describe("P0015 PoC seed data", () => {
     const database = createPocSeedData();
 
     assert.equal(database.priceComponents.size, database.productConfigurationComponents.size);
-    assert.ok([...database.priceComponents.values()].every((priceComponent) => priceComponent.currency === "EUR"));
+    for (const priceComponent of database.priceComponents.values()) {
+      const component = database.productConfigurationComponents.get(priceComponent.productcomponent_id);
+      assert.equal(priceComponent.currency, component?.component === "currency.eursek" ? "SEK" : "EUR");
+    }
   });
 });
 

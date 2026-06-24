@@ -29,9 +29,9 @@ describe("hedging tool shell", () => {
     assert.match(html, /Hedge Forecast/);
     assert.match(html, /Calloff List/);
     assert.match(html, /Position Report/);
-    assert.match(html, /Position/);
     assert.match(html, /Data Viewer/);
     assert.match(html, /Hedge Baseload/);
+    assert.doesNotMatch(html, /feature_id=position(?:&|")/);
     assert.doesNotMatch(html, /Calloff List - Baseloads/);
     assert.doesNotMatch(html, /<label>\s*Perspective/);
   });
@@ -109,8 +109,8 @@ describe("hedging tool shell", () => {
     assert.doesNotMatch(html, /PeaksModern Portfolio/);
   });
 
-  it("Forecast, Calloff List, Position Report and Position expose Baseloads, Classic and Modern tabs", () => {
-    for (const feature_id of ["forecast", "calloff-list", "position-report", "position"] as const) {
+  it("Forecast, Calloff List and Position Report expose Baseloads, Classic and Modern tabs", () => {
+    for (const feature_id of ["forecast", "calloff-list", "position-report"] as const) {
       const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0", feature_id });
 
       assert.match(html, /Feature perspective/);
@@ -118,6 +118,13 @@ describe("hedging tool shell", () => {
       assert.match(html, /Classic/);
       assert.match(html, /Modern/);
     }
+  });
+
+  it("legacy Position feature id maps to Position Report", () => {
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0", feature_id: "position" });
+
+    assert.match(html, /<h2>Position Report<\/h2>/);
+    assert.doesNotMatch(html, /<h2>Position<\/h2>/);
   });
 
   it("Hedge Forecast exposes Classic and Modern tabs only", () => {

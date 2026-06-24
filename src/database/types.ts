@@ -18,6 +18,7 @@ export type CustomerPortfolio = {
   customer_number: string;
   price_area: string;
   calendar_id: string;
+  currency?: string;
 };
 
 export type CustomerForecast = {
@@ -26,6 +27,37 @@ export type CustomerForecast = {
   month: string;
   mwh: number;
   peak_pct: number;
+};
+
+export type EventType = "FORECAST" | "PURCHASE" | "ADJUSTMENT" | "CORRECTION" | "CANCELLATION" | "SETTLEMENT";
+
+export type EventStatus = "active" | "cancelled";
+
+export type HedgingEvent = {
+  event_id: string;
+  portfolio_id: string;
+  event_type: EventType;
+  version: number;
+  created_at: string;
+  created_order: number;
+  source: string;
+  status: EventStatus;
+};
+
+export type EventDetailQuantityType = "MW" | "MWh" | "EUR";
+
+export type EventDetail = {
+  event_detail_id: string;
+  event_id: string;
+  component_code: string;
+  period: string;
+  price_area: string | null;
+  quantity: number;
+  quantity_type: EventDetailQuantityType;
+  price: number | null;
+  price_type: "EUR_PER_MWH" | "SEK_PER_EUR" | null;
+  factor: number | null;
+  factor_type: "Q_FACTOR" | null;
 };
 
 export type ProductConfiguration = {
@@ -91,6 +123,12 @@ export type CustomerTransaction = {
   productcomponent_id: string;
   mw: number;
   q_factor: number;
+  quantity?: number;
+  quantity_type?: "MW" | "EUR";
+  price?: number;
+  price_type?: "EUR_PER_MWH" | "SEK_PER_EUR";
+  factor?: number | null;
+  factor_type?: "Q_FACTOR" | null;
 };
 
 export type CustomerPortfolioWithForecasts = {

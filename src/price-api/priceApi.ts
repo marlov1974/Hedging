@@ -23,6 +23,7 @@ type PriceApiProviders = {
 
 export function createPriceApi(providers: PriceApiProviders): PriceApi {
   const blockPriceProvider = providers.blockPriceProvider ?? new FixtureBlockPriceProvider();
+  const monthlyBlockPriceProvider = providers.blockPriceProvider;
 
   return {
     getMonthlyPrices(request: PriceApiRequest): PriceApiResponse {
@@ -47,8 +48,8 @@ export function createPriceApi(providers: PriceApiProviders): PriceApi {
 
           return {
             month,
-            "base.sys": futures["base.sys"],
-            "base.epad": futures["base.epad"],
+            "base.sys": monthlyComponentPrice(monthlyBlockPriceProvider, "base.sys", month, futures["base.sys"]),
+            "base.epad": monthlyComponentPrice(monthlyBlockPriceProvider, "base.epad", month, futures["base.epad"]),
             "currency.sek": currency.value,
           };
         }),
@@ -75,4 +76,13 @@ export function createDefaultPriceApi(): PriceApi {
     futuresPriceProvider: new FixtureFuturesPriceProvider(),
     currencyProvider: new FixtureCurrencyProvider(),
   });
+}
+
+function monthlyComponentPrice(
+  blockPriceProvider: BlockPriceProvider | undefined,
+  component: "base.sys" | "base.epad",
+  month: string,
+  annualPrice: number,
+): number {
+  return blockPriceProvider?.getBlock(component, "STO", "month", month)?.price ?? annualPrice;
 }

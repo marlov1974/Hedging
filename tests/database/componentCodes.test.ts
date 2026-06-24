@@ -79,8 +79,16 @@ describe("component code classification", () => {
   it("keeps market projection excluding allocation components", () => {
     assert.equal(isMarketProjectionComponent("allocation.peak.sys"), false);
     assert.equal(isMarketProjectionComponent("allocation.peak.epad"), false);
+    assert.equal(isMarketProjectionComponent("currency.eursek"), false);
     assert.equal(isMarketProjectionComponent("base.sys"), true);
     assert.equal(isMarketProjectionComponent("peak.sys"), true);
+  });
+
+  it("recognizes EUR/SEK currency component as persistable currency metadata", () => {
+    assert.equal(componentCodeConcept("currency.eursek"), "reserved");
+    assert.equal(isPersistableComponentCode("currency.eursek"), true);
+    assert.equal(getComponentMetadata("currency.eursek").component_category, "currency");
+    assert.equal(getComponentMetadata("currency.eursek").hour_basis, "none");
   });
 
   it("rejects projected-only names where persisted product components are required", () => {

@@ -8,6 +8,14 @@ Peaks.Classic presents customer calloffs as Offpeak and Peak levels.
 
 The Classic list is a customer projection from canonical component transactions, not a raw component table.
 
+P0043 treats Classic as an explicit projected model layer:
+
+```text
+canonical rows -> Classic projected model -> Classic reports/views
+```
+
+Classic Calloff List and Classic Position Report consume Classic projected model rows. If a report needs additional fields, add them to the projected model contract rather than recalculating directly from raw canonical rows.
+
 ## MW Projection
 
 Classic can use MW internally. It uses the physical customer peak level directly from allocation:

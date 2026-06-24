@@ -16,6 +16,10 @@ Projected components exist only in feature projections/views.
 
 Runtime validation must reject projected component names where persisted source-of-truth product components or q-factor components are required.
 
+For `currency.eursek` quantity and price semantics, see [Currency Component Model](currency_component_model.md).
+
+For generic `event` and `event_detail` source rows, see [Event Detail Model](event_detail_model.md).
+
 ## 2. Layer Overview
 
 Canonical components:
@@ -51,9 +55,19 @@ allocation.peak.sys
 allocation.peak.epad
 base.sys
 base.epad
+base.sto
+base.mal
+base.lul
+base.sun
 peak.sys
 peak.epad
+peak.sto
+peak.mal
+peak.lul
+peak.sun
 ```
+
+P0044 adds explicit price-area components for event details. New forecast event details use `base.<area>` and `peak.<area>` instead of generic EPAD forecast rows.
 
 ### `allocation.peak.sys`
 
@@ -119,6 +133,17 @@ peak.epad
 | internal/raw behavior | included |
 | meaning | flat monthly EPAD/area base exposure over the whole month |
 
+### `base.sto`, `base.mal`, `base.lul`, `base.sun`
+
+| Field | Value |
+| --- | --- |
+| component category | `base` |
+| persisted source of truth | yes |
+| stored unit | event details may use MWh for forecasts or MW for purchases |
+| hour basis | `total_h` |
+| price_area required | yes |
+| meaning | explicit price-area base exposure |
+
 ### `peak.sys`
 
 | Field | Value |
@@ -150,6 +175,17 @@ peak.epad
 | market projection behavior | included |
 | internal/raw behavior | included |
 | meaning | canonical EPAD/area peak component relative to flat monthly base |
+
+### `peak.sto`, `peak.mal`, `peak.lul`, `peak.sun`
+
+| Field | Value |
+| --- | --- |
+| component category | `peak` |
+| persisted source of truth | yes |
+| stored unit | event details may use MWh for forecasts or MW for purchases |
+| hour basis | `peak_h` |
+| price_area required | yes |
+| meaning | explicit price-area peak exposure |
 
 ### Broader Reserved Canonical Components
 

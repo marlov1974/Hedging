@@ -11,6 +11,8 @@ import type { PrototypeDatabase } from "../../src/database/schema.ts";
 import { getApplicationFeaturesForPortfolio } from "../../src/hedging/applicationConfig.ts";
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 import {
+  getClassicProjectedModelRowsForPortfolioYear,
+  getModernProjectedModelRowsForPortfolioYear,
   getPeaksClassicCalloffTransactionRows,
   getPeaksModernCalloffTransactionRows,
   projectPeaksCalloffMonth,
@@ -65,13 +67,31 @@ describe("Peaks calloff transaction lists", () => {
     const modern = getPeaksModernCalloffTransactionRows(createWorkedExampleDatabase("modern"), "CUS02-0")[0];
 
     assert.equal(classic.offpeak_price, 85);
-    assert.equal(classic.peak_price, 88.075269);
+    assert.equal(classic.peak_price, 96.88172);
     assert.equal(modern.base_price, 85);
-    assert.equal(modern.peak_price, 97.537634);
+    assert.equal(modern.peak_price, 133.44086);
     assert.equal(classic.projected_total_value, classic.canonical_total_value);
     assert.equal(modern.projected_total_value, modern.canonical_total_value);
-    assertApprox(classic.canonical_total_value, 8653.763441);
-    assertApprox(modern.canonical_total_value, 8653.763441);
+    assertApprox(classic.canonical_total_value, 9094.086022);
+    assertApprox(modern.canonical_total_value, 9094.086022);
+  });
+
+  it("Classic and Modern projected models expose report-ready normalized rows", () => {
+    const classicRows = getClassicProjectedModelRowsForPortfolioYear(createWorkedExampleDatabase("classic"), "CUS01-0", "2027");
+    const modernRows = getModernProjectedModelRowsForPortfolioYear(createWorkedExampleDatabase("modern"), "CUS02-0", "2027");
+
+    assert.deepEqual(
+      classicRows.map((row) => row.component),
+      ["classic.offpeak.sys", "classic.peak.sys"],
+    );
+    assert.deepEqual(
+      modernRows.map((row) => row.component),
+      ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad"],
+    );
+    assert.equal(modernRows.every((row) => row.component_concept === "projected"), true);
+    assert.equal(modernRows.every((row) => row.quantity_type === "MW"), true);
+    assert.equal(modernRows.every((row) => row.price_type === "EUR_PER_MWH"), true);
+    assert.equal(modernRows.every((row) => typeof row.mwh === "number" && typeof row.value_eur === "number"), true);
   });
 
   it("allows negative Modern PeakMWh and preserves value", () => {
@@ -125,9 +145,52 @@ describe("Peaks calloff transaction lists", () => {
 
     assert.equal(row.base_mwh, round(monthRows[0].modern_base_mwh + monthRows[1].modern_base_mwh));
     assert.equal(row.peak_mwh, round(monthRows[0].modern_peak_mwh + monthRows[1].modern_peak_mwh));
-    assert.equal(row.peak_price, round((monthRows[0].modern_peak_value + monthRows[1].modern_peak_value) / row.peak_mwh));
+    assertApprox(row.peak_price ?? undefined, round((monthRows[0].modern_peak_value + monthRows[1].modern_peak_value) / row.peak_mwh));
     assert.notEqual(row.peak_price, arithmeticPeakPrice);
     assert.equal(row.projected_total_value, row.canonical_total_value);
+  });
+
+  it("converts Classic and Modern calloff list display values to SEK from matching currency rows", () => {
+    const modernDatabase = createWorkedExampleDatabase("modern");
+    addCurrencyTransaction(modernDatabase, "PRO02", "CAL20", 9094.086022, 11.25);
+    const classicDatabase = createWorkedExampleDatabase("classic");
+    addCurrencyTransaction(classicDatabase, "PRO01", "CAL20", 9094.086022, 11.25);
+
+    const modern = getPeaksModernCalloffTransactionRows(modernDatabase, "CUS02-0")[0];
+    const classic = getPeaksClassicCalloffTransactionRows(classicDatabase, "CUS01-0")[0];
+
+    assert.equal(modern.display_currency, "SEK");
+    assert.equal(classic.display_currency, "SEK");
+    assert.equal(modern.fx_rate, 11.25);
+    assert.equal(classic.fx_rate, 11.25);
+    assert.equal(modern.coverage_pct, 1);
+    assert.equal(classic.coverage_pct, 1);
+    assert.equal(modern.base_price, 956.25);
+    assert.equal(classic.offpeak_price, 956.25);
+    assertApprox(modern.display_value, 102308.467748);
+    assert.equal(modern.projected_total_value, modern.canonical_total_value);
+  });
+
+  it("surfaces partial currency coverage without hiding the warning", () => {
+    const database = createWorkedExampleDatabase("modern");
+    addCurrencyTransaction(database, "PRO02", "CAL20", 1000, 11.25);
+
+    const row = getPeaksModernCalloffTransactionRows(database, "CUS02-0")[0];
+
+    assert.equal(row.display_currency, "SEK");
+    assert.ok((row.coverage_pct ?? 0) < 1);
+    assert.match(row.warnings.join("; "), /partial_currency_coverage/);
+  });
+
+  it("does not warn for tiny currency coverage rounding differences", () => {
+    const database = createWorkedExampleDatabase("modern");
+    addCurrencyTransaction(database, "PRO02", "CAL20", 9094.086022 - 0.004, 11.25);
+
+    const row = getPeaksModernCalloffTransactionRows(database, "CUS02-0")[0];
+
+    assert.equal(row.display_currency, "SEK");
+    assert.ok((row.coverage_pct ?? 0) > 0.99999);
+    assert.doesNotMatch(row.warnings.join("; "), /partial_currency_coverage/);
   });
 
   it("warns instead of dividing by zero", () => {
@@ -355,6 +418,23 @@ function addAdjustmentTransaction(database: PrototypeDatabase, productId: string
     productcomponent_id: `${productId}:fixed`,
     mw: 999,
     q_factor: 1,
+  });
+}
+
+function addCurrencyTransaction(database: PrototypeDatabase, productId: string, calloffId: string, eurAmount: number, fxRate: number): void {
+  insertTransaction(database, {
+    transaction_id: `${calloffId}-006`,
+    calloff_id: calloffId,
+    month: "2027-01",
+    productcomponent_id: `${productId}:currency.eursek`,
+    mw: 0,
+    q_factor: 0,
+    quantity: eurAmount,
+    quantity_type: "EUR",
+    price: fxRate,
+    price_type: "SEK_PER_EUR",
+    factor: null,
+    factor_type: null,
   });
 }
 

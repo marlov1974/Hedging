@@ -8,8 +8,11 @@ import {
 } from "../database/types.ts";
 import { getPortfolioProductComponents, getQFactorValuesBySet, insertCalloff, insertTransaction } from "../database/repository.ts";
 import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
+import { createPurchaseEventForCalloff, getCanonicalForecast } from "../database/eventForecasts.ts";
 import type { PerspectiveId } from "./applicationConfig.ts";
 import { ClassicProjectionError, convertClassicHedgeToCanonical, deriveClassicFromForecast } from "./classicProjection.ts";
+import { resolveConfiguredComponentPrice } from "./componentPricing.ts";
+import { derivePowerTransactionEconomics } from "./currencyModel.ts";
 import { convertModernHedgeToCanonical, deriveModernFromForecast, ModernProjectionError } from "./modernProjection.ts";
 
 const PEAKS_MODERN_PRODUCT_NAME = "Peaks.Modern";
@@ -94,6 +97,32 @@ export type ForecastHedgeAcceptResult = {
   calloff: Calloff;
   transactions: CustomerTransaction[];
   profile: ForecastHedgeProfile;
+};
+
+export type ExplicitClassicHedgePurchaseInput = {
+  portfolio_id: string;
+  month: string;
+  offpeak_mwh: number;
+  peak_mwh: number;
+  offpeak_price_eur_per_mwh: number;
+  peak_price_eur_per_mwh: number;
+  fx_rate?: number;
+  currency_quantity_eur?: number;
+  date?: string;
+  calloff_id?: string;
+};
+
+export type ExplicitModernHedgePurchaseInput = {
+  portfolio_id: string;
+  month: string;
+  base_mwh: number;
+  peak_mwh: number;
+  base_price_eur_per_mwh: number;
+  peak_price_eur_per_mwh: number;
+  fx_rate?: number;
+  currency_quantity_eur?: number;
+  date?: string;
+  calloff_id?: string;
 };
 
 type NormalizedInput = {
@@ -380,9 +409,82 @@ export function acceptForecastHedgeProfile(
     delivery_end_month: normalized.end_month,
     calloff_id: input.calloff_id,
   });
-  const transactions = createForecastHedgeTransactions(database, { calloff, rows: profile.rows });
+  const powerTransactions = createForecastHedgeTransactions(database, { calloff, rows: profile.rows });
+  const currencyTransactions = createCurrencyTransactionsForPowerRows(database, calloff, powerTransactions);
+  const transactions = [...powerTransactions, ...currencyTransactions];
+  createPurchaseEventForCalloff(database, { calloff, transactions });
 
   return { calloff, transactions, profile };
+}
+
+export function createExplicitClassicHedgePurchase(
+  database: PrototypeDatabase,
+  input: ExplicitClassicHedgePurchaseInput,
+): ForecastHedgeAcceptResult {
+  const calendar = getCalendar(database, input.month);
+  const row = updateForecastHedgeProfileRow({
+    month: input.month,
+    perspective_id: "classic",
+    forecast_mwh: input.offpeak_mwh + input.peak_mwh,
+    forecast_peak_pct: input.offpeak_mwh + input.peak_mwh === 0 ? 0 : input.peak_mwh / (input.offpeak_mwh + input.peak_mwh),
+    forecast_modern_base_mwh: 0,
+    forecast_modern_peak_mwh: 0,
+    forecast_classic_offpeak_mwh: input.offpeak_mwh,
+    forecast_classic_peak_mwh: input.peak_mwh,
+    calendar_total_h: calendar.total_h,
+    calendar_peak_h: calendar.peak_h,
+    classic_offpeak_mwh: input.offpeak_mwh,
+    classic_peak_mwh: input.peak_mwh,
+  });
+
+  return createExplicitHedgePurchase(database, {
+    portfolio_id: input.portfolio_id,
+    perspective_id: "classic",
+    month: input.month,
+    date: input.date,
+    calloff_id: input.calloff_id,
+    row,
+    first_price_eur_per_mwh: input.offpeak_price_eur_per_mwh,
+    second_price_eur_per_mwh: input.peak_price_eur_per_mwh,
+    first_mwh: input.offpeak_mwh,
+    second_mwh: input.peak_mwh,
+    fx_rate: input.fx_rate,
+    currency_quantity_eur: input.currency_quantity_eur,
+  });
+}
+
+export function createExplicitModernHedgePurchase(
+  database: PrototypeDatabase,
+  input: ExplicitModernHedgePurchaseInput,
+): ForecastHedgeAcceptResult {
+  const calendar = getCalendar(database, input.month);
+  const row = updateForecastHedgeProfileRow({
+    month: input.month,
+    perspective_id: "modern",
+    forecast_mwh: input.base_mwh + input.peak_mwh,
+    forecast_peak_pct: 0,
+    forecast_modern_base_mwh: input.base_mwh,
+    forecast_modern_peak_mwh: input.peak_mwh,
+    calendar_total_h: calendar.total_h,
+    calendar_peak_h: calendar.peak_h,
+    modern_base_mwh: input.base_mwh,
+    modern_peak_mwh: input.peak_mwh,
+  });
+
+  return createExplicitHedgePurchase(database, {
+    portfolio_id: input.portfolio_id,
+    perspective_id: "modern",
+    month: input.month,
+    date: input.date,
+    calloff_id: input.calloff_id,
+    row,
+    first_price_eur_per_mwh: input.base_price_eur_per_mwh,
+    second_price_eur_per_mwh: input.peak_price_eur_per_mwh,
+    first_mwh: input.base_mwh,
+    second_mwh: input.peak_mwh,
+    fx_rate: input.fx_rate,
+    currency_quantity_eur: input.currency_quantity_eur,
+  });
 }
 
 export function createForecastHedgeCalloff(
@@ -419,6 +521,7 @@ export function createForecastHedgeTransactions(
   for (const row of input.rows) {
     for (const component of components) {
       const qFactor = getQFactorForComponentMonth(database, input.calloff.portfolio_id, component, row.month);
+      const mw = transactionMwForComponent(row, component.component);
       transactions.push(
         wrapDatabaseError(() =>
           insertTransaction(database, {
@@ -426,8 +529,14 @@ export function createForecastHedgeTransactions(
             calloff_id: input.calloff.calloff_id,
             month: row.month,
             productcomponent_id: component.productcomponent_id,
-            mw: transactionMwForComponent(row, component.component),
+            mw,
             q_factor: qFactor,
+            quantity: mw,
+            quantity_type: "MW",
+            price: resolveConfiguredComponentPrice(database, component, qFactor),
+            price_type: "EUR_PER_MWH",
+            factor: qFactor,
+            factor_type: "Q_FACTOR",
           }),
         ),
       );
@@ -435,6 +544,147 @@ export function createForecastHedgeTransactions(
   }
 
   return transactions;
+}
+
+function createExplicitHedgePurchase(
+  database: PrototypeDatabase,
+  input: {
+    portfolio_id: string;
+    perspective_id: "classic" | "modern";
+    month: string;
+    date?: string;
+    calloff_id?: string;
+    row: ForecastHedgeProfileRow;
+    first_mwh: number;
+    second_mwh: number;
+    first_price_eur_per_mwh: number;
+    second_price_eur_per_mwh: number;
+    fx_rate?: number;
+    currency_quantity_eur?: number;
+  },
+): ForecastHedgeAcceptResult {
+  const calloff = createForecastHedgeCalloff(database, {
+    portfolio_id: input.portfolio_id,
+    perspective_id: input.perspective_id,
+    date: input.date ?? currentIsoDate(),
+    delivery_start_month: input.month,
+    delivery_end_month: input.month,
+    calloff_id: input.calloff_id,
+  });
+  const profile: ForecastHedgeProfile = {
+    portfolio_id: input.portfolio_id,
+    start_month: input.month,
+    end_month: input.month,
+    percentage: input.row.percentage,
+    perspective_id: input.perspective_id,
+    rows: [input.row],
+  };
+  const powerTransactions = createForecastHedgeTransactions(database, { calloff, rows: [input.row] });
+  applyExplicitPowerPrices(database, powerTransactions, input.first_price_eur_per_mwh, input.second_price_eur_per_mwh);
+  const currencyTransaction = createCurrencyTransactionIfNeeded(database, {
+    calloff,
+    month: input.month,
+    eurAmount:
+      input.currency_quantity_eur ?? input.first_mwh * input.first_price_eur_per_mwh + input.second_mwh * input.second_price_eur_per_mwh,
+    fxRate: input.fx_rate ?? 11.25,
+  });
+  const transactions = currencyTransaction ? [...powerTransactions, currencyTransaction] : powerTransactions;
+  createPurchaseEventForCalloff(database, { calloff, transactions, source: "explicit_purchase" });
+  return { calloff, transactions, profile };
+}
+
+function applyExplicitPowerPrices(
+  database: PrototypeDatabase,
+  transactions: CustomerTransaction[],
+  basePrice: number,
+  peakPrice: number,
+): void {
+  for (const transaction of transactions) {
+    const component = database.productConfigurationComponents.get(transaction.productcomponent_id)?.component;
+    if (!component) {
+      continue;
+    }
+    if (component.startsWith("base.")) {
+      transaction.price = basePrice;
+    }
+    if (component.startsWith("peak.")) {
+      transaction.price = peakPrice;
+    }
+  }
+}
+
+function createCurrencyTransactionIfNeeded(
+  database: PrototypeDatabase,
+  input: { calloff: Calloff; month: string; eurAmount: number; fxRate: number },
+): CustomerTransaction | undefined {
+  const portfolio = database.portfolios.get(input.calloff.portfolio_id);
+  if (portfolio?.currency !== "SEK") {
+    return undefined;
+  }
+  const component = getCurrencyProductComponent(database, input.calloff.product_id);
+
+  return wrapDatabaseError(() =>
+    insertTransaction(database, {
+      transaction_id: nextTransactionId(database, input.calloff.calloff_id, input.month, component.component),
+      calloff_id: input.calloff.calloff_id,
+      month: input.month,
+      productcomponent_id: component.productcomponent_id,
+      mw: 0,
+      q_factor: 0,
+      quantity: input.eurAmount,
+      quantity_type: "EUR",
+      price: input.fxRate,
+      price_type: "SEK_PER_EUR",
+      factor: null,
+      factor_type: null,
+    }),
+  );
+}
+
+function createCurrencyTransactionsForPowerRows(
+  database: PrototypeDatabase,
+  calloff: Calloff,
+  powerTransactions: CustomerTransaction[],
+): CustomerTransaction[] {
+  const portfolio = database.portfolios.get(calloff.portfolio_id);
+  if (portfolio?.currency !== "SEK") {
+    return [];
+  }
+
+  const currencyComponent = getCurrencyProductComponent(database, calloff.product_id);
+  const fxRate = priceForComponent(database, currencyComponent);
+  const transactionsByMonth = new Map<string, CustomerTransaction[]>();
+  for (const transaction of powerTransactions) {
+    const transactions = transactionsByMonth.get(transaction.month) ?? [];
+    transactions.push(transaction);
+    transactionsByMonth.set(transaction.month, transactions);
+  }
+
+  const currencyTransactions: CustomerTransaction[] = [];
+  for (const [month, transactions] of [...transactionsByMonth.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+    const eurAmount = transactions.reduce((sum, transaction) => {
+      if (transaction.quantity_type !== "MW" || transaction.price_type !== "EUR_PER_MWH") {
+        return sum;
+      }
+      return sum + derivePowerTransactionEconomics(database, transaction).q_value_eur;
+    }, 0);
+    const currencyTransaction = createCurrencyTransactionIfNeeded(database, { calloff, month, eurAmount, fxRate });
+    if (currencyTransaction) {
+      currencyTransactions.push(currencyTransaction);
+    }
+  }
+
+  return currencyTransactions;
+}
+
+function getCurrencyProductComponent(database: PrototypeDatabase, productId: string): ProductConfigurationComponent {
+  const component = [...database.productConfigurationComponents.values()].find(
+    (candidate) => candidate.product_id === productId && candidate.component === "currency.eursek",
+  );
+  if (!component) {
+    throw new ForecastHedgeError("not_found", "missing currency.eursek product component");
+  }
+  return component;
 }
 
 function validateProfileInput(database: PrototypeDatabase, input: ForecastHedgeProfileInput): NormalizedInput {
@@ -465,9 +715,7 @@ function validateProfileInput(database: PrototypeDatabase, input: ForecastHedgeP
 }
 
 function getForecast(database: PrototypeDatabase, portfolioId: string, month: string) {
-  const forecast = [...database.forecasts.values()].find(
-    (candidate) => candidate.portfolio_id === portfolioId && candidate.month === month,
-  );
+  const forecast = getCanonicalForecast(database, portfolioId, month);
   if (!forecast) {
     throw new ForecastHedgeError("not_found", `missing forecast row for ${portfolioId} ${month}`);
   }
@@ -544,6 +792,12 @@ function getQFactorForComponentMonth(
   }
 
   return value.value;
+}
+
+function priceForComponent(database: PrototypeDatabase, component: ProductConfigurationComponent): number {
+  return (
+    [...database.priceComponents.values()].find((candidate) => candidate.productcomponent_id === component.productcomponent_id)?.price ?? 0
+  );
 }
 
 function assertMonth(value: string, label: string): void {

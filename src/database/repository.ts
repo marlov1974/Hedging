@@ -5,10 +5,12 @@ import {
   type Calloff,
   type CalloffWithTransactions,
   type Customer,
+  type EventDetail,
   type CustomerForecast,
   type CustomerPortfolio,
   type CustomerPortfolioWithForecasts,
   type CustomerTransaction,
+  type HedgingEvent,
   type PriceComponent,
   type PortfolioProductComponent,
   type ProductConfiguration,
@@ -52,6 +54,8 @@ export function insertCustomerPortfolio(database: PrototypeDatabase, input: Cust
   assertUniqueKey(database.portfolios, input.portfolio_id, "portfolio_id");
   assertRequiredString(input.name, "name");
   assertRequiredString(input.price_area, "price_area");
+  const currency = input.currency ?? "EUR";
+  assertRequiredString(currency, "currency");
 
   const customer = database.customers.get(input.customer_id);
   if (!customer) {
@@ -66,8 +70,9 @@ export function insertCustomerPortfolio(database: PrototypeDatabase, input: Cust
     throw new DatabaseError("invalid_input", "portfolio customer_number must match linked customer");
   }
 
-  database.portfolios.set(input.portfolio_id, input);
-  return input;
+  const portfolio = { ...input, currency };
+  database.portfolios.set(input.portfolio_id, portfolio);
+  return portfolio;
 }
 
 export function insertCustomerForecast(database: PrototypeDatabase, input: CustomerForecast): CustomerForecast {
@@ -87,6 +92,48 @@ export function insertCustomerForecast(database: PrototypeDatabase, input: Custo
 
   database.forecasts.set(input.forecast_id, input);
   database.forecastsByPortfolioMonth.set(portfolioMonthKey, input.forecast_id);
+  return input;
+}
+
+export function insertEvent(database: PrototypeDatabase, input: HedgingEvent): HedgingEvent {
+  assertUniqueKey(database.events, input.event_id, "event_id");
+  assertRequiredString(input.portfolio_id, "portfolio_id");
+  assertRequiredString(input.event_type, "event_type");
+  assertFiniteNumber(input.version, "version");
+  assertDate(input.created_at, "created_at");
+  assertFiniteNumber(input.created_order, "created_order");
+  assertRequiredString(input.source, "source");
+  assertRequiredString(input.status, "status");
+
+  if (!database.portfolios.has(input.portfolio_id)) {
+    throw new DatabaseError("not_found", `portfolio_id ${input.portfolio_id} does not exist`);
+  }
+  if (input.status !== "active" && input.status !== "cancelled") {
+    throw new DatabaseError("invalid_input", "event status must be active or cancelled");
+  }
+
+  database.events.set(input.event_id, input);
+  return input;
+}
+
+export function insertEventDetail(database: PrototypeDatabase, input: EventDetail): EventDetail {
+  assertUniqueKey(database.eventDetails, input.event_detail_id, "event_detail_id");
+  assertRequiredString(input.event_id, "event_id");
+  assertKnownComponentCode(input.component_code);
+  assertMonth(input.period, "period");
+  assertFiniteNumber(input.quantity, "quantity");
+  assertRequiredString(input.quantity_type, "quantity_type");
+  assertEventDetailNormalizedFields(input);
+
+  const event = database.events.get(input.event_id);
+  if (!event) {
+    throw new DatabaseError("not_found", `event_id ${input.event_id} does not exist`);
+  }
+  if (requiresPriceArea(input.component_code, event.event_type) && !input.price_area) {
+    throw new DatabaseError("invalid_input", `price_area is required for ${input.component_code}`);
+  }
+
+  database.eventDetails.set(input.event_detail_id, input);
   return input;
 }
 
@@ -228,6 +275,7 @@ export function insertTransaction(database: PrototypeDatabase, input: CustomerTr
   assertRequiredString(input.productcomponent_id, "productcomponent_id");
   assertFiniteNumber(input.mw, "mw");
   assertFiniteNumber(input.q_factor, "q_factor");
+  assertNormalizedTransactionFields(input);
 
   const calloff = database.calloffs.get(input.calloff_id);
   if (!calloff) {
@@ -245,6 +293,55 @@ export function insertTransaction(database: PrototypeDatabase, input: CustomerTr
 
   database.transactions.set(input.transaction_id, input);
   return input;
+}
+
+function assertNormalizedTransactionFields(input: CustomerTransaction): void {
+  if (input.quantity !== undefined) {
+    assertFiniteNumber(input.quantity, "quantity");
+  }
+  if (input.price !== undefined) {
+    assertFiniteNumber(input.price, "price");
+  }
+  if (input.factor !== undefined && input.factor !== null) {
+    assertFiniteNumber(input.factor, "factor");
+  }
+  if (input.quantity_type !== undefined && input.quantity_type !== "MW" && input.quantity_type !== "EUR") {
+    throw new DatabaseError("invalid_input", "quantity_type must be MW or EUR");
+  }
+  if (input.price_type !== undefined && input.price_type !== "EUR_PER_MWH" && input.price_type !== "SEK_PER_EUR") {
+    throw new DatabaseError("invalid_input", "price_type must be EUR_PER_MWH or SEK_PER_EUR");
+  }
+  if (input.factor_type !== undefined && input.factor_type !== null && input.factor_type !== "Q_FACTOR") {
+    throw new DatabaseError("invalid_input", "factor_type must be Q_FACTOR or null");
+  }
+}
+
+function assertEventDetailNormalizedFields(input: EventDetail): void {
+  if (input.price !== null) {
+    assertFiniteNumber(input.price, "price");
+  }
+  if (input.factor !== null) {
+    assertFiniteNumber(input.factor, "factor");
+  }
+  if (input.quantity_type !== "MW" && input.quantity_type !== "MWh" && input.quantity_type !== "EUR") {
+    throw new DatabaseError("invalid_input", "quantity_type must be MW, MWh or EUR");
+  }
+  if (input.price_type !== null && input.price_type !== "EUR_PER_MWH" && input.price_type !== "SEK_PER_EUR") {
+    throw new DatabaseError("invalid_input", "price_type must be EUR_PER_MWH, SEK_PER_EUR or null");
+  }
+  if (input.factor_type !== null && input.factor_type !== "Q_FACTOR") {
+    throw new DatabaseError("invalid_input", "factor_type must be Q_FACTOR or null");
+  }
+}
+
+function requiresPriceArea(componentCode: string, eventType: string): boolean {
+  if (/^(base|peak)\.(sto|mal|lul|sun)$/.test(componentCode)) {
+    return true;
+  }
+  if (eventType === "PURCHASE" && (componentCode === "base.sys" || componentCode === "peak.sys")) {
+    return true;
+  }
+  return false;
 }
 
 export function getCustomerPortfolioWithForecasts(

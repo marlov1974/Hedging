@@ -4,6 +4,8 @@ P0020 adds the first monthly financial settlement report to the hedging tool.
 
 The report is a PoC feature for Baseloads hedges. It uses synthetic in-memory hedge transactions and P0019 static monthly spot actuals.
 
+For the normalized currency model introduced in P0041, see [Currency Component Model](currency_component_model.md). Power rows remain EUR-denominated; `currency.eursek` rows are separate currency legs and are not MWh exposure.
+
 ## Month Selector
 
 The feature provides a month dropdown using the seeded/static range:
@@ -78,3 +80,7 @@ Positive value means spot price is above hedge price.
 - Uses static synthetic spot actuals.
 - Uses the P0019 `STO` static price-area bridge while seeded portfolios currently use `SE3`.
 - In-memory transactions only.
+
+## P0042 Currency Note
+
+Classic/Modern calloff and position reports can show SEK display values from traded `currency.eursek` rows. Financial settlement remains a separate settlement view and does not treat currency rows as power exposure.

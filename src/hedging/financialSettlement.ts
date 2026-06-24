@@ -106,7 +106,7 @@ export function combineSysAndEpadHedgePrice(database: PrototypeDatabase, transac
 
   const representativeMwh = Math.max(...componentMwh.map((row) => row.mwh));
   const weightedPriceSum = componentMwh.reduce((sum, row) => sum + row.mwh * row.price, 0);
-  const hedgePrice = representativeMwh === 0 ? 0 : weightedPriceSum / representativeMwh;
+  const hedgePrice = representativeMwh === 0 ? 0 : roundPrice(weightedPriceSum / representativeMwh);
   const months = [...new Set(componentRows.map((row) => row.transaction.month))].sort();
 
   return {
@@ -181,5 +181,9 @@ function getWeightedComponentPrice(
     mwhSum += mwh;
   }
 
-  return mwhSum === 0 ? 0 : weightedPriceSum / mwhSum;
+  return mwhSum === 0 ? 0 : roundPrice(weightedPriceSum / mwhSum);
+}
+
+function roundPrice(price: number): number {
+  return Math.round(price * 100) / 100;
 }

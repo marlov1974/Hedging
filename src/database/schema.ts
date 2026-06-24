@@ -2,9 +2,11 @@ import type {
   Calendar,
   Calloff,
   Customer,
+  EventDetail,
   CustomerForecast,
   CustomerPortfolio,
   CustomerTransaction,
+  HedgingEvent,
   PriceComponent,
   PortfolioProductComponent,
   ProductConfiguration,
@@ -20,6 +22,8 @@ export type PrototypeDatabase = {
   portfolios: Map<string, CustomerPortfolio>;
   forecasts: Map<string, CustomerForecast>;
   forecastsByPortfolioMonth: Map<string, string>;
+  events: Map<string, HedgingEvent>;
+  eventDetails: Map<string, EventDetail>;
   productConfigurations: Map<string, ProductConfiguration>;
   productConfigurationComponents: Map<string, ProductConfigurationComponent>;
   priceComponents: Map<string, PriceComponent>;
@@ -39,6 +43,8 @@ export function createSchema(): PrototypeDatabase {
     portfolios: new Map(),
     forecasts: new Map(),
     forecastsByPortfolioMonth: new Map(),
+    events: new Map(),
+    eventDetails: new Map(),
     productConfigurations: new Map(),
     productConfigurationComponents: new Map(),
     priceComponents: new Map(),

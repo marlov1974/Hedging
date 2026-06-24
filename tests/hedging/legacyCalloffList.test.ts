@@ -51,8 +51,8 @@ describe("Peaks.Classic Legacy Calloff List", () => {
     assert.equal(offpeak?.value, 4250);
     assert.equal(peak?.mw, 0.15625);
     assert.equal(peak?.mwh, 50);
-    assert.equal(peak?.price, 88.075269);
-    assertApprox(peak?.value, 4403.76344);
+    assert.equal(peak?.price, 96.88172);
+    assertApprox(peak?.value, 4844.08602);
   });
 
   it("preserves canonical total value", () => {
@@ -60,7 +60,7 @@ describe("Peaks.Classic Legacy Calloff List", () => {
     const rows = getLegacyCalloffListRows(database, "CUS01-0");
 
     const projectedValue = rows.reduce((sum, row) => sum + row.value, 0);
-    assertApprox(projectedValue, 8653.76344);
+    assertApprox(projectedValue, 9094.08602);
   });
 
   it("allows negative peak MW and can project peak price below base price", () => {
@@ -178,7 +178,7 @@ describe("Peaks.Classic Legacy Calloff List", () => {
     const database = createWorkedExampleDatabase({ use_legacy_peak_premium_components: true });
     const peak = getLegacyCalloffListRows(database, "CUS01-0").find((row) => row.block === "Peak");
 
-    assert.equal(peak?.price, 88.075269);
+    assert.equal(peak?.price, 96.88172);
   });
 });
 
