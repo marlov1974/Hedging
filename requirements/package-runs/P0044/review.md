@@ -15,7 +15,7 @@ The package is intentionally broad. A full rename of all existing `calloff` and 
 Assumptions:
 
 - `base.epad`, `peak.epad` and `allocation.peak.epad` remain accepted compatibility components for existing purchase/report tests.
-- Forecast event details use `quantity_type = MWh`; purchase event details use the existing normalized transaction quantity fields, usually `MW`.
+- Forecast event details use `quantity_type = MW`; forecast MWh is derived from component hour basis and calendar hours. Purchase event details use the existing normalized transaction quantity fields, usually `MW`.
 - SYS purchase event details are split across supported synthetic price areas so each SYS detail has `price_area`.
 - The supported price areas are synthetic public-safe model values: `STO`, `MAL`, `LUL`, `SUN`.
 

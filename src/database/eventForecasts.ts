@@ -50,6 +50,8 @@ export function createForecastEventDetailsForForecast(
 
   deleteEventDetails(database, eventId);
   const peakMwh = forecast.mwh * forecast.peak_pct;
+  const totalH = forecastHoursForComponent(database, forecast.month, "base.sto");
+  const peakH = forecastHoursForComponent(database, forecast.month, "peak.sto");
   const eventDetails = PRICE_AREA_SHARES.flatMap(({ price_area: priceArea, share }) => [
     insertEventDetail(database, {
       event_detail_id: forecastEventDetailId(eventId, `base.${priceArea.toLowerCase()}`),
@@ -57,8 +59,8 @@ export function createForecastEventDetailsForForecast(
       component_code: `base.${priceArea.toLowerCase()}`,
       period: forecast.month,
       price_area: priceArea,
-      quantity: roundQuantity(forecast.mwh * share),
-      quantity_type: "MWh",
+      quantity: roundStoredQuantity((forecast.mwh * share) / totalH),
+      quantity_type: "MW",
       price: null,
       price_type: null,
       factor: null,
@@ -70,8 +72,8 @@ export function createForecastEventDetailsForForecast(
       component_code: `peak.${priceArea.toLowerCase()}`,
       period: forecast.month,
       price_area: priceArea,
-      quantity: roundQuantity(peakMwh * share),
-      quantity_type: "MWh",
+      quantity: roundStoredQuantity((peakMwh * share) / peakH),
+      quantity_type: "MW",
       price: null,
       price_type: null,
       factor: null,
@@ -93,12 +95,21 @@ export function getCanonicalForecast(database: PrototypeDatabase, portfolioId: s
   }
 
   const details = getEventDetails(database, event.event_id).filter((detail) => detail.period === month);
-  const baseMwh = details
-    .filter((detail) => detail.quantity_type === "MWh" && /^base\.(sto|mal|lul|sun)$/.test(detail.component_code))
-    .reduce((sum, detail) => sum + detail.quantity, 0);
-  const peakMwh = details
-    .filter((detail) => detail.quantity_type === "MWh" && /^peak\.(sto|mal|lul|sun)$/.test(detail.component_code))
-    .reduce((sum, detail) => sum + detail.quantity, 0);
+  let baseMwh = 0;
+  let peakMwh = 0;
+  try {
+    baseMwh = details
+      .filter((detail) => /^base\.(sto|mal|lul|sun)$/.test(detail.component_code))
+      .reduce((sum, detail) => sum + forecastDetailMwh(database, detail), 0);
+    peakMwh = details
+      .filter((detail) => /^peak\.(sto|mal|lul|sun)$/.test(detail.component_code))
+      .reduce((sum, detail) => sum + forecastDetailMwh(database, detail), 0);
+  } catch (error) {
+    if (error instanceof Error && /Missing calendar/.test(error.message)) {
+      return getCompatibilityForecast(database, portfolioId, month);
+    }
+    throw error;
+  }
 
   if (baseMwh <= 0) {
     return getCompatibilityForecast(database, portfolioId, month);
@@ -141,15 +152,25 @@ export function getForecastAreaShares(database: PrototypeDatabase, portfolioId: 
     return PRICE_AREA_SHARES;
   }
   const baseDetails = getEventDetails(database, event.event_id).filter(
-    (detail) => detail.quantity_type === "MWh" && detail.price_area && /^base\.(sto|mal|lul|sun)$/.test(detail.component_code),
+    (detail) => detail.price_area && /^base\.(sto|mal|lul|sun)$/.test(detail.component_code),
   );
-  const total = baseDetails.reduce((sum, detail) => sum + detail.quantity, 0);
+  let baseMwhByArea: { detail: EventDetail; mwh: number }[] = [];
+  let total = 0;
+  try {
+    baseMwhByArea = baseDetails.map((detail) => ({ detail, mwh: forecastDetailMwh(database, detail) }));
+    total = baseMwhByArea.reduce((sum, row) => sum + row.mwh, 0);
+  } catch (error) {
+    if (error instanceof Error && /Missing calendar/.test(error.message)) {
+      return PRICE_AREA_SHARES;
+    }
+    throw error;
+  }
   if (total <= 0) {
     return PRICE_AREA_SHARES;
   }
-  return baseDetails.map((detail) => ({
+  return baseMwhByArea.map(({ detail, mwh }) => ({
     price_area: detail.price_area as SupportedPriceArea,
-    share: detail.quantity / total,
+    share: mwh / total,
   }));
 }
 
@@ -303,12 +324,37 @@ function purchaseEventDetailId(
   return `${eventId}:${transactionId}:${componentCode}:${priceArea ?? "NA"}:${String(index).padStart(2, "0")}`;
 }
 
+function forecastDetailMwh(database: PrototypeDatabase, detail: EventDetail): number {
+  if (detail.quantity_type === "MWh") {
+    return detail.quantity;
+  }
+  if (detail.quantity_type !== "MW") {
+    return 0;
+  }
+  return detail.quantity * forecastHoursForComponent(database, detail.period, detail.component_code);
+}
+
+function forecastHoursForComponent(database: PrototypeDatabase, month: string, componentCode: string): number {
+  const calendar = [...database.calendars.values()].find((candidate) => candidate.month === month);
+  if (!calendar) {
+    throw new Error(`Missing calendar for ${month}`);
+  }
+  if (componentCode.startsWith("peak.")) {
+    return calendar.peak_h;
+  }
+  return calendar.total_h;
+}
+
 function nextEventOrder(database: PrototypeDatabase, eventId: string): number {
   return database.events.get(eventId)?.created_order ?? database.events.size + 1;
 }
 
 function roundQuantity(value: number): number {
   return Number(value.toFixed(6));
+}
+
+function roundStoredQuantity(value: number): number {
+  return Number(value.toFixed(9));
 }
 
 function roundDecimal(value: number): number {

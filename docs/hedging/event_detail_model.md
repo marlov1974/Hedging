@@ -51,7 +51,12 @@ factor
 factor_type
 ```
 
-Forecast details normally store `quantity_type = MWh` and leave price/factor fields null.
+Forecast power details store `quantity_type = MW` and leave price/factor fields null. Forecast MWh is derived from component hour basis and calendar hours:
+
+```text
+base.<area> MWh = MW * total_h
+peak.<area> MWh = MW * peak_h
+```
 
 Purchase details mirror normalized purchase economics from the compatibility transaction rows. Power rows normally use `quantity_type = MW`. Currency rows use `quantity_type = EUR` and `price_type = SEK_PER_EUR`.
 

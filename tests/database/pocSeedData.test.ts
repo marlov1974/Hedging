@@ -95,11 +95,22 @@ describe("P0015 PoC seed data", () => {
     assert.equal(forecastEvents.length, database.forecasts.size);
     assert.equal(details.length, 8);
     assert.deepEqual([...new Set(details.map((detail) => detail.price_area))].sort(), ["LUL", "MAL", "STO", "SUN"]);
-    assert.equal(details.every((detail) => detail.quantity_type === "MWh"), true);
+    assert.equal(details.every((detail) => detail.quantity_type === "MW"), true);
     assert.equal(details.some((detail) => detail.component_code === "base.epad" || detail.component_code === "peak.epad"), false);
     assert.equal(details.every((detail) => componentCodeConcept(detail.component_code) === "canonical"), true);
+    const calendar = [...database.calendars.values()].find((candidate) => candidate.month === "2027-01");
+    assert.ok(calendar);
     assert.equal(
-      details.filter((detail) => detail.component_code.startsWith("base.")).reduce((sum, detail) => sum + detail.quantity, 0),
+      Number(details.filter((detail) => detail.component_code.startsWith("base.")).reduce((sum, detail) => sum + detail.quantity, 0).toFixed(6)),
+      Number((1230 / calendar.total_h).toFixed(6)),
+    );
+    assert.equal(
+      Number(
+        details
+          .filter((detail) => detail.component_code.startsWith("base."))
+          .reduce((sum, detail) => sum + detail.quantity * calendar.total_h, 0)
+          .toFixed(6),
+      ),
       1230,
     );
   });

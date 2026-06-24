@@ -139,7 +139,7 @@ P0044 adds explicit price-area components for event details. New forecast event 
 | --- | --- |
 | component category | `base` |
 | persisted source of truth | yes |
-| stored unit | event details may use MWh for forecasts or MW for purchases |
+| stored unit | MW |
 | hour basis | `total_h` |
 | price_area required | yes |
 | meaning | explicit price-area base exposure |
@@ -182,7 +182,7 @@ P0044 adds explicit price-area components for event details. New forecast event 
 | --- | --- |
 | component category | `peak` |
 | persisted source of truth | yes |
-| stored unit | event details may use MWh for forecasts or MW for purchases |
+| stored unit | MW |
 | hour basis | `peak_h` |
 | price_area required | yes |
 | meaning | explicit price-area peak exposure |

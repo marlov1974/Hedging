@@ -188,6 +188,8 @@ describe("Data Viewer", () => {
     assert.equal(rows.length, 96);
     assert.equal(rows[0].event_type, "FORECAST");
     assert.equal(rows.some((row) => row.component_code === "base.sto" && row.price_area === "STO"), true);
+    assert.equal(rows.some((row) => row.component_code === "base.sto" && row.quantity_type === "MW" && row.quantity === 0.661290323), true);
+    assert.equal(rows.some((row) => row.component_code === "peak.sto" && row.quantity_type === "MW" && row.quantity === 0.732142857), true);
     assert.equal(rows.some((row) => row.component_code === "base.epad"), false);
   });
 

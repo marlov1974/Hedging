@@ -13,7 +13,8 @@ P0044 starts the source model migration from forecast/calloff/transaction-specif
   - `peak.sto`, `peak.mal`, `peak.lul`, `peak.sun`
 - Add a small forecast event model helper that:
   - creates canonical `FORECAST` events and area event details,
-  - derives the existing `CustomerForecast` shape from forecast event details,
+  - stores forecast power quantities as `MW`,
+  - derives the existing `CustomerForecast` MWh/peak percentage shape from forecast event details and calendar hours,
   - syncs edits back into event details.
 - Seed data keeps legacy `CustomerForecast` rows for compatibility and also creates matching forecast events.
 - Forecast and Hedge Forecast reads go through the canonical forecast helper.
@@ -30,7 +31,7 @@ P0044 starts the source model migration from forecast/calloff/transaction-specif
 ## Test strategy
 
 - Unit tests for event/event_detail inserts and validation.
-- Seed tests for forecast events, price_area, and no generic EPAD forecast event details.
+- Seed tests for forecast events, MW storage with derived MWh, price_area, and no generic EPAD forecast event details.
 - Forecast feature tests that Classic/Modern views derive from canonical forecast events.
 - Hedge Forecast tests that purchase events/details are created, SYS details carry price_area, area component details exist, and currency remains intact.
 - Data Viewer tests for forecast event detail and projected forecast tables.

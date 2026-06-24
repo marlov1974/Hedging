@@ -124,7 +124,7 @@ factor
 factor_type
 ```
 
-Forecast event details use explicit price-area components such as `base.sto` and `peak.sto`. Generic EPAD forecast details are not written for new seed data.
+Forecast event details use explicit price-area components such as `base.sto` and `peak.sto`. They store power as `MW`; forecast `MWh` is derived from calendar hours and component hour basis. Generic EPAD forecast details are not written for new seed data.
 
 Legacy calloff and transaction rows remain in the compatibility layer for older purchase/report code, but they are not canonical Data Viewer tables.
 

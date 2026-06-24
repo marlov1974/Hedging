@@ -54,7 +54,7 @@ CustomerForecast.mwh = total_mwh
 CustomerForecast.peak_pct = peak_pct
 ```
 
-The saved compatibility row is synced back to canonical forecast event details.
+The saved compatibility row is synced back to canonical forecast event details. Canonical forecast details store power as MW; displayed MWh is derived with `total_h` for `base.<area>` and `peak_h` for `peak.<area>`.
 
 ## Validation
 

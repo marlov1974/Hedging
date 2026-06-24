@@ -17,14 +17,14 @@
   - Tests: database event model tests.
 
 - `createForecastEventDetailsForForecast(database, forecast)`
-  - Purpose: create canonical price-area forecast event details from a compatibility forecast row.
+  - Purpose: create canonical price-area forecast event details from a compatibility forecast row, storing power as MW.
   - Inputs: database and `CustomerForecast`.
   - Output: created event and event details.
   - Side effects: inserts event rows.
   - Tests: seed and forecast event tests.
 
 - `getCanonicalForecast(database, portfolioId, month)`
-  - Purpose: derive forecast total MWh and peak percentage from canonical forecast event details.
+  - Purpose: derive forecast total MWh and peak percentage from canonical forecast event details using calendar hours.
   - Inputs: database, portfolio id, month.
   - Output: forecast-like values.
   - Side effects: none.

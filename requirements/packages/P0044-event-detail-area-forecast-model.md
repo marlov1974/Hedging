@@ -126,6 +126,17 @@ quantity_type
 
 Forecast is not a purchase event and not an initial calloff.
 
+Forecast power quantities must be stored as `quantity_type = MW`.
+
+Forecast `MWh` is a projected/derived customer quantity:
+
+```text
+base.<area> MWh = base.<area> MW * calendar.total_h
+peak.<area> MWh = peak.<area> MW * calendar.peak_h
+```
+
+Forecast UI features may continue to accept and display MWh, but saving forecast source rows must convert MWh to MW before writing canonical event details.
+
 ## Price-area components
 
 Replace generic EPAD forecast details with explicit area components:
@@ -202,17 +213,18 @@ Add or update focused tests for:
 
 1. event and event_detail structures,
 2. forecast stored as `FORECAST` event with event details,
-3. `price_area` on forecast event details,
-4. area components recognized,
-5. generic EPAD components not used for new forecast seed event details,
-6. Forecast Classic/Modern views over canonical events,
-7. Hedge Forecast reading canonical forecast events,
-8. Hedge Forecast creating purchase events/details,
-9. SYS purchase details per price area,
-10. area purchase details,
-11. currency behavior retained,
-12. Classic/Modern projected model compatibility,
-13. existing P0037-P0043 tests still passing or deliberately updated.
+3. forecast event detail power stored as `MW` with MWh derived from calendar hours,
+4. `price_area` on forecast event details,
+5. area components recognized,
+6. generic EPAD components not used for new forecast seed event details,
+7. Forecast Classic/Modern views over canonical events,
+8. Hedge Forecast reading canonical forecast events,
+9. Hedge Forecast creating purchase events/details,
+10. SYS purchase details per price area,
+11. area purchase details,
+12. currency behavior retained,
+13. Classic/Modern projected model compatibility,
+14. existing P0037-P0043 tests still passing or deliberately updated.
 
 Prefer focused model/function tests over brittle UI snapshots.
 
