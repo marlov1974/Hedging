@@ -228,6 +228,7 @@ requirements/packages/P0036-peaks-classic-forecast-and-hedge-forecast.md
 requirements/packages/P0037-component-catalog-and-projected-component-glossary.md
 requirements/packages/P0038-runtime-component-code-cleanup.md
 requirements/packages/P0039-data-viewer-projection-cleanup.md
+requirements/packages/P0040-position-calloff-ui-and-derivative-names.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
