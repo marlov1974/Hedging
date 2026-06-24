@@ -1,5 +1,7 @@
 # Modern Projected Transactions
 
+For the runtime distinction between source-of-truth components and projected `modern.*` names, see [Component Catalog](component_catalog.md).
+
 `Modern Projected Transactions` is a Data Viewer table that projects canonical Peaks calloff transactions into Modern component rows.
 
 Core columns:

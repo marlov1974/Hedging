@@ -1,40 +1,8 @@
 import { DatabaseError } from "./types.ts";
-import { isKnownComponentCode } from "./canonicalComponents.ts";
+import { isPersistableComponentCode, isProjectedOnlyComponentCode } from "./canonicalComponents.ts";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
-
-const KNOWN_COMPONENT_CODES = new Set([
-  "base",
-  "sys",
-  "epad",
-  "base.sys",
-  "base.epad",
-  "base.classic.sys",
-  "base.classic.epad",
-  "peak",
-  "offpeak",
-  "peak.classic.sys",
-  "peak.classic.epad",
-  "allocation.peak",
-  "allocation.peak.sys",
-  "allocation.peak.epad",
-  "peak.modern.sys",
-  "peak.modern.epad",
-  "peak.premium.sys",
-  "peak.premium.epad",
-  "peak.sys",
-  "peak.epad",
-  "profile.peak",
-  "profile.15m",
-  "profile.sys",
-  "profile.epad",
-  "volume",
-  "volume.flex",
-  "fixed",
-  "calendar",
-  "currency.sek",
-]);
 
 export function assertRequiredString(value: string, fieldName: string): void {
   if (typeof value !== "string" || value.trim() === "") {
@@ -61,7 +29,10 @@ export function assertFiniteNumber(value: number, fieldName: string): void {
 }
 
 export function assertKnownComponentCode(component: string): void {
-  if (!KNOWN_COMPONENT_CODES.has(component) && !isKnownComponentCode(component)) {
+  if (isProjectedOnlyComponentCode(component)) {
+    throw new DatabaseError("invalid_input", `projected-only component code ${component} cannot be persisted`);
+  }
+  if (!isPersistableComponentCode(component)) {
     throw new DatabaseError("invalid_input", `unknown component code ${component}`);
   }
 }
