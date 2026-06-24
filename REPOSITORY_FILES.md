@@ -222,6 +222,7 @@ requirements/packages/P0034-universal-model-perspective-features.md
 requirements/packages/P0035-single-portfolio-feature-perspective-tabs.md
 requirements/packages/P0036-peaks-classic-forecast-and-hedge-forecast.md
 requirements/packages/P0037-component-catalog-and-projected-component-glossary.md
+requirements/packages/P0038-runtime-component-code-cleanup.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
