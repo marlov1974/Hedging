@@ -11,7 +11,8 @@ This package introduces:
 3. explicit price-area components replacing generic EPAD components,
 4. price area carried on event details/transactions, including SYS purchases,
 5. updated Forecast and Hedge Forecast features built on canonical events and projected Classic/Modern views,
-6. forecast power quantities stored as MW, with MWh derived in projections and reports.
+6. forecast power quantities stored as MW, with MWh derived in projections and reports,
+7. mandatory price-area selection when buying a percentage of forecast in this version.
 
 This is a larger model refactor package. It should preserve public-safe synthetic data only.
 
@@ -412,7 +413,30 @@ Rules:
 - Different hedge percentages for SYS and area components must be supported.
 - It must be possible to buy 80 percent SYS and 50 percent area components, then later add more area hedges closer to delivery.
 
-## 10. SYS purchase rule
+## 10. Mandatory price-area selection for percent-of-forecast purchases
+
+In this version, when the user buys a percentage of forecast, the user must choose price area explicitly.
+
+This applies to both Modern and Classic.
+
+This applies to both SYS and area components.
+
+Rules:
+
+- Percent-of-forecast purchase requires `price_area` input.
+- The UI must not allow a percent-of-forecast purchase without selected price area.
+- The rule applies in both the Modern Hedge Forecast flow and the Classic Hedge Forecast flow.
+- The purchase calculation uses the selected price area's forecast event details as the basis.
+- For SYS purchases, the created detail uses `component_code = base.sys` or `peak.sys`, but still carries the selected `price_area`.
+- For area purchases, the created detail uses the selected area's area component, e.g. `base.sto`, `base.mal`, `peak.sto`, or `peak.mal`.
+- Buying a percentage of forecast for several price areas requires one explicit selection/action per price area, or an explicit multi-area UI action that still expands into one purchase detail per selected price area.
+- No implicit all-area allocation is allowed in this version.
+
+Reason:
+
+The model must know which price area's forecast was used as the basis for the percent calculation. This is required both for later reconciliation and to avoid creating SYS or area purchase details that cannot be tied back to the selected price-area forecast.
+
+## 11. SYS purchase rule
 
 Default rule for this package:
 
@@ -446,7 +470,7 @@ Open design reservation:
 The model may later support unmarked/unallocated SYS rows, but that is not the default in this package.
 ```
 
-## 11. Projections and reports
+## 12. Projections and reports
 
 Classic and Modern projected models should carry the new event/event_detail and price-area structure.
 
@@ -473,7 +497,7 @@ area coverage percent
 remaining/unhedged area exposure
 ```
 
-## 12. Documentation updates
+## 13. Documentation updates
 
 Update or create concise documentation, likely:
 
@@ -506,13 +530,15 @@ Add or update tests to validate at least:
 10. Forecast feature can show Modern view while storing canonical forecast events.
 11. Hedge Forecast reads canonical forecast events.
 12. Hedge Forecast creates purchase events/event details.
-13. SYS purchase for all supported areas creates one SYS detail per price area.
-14. SYS details carry `price_area`.
-15. Area purchases create area component details.
-16. Different SYS and area hedge percentages are allowed.
-17. Currency details still work with `currency.eursek`.
-18. Classic/Modern projected models carry price-area detail.
-19. Existing P0037-P0043 tests still pass or are deliberately updated.
+13. Percent-of-forecast purchase requires selected price area.
+14. The price-area selection rule applies to both Classic and Modern Hedge Forecast flows.
+15. SYS purchase for all supported areas creates one SYS detail per price area.
+16. SYS details carry `price_area`.
+17. Area purchases create area component details.
+18. Different SYS and area hedge percentages are allowed.
+19. Currency details still work with `currency.eursek`.
+20. Classic/Modern projected models carry price-area detail.
+21. Existing P0037-P0043 tests still pass or are deliberately updated.
 
 Prefer focused model/function tests over brittle full UI snapshots.
 
@@ -530,6 +556,8 @@ Do not redesign currency semantics from P0041/P0042.
 
 Do not keep MWh as the canonical stored power forecast quantity, except as temporary documented compatibility.
 
+Do not allow implicit all-area percent-of-forecast purchases in this package.
+
 ## Expected result
 
 After this package:
@@ -543,6 +571,7 @@ After this package:
 - SYS forecast can be derived from area forecast,
 - Forecast feature projects canonical events into Classic/Modern views,
 - Hedge Forecast creates purchase events from canonical forecast events,
+- percent-of-forecast purchases require selected price area in both Classic and Modern,
 - SYS purchases are marked per price area,
 - the model supports different SYS and area hedge percentages.
 
@@ -571,6 +600,7 @@ Report:
 - EPAD compatibility behavior,
 - Forecast feature Classic/Modern projection behavior,
 - Hedge Forecast behavior,
+- percent-of-forecast price-area selection behavior,
 - SYS purchase per price area behavior,
 - currency behavior retained/changed,
 - tests added/updated,
