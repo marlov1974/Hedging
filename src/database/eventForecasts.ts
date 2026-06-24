@@ -124,6 +124,48 @@ export function getCanonicalForecast(database: PrototypeDatabase, portfolioId: s
   };
 }
 
+export function getCanonicalForecastForPriceArea(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  month: string,
+  priceArea: SupportedPriceArea,
+): CanonicalForecast | undefined {
+  const event = getForecastEvent(database, portfolioId, month);
+  if (!event) {
+    return getCompatibilityForecastForPriceArea(database, portfolioId, month, priceArea);
+  }
+
+  const areaCode = priceArea.toLowerCase();
+  const details = getEventDetails(database, event.event_id).filter((detail) => detail.period === month && detail.price_area === priceArea);
+  let baseMwh = 0;
+  let peakMwh = 0;
+  try {
+    baseMwh = details
+      .filter((detail) => detail.component_code === `base.${areaCode}`)
+      .reduce((sum, detail) => sum + forecastDetailMwh(database, detail), 0);
+    peakMwh = details
+      .filter((detail) => detail.component_code === `peak.${areaCode}`)
+      .reduce((sum, detail) => sum + forecastDetailMwh(database, detail), 0);
+  } catch (error) {
+    if (error instanceof Error && /Missing calendar/.test(error.message)) {
+      return getCompatibilityForecastForPriceArea(database, portfolioId, month, priceArea);
+    }
+    throw error;
+  }
+
+  if (baseMwh <= 0) {
+    return getCompatibilityForecastForPriceArea(database, portfolioId, month, priceArea);
+  }
+
+  return {
+    forecast_id: event.event_id,
+    portfolio_id: portfolioId,
+    month,
+    mwh: roundQuantity(baseMwh),
+    peak_pct: roundDecimal(peakMwh / baseMwh),
+  };
+}
+
 export function getCanonicalForecasts(database: PrototypeDatabase, portfolioId: string): CanonicalForecast[] {
   const months = new Set<string>();
   for (const event of database.events.values()) {
@@ -223,6 +265,22 @@ function eventDetailsForTransaction(
     ];
   }
 
+  if (transaction.price_area) {
+    const priceArea = transaction.price_area as SupportedPriceArea;
+    const detailComponent = eventDetailComponentForTransaction(componentCode, priceArea);
+    return [
+      eventDetailFromTransaction(
+        eventId,
+        transaction,
+        detailComponent,
+        priceArea,
+        transaction.quantity ?? transaction.mw,
+        transaction.quantity_type ?? "MW",
+        0,
+      ),
+    ];
+  }
+
   const shares = getForecastAreaShares(database, calloff.portfolio_id, transaction.month);
   return shares.map(({ price_area: priceArea, share }, index) => {
     const detailComponent = eventDetailComponentForTransaction(componentCode, priceArea);
@@ -300,6 +358,23 @@ function getCompatibilityForecast(database: PrototypeDatabase, portfolioId: stri
     (candidate) => candidate.portfolio_id === portfolioId && candidate.month === month,
   );
   return forecast ? { ...forecast } : undefined;
+}
+
+function getCompatibilityForecastForPriceArea(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  month: string,
+  priceArea: SupportedPriceArea,
+): CanonicalForecast | undefined {
+  const forecast = getCompatibilityForecast(database, portfolioId, month);
+  if (!forecast) {
+    return undefined;
+  }
+  const share = PRICE_AREA_SHARES.find((candidate) => candidate.price_area === priceArea)?.share ?? 0;
+  return {
+    ...forecast,
+    mwh: roundQuantity(forecast.mwh * share),
+  };
 }
 
 function forecastEventId(portfolioId: string, month: string): string {

@@ -83,15 +83,12 @@ Generic EPAD rows are not stored as new forecast event details. SYS forecast val
 
 Hedge Forecast accept still creates compatibility calloff/transaction rows and also creates a `PURCHASE` event.
 
-SYS purchases are recorded per price area:
+Percent-of-forecast SYS purchases are recorded with the selected price area:
 
 ```text
 base.sys price_area = STO
-base.sys price_area = MAL
-base.sys price_area = LUL
-base.sys price_area = SUN
 ```
 
-Area purchase details use explicit area components such as `base.sto` and `peak.sto`.
+Area purchase details use explicit area components such as `base.sto` and `peak.sto` for the selected area.
 
 `base.epad`, `peak.epad` and `allocation.peak.epad` remain compatibility transaction components until a later package migrates purchase storage fully.

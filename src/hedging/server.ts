@@ -120,6 +120,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
       const start_month = String(body.get("start_month") ?? "");
       const end_month = String(body.get("end_month") ?? "");
       const percentage = String(body.get("percentage") ?? "");
+      const price_area = String(body.get("price_area") ?? "");
 
       try {
         const profile = buildForecastHedgeProfile(database, {
@@ -127,6 +128,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           start_month,
           end_month,
           percentage,
+          price_area,
           perspective_id,
         });
         writeHtml(
@@ -148,7 +150,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
             portfolio_id,
             perspective_id,
             feature_id: "forecast-hedge",
-            forecast_hedge_input: { start_month, end_month, percentage },
+            forecast_hedge_input: { start_month, end_month, percentage, price_area },
             error: message,
           }),
         );
@@ -163,6 +165,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
       const start_month = String(body.get("start_month") ?? "");
       const end_month = String(body.get("end_month") ?? "");
       const percentage = String(body.get("percentage") ?? "");
+      const price_area = String(body.get("price_area") ?? "");
       const months = body.getAll("month").map((month) => String(month));
 
       try {
@@ -171,6 +174,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
           start_month,
           end_month,
           percentage,
+          price_area,
           perspective_id,
           rows: months.map((month) => ({
             month,
@@ -196,7 +200,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
         const message = error instanceof ForecastHedgeError ? error.message : "Forecast hedge accept failed";
         let profile;
         try {
-          profile = buildForecastHedgeProfile(database, { portfolio_id, start_month, end_month, percentage, perspective_id });
+          profile = buildForecastHedgeProfile(database, { portfolio_id, start_month, end_month, percentage, price_area, perspective_id });
         } catch {
           profile = undefined;
         }
@@ -208,7 +212,7 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
             perspective_id,
             feature_id: "forecast-hedge",
             forecast_hedge_profile: profile,
-            forecast_hedge_input: { start_month, end_month, percentage },
+            forecast_hedge_input: { start_month, end_month, percentage, price_area },
             error: message,
           }),
         );

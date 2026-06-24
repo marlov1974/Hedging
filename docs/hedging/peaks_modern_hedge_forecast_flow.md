@@ -25,9 +25,10 @@ The user selects:
 start_month
 end_month
 percentage
+price_area
 ```
 
-The percentage scales both forecast modern values:
+`price_area` is mandatory for percent-of-forecast purchases. The profile is built from the selected area's forecast event details. The percentage scales both selected-area forecast modern values:
 
 ```text
 hedge_modern_base_mwh = forecast_modern_base_mwh * percentage
@@ -95,7 +96,7 @@ Modern projected Data Viewer rows can still show `modern.*` rows after accept be
 
 For SEK portfolios, explicit purchase helpers also add a `currency.eursek` transaction carrying EUR quantity and SEK_PER_EUR rate.
 
-SYS purchase event details are split by supported price area. Area-side purchase details use explicit area components such as `base.sto` and `peak.sto`.
+Percent-of-forecast purchase event details use the selected price area only. SYS details keep `base.sys` / `peak.sys` component codes and carry the selected `price_area`. Area-side compatibility rows become explicit area details such as `base.sto` and `peak.sto` when `STO` is selected.
 
 ## Q-Factor Usage
 

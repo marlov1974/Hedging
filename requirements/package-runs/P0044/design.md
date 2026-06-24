@@ -40,3 +40,12 @@ P0044 starts the source model migration from forecast/calloff/transaction-specif
 
 - The package spans source model, seed data, feature reads, purchase writes and Data Viewer. The implementation keeps the first migration thin to reduce churn.
 - Generic EPAD purchase compatibility remains visible in raw transactions until later packages migrate purchase rows to explicit area components.
+
+## Addendum - price-area percent hedge design
+
+- Extend Hedge Forecast input/profile with `price_area`.
+- Validate the selected price area against the supported synthetic areas.
+- Read the selected area's forecast event details when building percent-of-forecast profiles.
+- Keep compatibility transactions but attach `price_area` to newly generated Hedge Forecast transactions.
+- Event-detail mirroring uses transaction `price_area` directly when present, instead of splitting by every forecast area share.
+- Existing explicit purchase helpers remain unchanged because this package addendum is about percent-of-forecast purchases.

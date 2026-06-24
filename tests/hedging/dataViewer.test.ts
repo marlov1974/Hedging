@@ -160,6 +160,7 @@ describe("Data Viewer", () => {
     assert.equal(row?.component_code, "base.sys");
     assert.equal(row?.component_category, "base");
     assert.equal(row?.component_concept, "canonical");
+    assert.equal(row?.price_area, null);
     assert.equal(row?.period, "2027-01");
     assert.equal(row?.mw, 10);
     assert.equal(row?.q_factor, 1);

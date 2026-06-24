@@ -296,6 +296,12 @@ export function insertTransaction(database: PrototypeDatabase, input: CustomerTr
 }
 
 function assertNormalizedTransactionFields(input: CustomerTransaction): void {
+  if (input.price_area !== undefined && input.price_area !== null) {
+    assertRequiredString(input.price_area, "price_area");
+    if (input.price_area !== "STO" && input.price_area !== "MAL" && input.price_area !== "LUL" && input.price_area !== "SUN") {
+      throw new DatabaseError("invalid_input", "price_area must be STO, MAL, LUL or SUN");
+    }
+  }
   if (input.quantity !== undefined) {
     assertFiniteNumber(input.quantity, "quantity");
   }

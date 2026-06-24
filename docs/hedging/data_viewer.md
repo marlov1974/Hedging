@@ -237,7 +237,7 @@ If both sys and epad rows are present, they are price dimensions and not additiv
 
 ## P0042 Normalized Value/Unit Fields
 
-Raw transaction rows expose normalized source fields (`quantity`, `quantity_type`, `price`, `price_type`, `factor`, `factor_type`) plus derived unit fields (`hours`, `mwh`, `value_eur`, `q_value_eur`, `value_sek`, `coverage_pct`).
+Raw transaction rows expose normalized source fields (`price_area`, `quantity`, `quantity_type`, `price`, `price_type`, `factor`, `factor_type`) plus derived unit fields (`hours`, `mwh`, `value_eur`, `q_value_eur`, `value_sek`, `coverage_pct`).
 
 Classic and Modern projected transaction views keep `currency.eursek` as a currency row. It is not renamed to `classic.*` or `modern.*` and does not contribute to projected MWh.
 

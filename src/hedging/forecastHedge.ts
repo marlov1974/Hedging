@@ -8,7 +8,12 @@ import {
 } from "../database/types.ts";
 import { getPortfolioProductComponents, getQFactorValuesBySet, insertCalloff, insertTransaction } from "../database/repository.ts";
 import { canonicalProductPackageName } from "../database/canonicalComponents.ts";
-import { createPurchaseEventForCalloff, getCanonicalForecast } from "../database/eventForecasts.ts";
+import {
+  createPurchaseEventForCalloff,
+  getCanonicalForecastForPriceArea,
+  SUPPORTED_PRICE_AREAS,
+  type SupportedPriceArea,
+} from "../database/eventForecasts.ts";
 import type { PerspectiveId } from "./applicationConfig.ts";
 import { ClassicProjectionError, convertClassicHedgeToCanonical, deriveClassicFromForecast } from "./classicProjection.ts";
 import { resolveConfiguredComponentPrice } from "./componentPricing.ts";
@@ -41,6 +46,7 @@ export type ForecastHedgeProfileInput = {
   start_month: string | undefined;
   end_month: string | undefined;
   percentage: string | number | undefined;
+  price_area?: string | undefined;
   perspective_id?: PerspectiveId;
 };
 
@@ -89,6 +95,7 @@ export type ForecastHedgeProfile = {
   start_month: string;
   end_month: string;
   percentage: number;
+  price_area: SupportedPriceArea;
   perspective_id: PerspectiveId;
   rows: ForecastHedgeProfileRow[];
 };
@@ -130,6 +137,7 @@ type NormalizedInput = {
   start_month: string;
   end_month: string;
   percentage: number;
+  price_area: SupportedPriceArea;
   perspective_id: PerspectiveId;
 };
 
@@ -166,7 +174,7 @@ export function buildForecastHedgeProfile(
   return {
     ...normalized,
     rows: months.map((month) => {
-      const forecast = getForecast(database, normalized.portfolio_id, month);
+      const forecast = getForecast(database, normalized.portfolio_id, month, normalized.price_area);
       const calendar = getCalendar(database, month);
       const modernForecast = deriveModernFromForecast({
         total_mwh: forecast.mwh,
@@ -368,7 +376,7 @@ export function acceptForecastHedgeProfile(
       if (!postedRow) {
         throw new ForecastHedgeError("invalid_input", `missing profile row for ${month}`);
       }
-      const forecast = getForecast(database, normalized.portfolio_id, month);
+      const forecast = getForecast(database, normalized.portfolio_id, month, normalized.price_area);
       const calendar = getCalendar(database, month);
       const modernForecast = deriveModernFromForecast({
         total_mwh: forecast.mwh,
@@ -409,7 +417,7 @@ export function acceptForecastHedgeProfile(
     delivery_end_month: normalized.end_month,
     calloff_id: input.calloff_id,
   });
-  const powerTransactions = createForecastHedgeTransactions(database, { calloff, rows: profile.rows });
+  const powerTransactions = createForecastHedgeTransactions(database, { calloff, rows: profile.rows, price_area: normalized.price_area });
   const currencyTransactions = createCurrencyTransactionsForPowerRows(database, calloff, powerTransactions);
   const transactions = [...powerTransactions, ...currencyTransactions];
   createPurchaseEventForCalloff(database, { calloff, transactions });
@@ -513,7 +521,7 @@ export function createForecastHedgeCalloff(
 
 export function createForecastHedgeTransactions(
   database: PrototypeDatabase,
-  input: { calloff: Calloff; rows: ForecastHedgeProfileRow[] },
+  input: { calloff: Calloff; rows: ForecastHedgeProfileRow[]; price_area?: SupportedPriceArea },
 ): CustomerTransaction[] {
   const components = getForecastHedgeComponents(database, input.calloff.product_id);
   const transactions: CustomerTransaction[] = [];
@@ -529,6 +537,7 @@ export function createForecastHedgeTransactions(
             calloff_id: input.calloff.calloff_id,
             month: row.month,
             productcomponent_id: component.productcomponent_id,
+            price_area: input.price_area,
             mw,
             q_factor: qFactor,
             quantity: mw,
@@ -576,6 +585,7 @@ function createExplicitHedgePurchase(
     start_month: input.month,
     end_month: input.month,
     percentage: input.row.percentage,
+    price_area: "STO",
     perspective_id: input.perspective_id,
     rows: [input.row],
   };
@@ -704,22 +714,32 @@ function validateProfileInput(database: PrototypeDatabase, input: ForecastHedgeP
   if (percentagePercent < 0 || percentagePercent > 100) {
     throw new ForecastHedgeError("invalid_input", "percentage must be between 0 and 100");
   }
+  const priceArea = normalizePriceArea(input.price_area);
 
   return {
     portfolio_id: portfolioId,
     start_month: startMonth,
     end_month: endMonth,
     percentage: roundDecimal(percentagePercent / 100),
+    price_area: priceArea,
     perspective_id: input.perspective_id === "classic" ? "classic" : "modern",
   };
 }
 
-function getForecast(database: PrototypeDatabase, portfolioId: string, month: string) {
-  const forecast = getCanonicalForecast(database, portfolioId, month);
+function getForecast(database: PrototypeDatabase, portfolioId: string, month: string, priceArea: SupportedPriceArea) {
+  const forecast = getCanonicalForecastForPriceArea(database, portfolioId, month, priceArea);
   if (!forecast) {
-    throw new ForecastHedgeError("not_found", `missing forecast row for ${portfolioId} ${month}`);
+    throw new ForecastHedgeError("not_found", `missing forecast row for ${portfolioId} ${month} ${priceArea}`);
   }
   return forecast;
+}
+
+function normalizePriceArea(value: string | undefined): SupportedPriceArea {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  if (!SUPPORTED_PRICE_AREAS.includes(normalized as SupportedPriceArea)) {
+    throw new ForecastHedgeError("invalid_input", "price_area must be STO, MAL, LUL or SUN");
+  }
+  return normalized as SupportedPriceArea;
 }
 
 function getCalendar(database: PrototypeDatabase, month: string) {

@@ -63,6 +63,7 @@ export type HedgingToolState = {
     start_month?: string;
     end_month?: string;
     percentage?: string;
+    price_area?: string;
   };
   forecast_hedge_profile?: ForecastHedgeProfile;
   forecast_hedge_result?: ForecastHedgeAcceptResult;
@@ -974,6 +975,7 @@ function renderForecastHedgeFeature(
     state.forecast_hedge_profile?.end_month ?? state.forecast_hedge_input?.end_month ?? months[Math.min(2, months.length - 1)] ?? "";
   const percentage =
     state.forecast_hedge_profile ? String(formatPercentInput(state.forecast_hedge_profile.percentage)) : state.forecast_hedge_input?.percentage ?? "50";
+  const priceArea = state.forecast_hedge_profile?.price_area ?? state.forecast_hedge_input?.price_area ?? "STO";
   const selectedPerspective = perspectiveId === "classic" ? "classic" : "modern";
   const perspectiveLabel = labelForPerspective(selectedPerspective);
 
@@ -1005,6 +1007,10 @@ function renderForecastHedgeFeature(
           Percentage
           <input name="percentage" type="number" min="0" max="100" step="0.001" required value="${escapeHtml(percentage)}">
         </label>
+        <label>
+          Price area
+          ${renderPriceAreaSelect("price_area", priceArea)}
+        </label>
       </div>
       <button type="submit">Build hedge profile</button>
     </form>
@@ -1029,6 +1035,7 @@ function renderForecastHedgeProfile(
     <input type="hidden" name="start_month" value="${escapeHtml(profile.start_month)}">
     <input type="hidden" name="end_month" value="${escapeHtml(profile.end_month)}">
     <input type="hidden" name="percentage" value="${escapeHtml(String(formatPercentInput(profile.percentage)))}">
+    <input type="hidden" name="price_area" value="${escapeHtml(profile.price_area)}">
     <table class="hedge-table">
       <thead>
         <tr>
@@ -1099,6 +1106,7 @@ function renderClassicForecastHedgeProfile(
     <input type="hidden" name="start_month" value="${escapeHtml(profile.start_month)}">
     <input type="hidden" name="end_month" value="${escapeHtml(profile.end_month)}">
     <input type="hidden" name="percentage" value="${escapeHtml(String(formatPercentInput(profile.percentage)))}">
+    <input type="hidden" name="price_area" value="${escapeHtml(profile.price_area)}">
     <table class="hedge-table">
       <thead>
         <tr>
@@ -1312,6 +1320,7 @@ function renderRawTransactionsTable(rows: RawTransactionRow[]): string {
         <th>component</th>
         <th>component_category</th>
         <th>component_concept</th>
+        <th>price_area</th>
         <th>period</th>
         <th>quantity</th>
         <th>quantity_type</th>
@@ -1338,6 +1347,7 @@ function renderRawTransactionsTable(rows: RawTransactionRow[]): string {
             <td>${escapeHtml(row.component_code)}</td>
             <td>${escapeHtml(row.component_category)}</td>
             <td>${escapeHtml(row.component_concept)}</td>
+            <td>${escapeHtml(row.price_area ?? "")}</td>
             <td>${escapeHtml(row.period)}</td>
             <td class="number">${formatOptionalNumber(row.quantity)}</td>
             <td>${escapeHtml(row.quantity_type ?? "")}</td>
@@ -1649,6 +1659,13 @@ function renderMarketProjectionTable(rows: DataViewerMarketProjectionRow[]): str
 function renderMonthSelect(name: string, months: string[], selectedMonth: string): string {
   return `<select name="${escapeHtml(name)}">
     ${months.map((month) => `<option value="${escapeHtml(month)}"${month === selectedMonth ? " selected" : ""}>${escapeHtml(month)}</option>`).join("")}
+  </select>`;
+}
+
+function renderPriceAreaSelect(name: string, selectedPriceArea: string): string {
+  const priceAreas = ["STO", "MAL", "LUL", "SUN"];
+  return `<select name="${escapeHtml(name)}" required>
+    ${priceAreas.map((priceArea) => `<option value="${priceArea}"${priceArea === selectedPriceArea ? " selected" : ""}>${priceArea}</option>`).join("")}
   </select>`;
 }
 

@@ -56,6 +56,7 @@ export type RawTransactionRow = {
   component_code: string;
   component_category: ComponentCategory;
   component_concept: ComponentCodeConcept;
+  price_area: string | null;
   period: string;
   mw: number;
   q_factor: number;
@@ -351,6 +352,7 @@ export function getRawTransactionsForPortfolioYear(database: PrototypeDatabase, 
         component_code: economics.component_code,
         component_category: economics.component_category,
         component_concept: componentCodeConcept(component),
+        price_area: transaction.price_area ?? null,
         period: economics.period,
         mw: transaction.mw,
         q_factor: transaction.q_factor,

@@ -121,6 +121,7 @@ export type CustomerTransaction = {
   calloff_id: string;
   month: string;
   productcomponent_id: string;
+  price_area?: string | null;
   mw: number;
   q_factor: number;
   quantity?: number;

@@ -61,3 +61,23 @@
 ## Removed functions
 
 None.
+
+## Addendum - price-area percent hedge functions
+
+- `getCanonicalForecastForPriceArea(database, portfolioId, month, priceArea)`
+  - Purpose: derive selected-area forecast MWh and peak percentage from canonical forecast event details.
+  - Inputs: database, portfolio id, month, price area.
+  - Output: forecast-like values for the selected area.
+  - Side effects: none.
+  - Tests: Forecast Hedge selected-area profile tests.
+
+- `normalizePriceArea(value)`
+  - Purpose: validate and normalize supported synthetic price-area input.
+  - Inputs: string-like price area.
+  - Output: supported price area.
+  - Side effects: none.
+  - Tests: Forecast Hedge validation tests.
+
+- `eventDetailsForTransaction(...)`
+  - Change: honors transaction `price_area` when present and emits selected-area event details only.
+  - Reason: percent-of-forecast purchases must not implicitly allocate across every area.

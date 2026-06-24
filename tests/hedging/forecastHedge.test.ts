@@ -51,6 +51,7 @@ describe("Forecast hedge feature", () => {
     assert.match(html, /name="start_month"/);
     assert.match(html, /name="end_month"/);
     assert.match(html, /name="percentage"/);
+    assert.match(html, /name="price_area"/);
   });
 
   it("renders modern base and peak profile columns", () => {
@@ -62,6 +63,7 @@ describe("Forecast hedge feature", () => {
         start_month: "2027-01",
         end_month: "2027-01",
         percentage: "50",
+        price_area: "STO",
       }),
     });
 
@@ -83,6 +85,7 @@ describe("Forecast hedge feature", () => {
         start_month: "2027-01",
         end_month: "2027-01",
         percentage: "50",
+        price_area: "STO",
       }),
     });
 
@@ -90,10 +93,23 @@ describe("Forecast hedge feature", () => {
 
     assert.ok(values.length > 0);
     assert.equal(values.every((value) => decimalPlaces(value) <= 3), true);
-    assert.match(html, /value="560\.735"/);
-    assert.match(html, /value="54\.265"/);
+    assert.match(html, /value="224\.294"/);
+    assert.match(html, /value="21\.706"/);
     assert.doesNotMatch(html, /value="560\.735294"/);
     assert.doesNotMatch(html, /value="54\.264706"/);
+  });
+
+  it("requires price area for percent-of-forecast profile generation", () => {
+    assert.throws(
+      () =>
+        buildForecastHedgeProfile(createPocSeedData(), {
+          portfolio_id: "CUS02-0",
+          start_month: "2027-01",
+          end_month: "2027-01",
+          percentage: "50",
+        }),
+      (error) => error instanceof ForecastHedgeError && /price_area/.test(error.message),
+    );
   });
 
   it("Classic Hedge Forecast proposal uses Offpeak and Peak MWh fields", () => {
@@ -102,6 +118,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       perspective_id: "classic",
     });
     const html = renderHedgingTool(createPocSeedData(), {
@@ -124,14 +141,15 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       perspective_id: "classic",
     }).rows[0];
 
-    assert.equal(row.forecast_classic_offpeak_mwh, 615);
-    assert.equal(row.forecast_classic_peak_mwh, 615);
-    assert.equal(row.classic_offpeak_mwh, 307.5);
-    assert.equal(row.classic_peak_mwh, 307.5);
-    assert.equal(row.total_mwh, 615);
+    assert.equal(row.forecast_classic_offpeak_mwh, 246);
+    assert.equal(row.forecast_classic_peak_mwh, 246);
+    assert.equal(row.classic_offpeak_mwh, 123);
+    assert.equal(row.classic_peak_mwh, 123);
+    assert.equal(row.total_mwh, 246);
     assert.equal(row.percentage, 0.5);
   });
 
@@ -141,6 +159,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-03",
       percentage: "50",
+      price_area: "STO",
     });
 
     assert.deepEqual(
@@ -155,14 +174,15 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     }).rows[0];
 
-    assert.equal(row.forecast_mwh, 1230);
-    assert.equal(row.forecast_modern_base_mwh, 1121.470588);
-    assert.equal(row.forecast_modern_peak_mwh, 108.529412);
-    assert.equal(row.modern_base_mwh, 560.735294);
-    assert.equal(row.modern_peak_mwh, 54.264706);
-    assert.equal(row.total_mwh, 615);
+    assert.equal(row.forecast_mwh, 492);
+    assert.equal(row.forecast_modern_base_mwh, 448.588235);
+    assert.equal(row.forecast_modern_peak_mwh, 43.411765);
+    assert.equal(row.modern_base_mwh, 224.294118);
+    assert.equal(row.modern_peak_mwh, 21.705883);
+    assert.equal(row.total_mwh, 246);
     assert.equal(row.percentage, 0.5);
   });
 
@@ -172,12 +192,13 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     }).rows[0];
 
     assert.equal(row.calendar_total_h, 744);
     assert.equal(row.calendar_peak_h, 336);
-    assert.equal(row.modern_base_mw, 0.753676);
-    assert.equal(row.modern_peak_mw, 0.161502);
+    assert.equal(row.modern_base_mw, 0.301471);
+    assert.equal(row.modern_peak_mw, 0.064601);
   });
 
   it("canonical allocation/base/peak MW are derived from modern profile values", () => {
@@ -186,14 +207,15 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     }).rows[0];
 
     assert.equal(row.forecast_peak_pct, 0.5);
     assert.equal(row.calendar_peak_h, 336);
-    assert.equal(row.allocation_peak_mw, 0.915179);
-    assert.equal(row.canonical_base_mw, 0.826613);
-    assert.equal(row.canonical_peak_mw, 0.088566);
-    assert.equal(row.peak_level_mwh, 307.5);
+    assert.equal(row.allocation_peak_mw, 0.366071);
+    assert.equal(row.canonical_base_mw, 0.330645);
+    assert.equal(row.canonical_peak_mw, 0.035426);
+    assert.equal(row.peak_level_mwh, 123);
   });
 
   it("matches the P0033 modern to canonical worked example", () => {
@@ -282,6 +304,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     }).rows.map(toAcceptRow);
 
     const result = acceptForecastHedgeProfile(database, {
@@ -289,6 +312,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       date: "2027-01-15",
       rows,
     });
@@ -312,12 +336,14 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-03",
       percentage: "50",
+      price_area: "STO",
     }).rows.map(toAcceptRow);
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-03",
       percentage: "50",
+      price_area: "STO",
       date: "2027-01-15",
       calloff_id: "CALLOFF_TEST",
       rows,
@@ -332,6 +358,8 @@ describe("Forecast hedge feature", () => {
     );
     const powerTransactions = result.transactions.filter((transaction) => transaction.quantity_type === "MW");
     const currencyTransactions = result.transactions.filter((transaction) => transaction.quantity_type === "EUR");
+    assert.equal(powerTransactions.every((transaction) => transaction.price_area === "STO"), true);
+    assert.equal(currencyTransactions.every((transaction) => transaction.price_area === undefined), true);
     assert.deepEqual(
       powerTransactions.slice(0, 5).map((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component),
       ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys"],
@@ -350,6 +378,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     }).rows.map(toAcceptRow);
 
     acceptForecastHedgeProfile(database, {
@@ -357,6 +386,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       date: "2027-01-15",
       calloff_id: "CAL_EVENT",
       rows,
@@ -373,10 +403,10 @@ describe("Forecast hedge feature", () => {
     const areaPeak = details.filter((detail) => /^peak\.(sto|mal|lul|sun)$/.test(detail.component_code));
     const currency = details.find((detail) => detail.component_code === "currency.eursek");
 
-    assert.deepEqual(baseSys.map((detail) => detail.price_area).sort(), ["LUL", "MAL", "STO", "SUN"]);
-    assert.deepEqual(peakSys.map((detail) => detail.price_area).sort(), ["LUL", "MAL", "STO", "SUN"]);
-    assert.equal(areaBase.length, 4);
-    assert.equal(areaPeak.length, 4);
+    assert.deepEqual(baseSys.map((detail) => detail.price_area), ["STO"]);
+    assert.deepEqual(peakSys.map((detail) => detail.price_area), ["STO"]);
+    assert.deepEqual(areaBase.map((detail) => detail.component_code), ["base.sto"]);
+    assert.deepEqual(areaPeak.map((detail) => detail.component_code), ["peak.sto"]);
     assert.ok(currency);
     assert.equal(currency.price_area, null);
     assert.equal(currency.quantity_type, "EUR");
@@ -389,12 +419,14 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     }).rows.map(toAcceptRow);
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       date: "2027-01-15",
       calloff_id: "CALLOFF_TEST",
       rows,
@@ -407,12 +439,12 @@ describe("Forecast hedge feature", () => {
       ]),
     );
 
-    assert.equal(rowsByComponent.get("base.sys")?.mw, 0.826613);
-    assert.equal(rowsByComponent.get("base.epad")?.mw, 0.826613);
-    assert.equal(rowsByComponent.get("allocation.peak.sys")?.mw, 0.915179);
-    assert.equal(rowsByComponent.get("allocation.peak.epad")?.mw, 0.915179);
-    assert.equal(rowsByComponent.get("peak.sys")?.mw, 0.088566);
-    assert.equal(rowsByComponent.get("peak.epad")?.mw, 0.088566);
+    assert.equal(rowsByComponent.get("base.sys")?.mw, 0.330645);
+    assert.equal(rowsByComponent.get("base.epad")?.mw, 0.330645);
+    assert.equal(rowsByComponent.get("allocation.peak.sys")?.mw, 0.366071);
+    assert.equal(rowsByComponent.get("allocation.peak.epad")?.mw, 0.366071);
+    assert.equal(rowsByComponent.get("peak.sys")?.mw, 0.035426);
+    assert.equal(rowsByComponent.get("peak.epad")?.mw, 0.035426);
     assert.equal(rowsByComponent.get("allocation.peak.sys")?.q_factor, 0);
     assert.equal(rowsByComponent.get("allocation.peak.epad")?.q_factor, 0);
     assert.equal(rowsByComponent.get("base.sys")?.q_factor, 1);
@@ -431,6 +463,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     }).rows.map(toAcceptRow);
 
     acceptForecastHedgeProfile(database, {
@@ -438,6 +471,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       date: "2027-01-15",
       calloff_id: "CALLOFF_TEST",
       rows,
@@ -448,8 +482,8 @@ describe("Forecast hedge feature", () => {
       projected.map((row) => row.component),
       ["modern.base.sys", "modern.base.epad", "modern.peak.sys", "modern.peak.epad", "currency.eursek"],
     );
-    assert.equal(projected.find((row) => row.component === "modern.base.sys")?.mwh, 560.735163);
-    assert.equal(projected.find((row) => row.component === "modern.peak.sys")?.mwh, 54.264909);
+    assert.equal(projected.find((row) => row.component === "modern.base.sys")?.mwh, 224.294161);
+    assert.equal(projected.find((row) => row.component === "modern.peak.sys")?.mwh, 21.705719);
   });
 
   it("rejects negative modern base MWh", () => {
@@ -495,12 +529,14 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     }).rows.map(toAcceptRow);
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       date: "2027-01-15",
       calloff_id: "CALLOFF_TEST",
       rows,
@@ -513,8 +549,8 @@ describe("Forecast hedge feature", () => {
     );
     assert.equal(projectionRows.some((row) => row.component === "allocation.peak.sys"), false);
     assert.equal(projectionRows.some((row) => row.component === "allocation.peak.epad"), false);
-    assert.equal(projectionRows.find((row) => row.component === "base.sys")?.market_mw, 0.826613);
-    assert.equal(projectionRows.find((row) => row.component === "peak.sys")?.market_mw, 0.106279);
+    assert.equal(projectionRows.find((row) => row.component === "base.sys")?.market_mw, 0.330645);
+    assert.equal(projectionRows.find((row) => row.component === "peak.sys")?.market_mw, 0.042511);
   });
 
   it("market projection excludes currency rows from explicit Modern purchases", () => {
@@ -544,12 +580,14 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     }).rows.map(toAcceptRow);
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS02-0",
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       date: "2027-01-15",
       calloff_id: "CALFX",
       rows,
@@ -637,6 +675,7 @@ describe("Forecast hedge feature", () => {
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "50",
+          price_area: "STO",
           date: "2027-01-15",
           calloff_id: "CALLOFF_TEST",
           rows: buildForecastHedgeProfile(database, {
@@ -644,6 +683,7 @@ describe("Forecast hedge feature", () => {
             start_month: "2027-01",
             end_month: "2027-01",
             percentage: "50",
+            price_area: "STO",
           }).rows.map(toAcceptRow),
         }),
       (error) => error instanceof ForecastHedgeError && /missing Q-factor value/.test(error.message),
@@ -661,6 +701,7 @@ describe("Forecast hedge feature", () => {
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "50",
+          price_area: "STO",
           date: "2027-01-15",
           calloff_id: "CALLOFF_TEST",
           rows: buildForecastHedgeProfile(database, {
@@ -668,6 +709,7 @@ describe("Forecast hedge feature", () => {
             start_month: "2027-01",
             end_month: "2027-01",
             percentage: "50",
+            price_area: "STO",
           }).rows.map(toAcceptRow),
         }),
       (error) => error instanceof ForecastHedgeError && /missing Q-factor value/.test(error.message),
@@ -691,6 +733,7 @@ describe("Forecast hedge feature", () => {
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "50",
+          price_area: "STO",
         }),
       (error) => error instanceof ForecastHedgeError && /missing forecast row/.test(error.message),
     );
@@ -707,6 +750,7 @@ describe("Forecast hedge feature", () => {
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "50",
+          price_area: "STO",
         }),
       (error) => error instanceof ForecastHedgeError && /missing calendar row/.test(error.message),
     );
@@ -720,6 +764,7 @@ describe("Forecast hedge feature", () => {
           start_month: "2027-01",
           end_month: "2027-01",
           percentage: "101",
+          price_area: "STO",
         }),
       (error) => error instanceof ForecastHedgeError && /percentage/.test(error.message),
     );
@@ -732,12 +777,14 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
     });
     const result = acceptForecastHedgeProfile(database, {
       portfolio_id: "CUS00-0",
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       date: "2027-01-15",
       calloff_id: "CALLOFF_SHARED",
       rows: profile.rows.map(toAcceptRow),
@@ -759,6 +806,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       perspective_id: "classic",
     }).rows.map(toClassicAcceptRow);
 
@@ -767,6 +815,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       perspective_id: "classic",
       date: "2027-01-15",
       calloff_id: "CALLOFF_CLASSIC",
@@ -780,12 +829,12 @@ describe("Forecast hedge feature", () => {
     );
 
     assert.equal(result.calloff.product_id, "PRO01");
-    assert.equal(rowsByComponent.get("allocation.peak.sys")?.mw, 0.915179);
-    assert.equal(rowsByComponent.get("allocation.peak.epad")?.mw, 0.915179);
-    assert.equal(rowsByComponent.get("base.sys")?.mw, 0.826613);
-    assert.equal(rowsByComponent.get("base.epad")?.mw, 0.826613);
-    assert.equal(rowsByComponent.get("peak.sys")?.mw, 0.088566);
-    assert.equal(rowsByComponent.get("peak.epad")?.mw, 0.088566);
+    assert.equal(rowsByComponent.get("allocation.peak.sys")?.mw, 0.366071);
+    assert.equal(rowsByComponent.get("allocation.peak.epad")?.mw, 0.366071);
+    assert.equal(rowsByComponent.get("base.sys")?.mw, 0.330645);
+    assert.equal(rowsByComponent.get("base.epad")?.mw, 0.330645);
+    assert.equal(rowsByComponent.get("peak.sys")?.mw, 0.035426);
+    assert.equal(rowsByComponent.get("peak.epad")?.mw, 0.035426);
     assert.equal([...rowsByComponent.keys()].some((component) => String(component).startsWith("classic.")), false);
     assert.equal(rowsByComponent.get("allocation.peak.sys")?.q_factor, 0);
   });
@@ -804,6 +853,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "100",
+      price_area: "STO",
       perspective_id: "classic",
       date: "2027-01-15",
       calloff_id: "CALLOFF_NEGATIVE_CLASSIC",
@@ -824,6 +874,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       perspective_id: "classic",
     }).rows.map(toClassicAcceptRow);
 
@@ -832,6 +883,7 @@ describe("Forecast hedge feature", () => {
       start_month: "2027-01",
       end_month: "2027-01",
       percentage: "50",
+      price_area: "STO",
       perspective_id: "classic",
       date: "2027-01-15",
       calloff_id: "CALLOFF_CLASSIC",
@@ -839,8 +891,8 @@ describe("Forecast hedge feature", () => {
     });
 
     const classicRows = getPeaksClassicCalloffTransactionRows(database, "CUS00-0");
-    assertApprox(classicRows[0].offpeak_mwh, 307.5);
-    assertApprox(classicRows[0].peak_mwh, 307.5);
+    assertApprox(classicRows[0].offpeak_mwh, 123.000024);
+    assertApprox(classicRows[0].peak_mwh, 122.999976);
     assert.equal(classicRows[0].projected_total_value, classicRows[0].canonical_total_value);
   });
 
