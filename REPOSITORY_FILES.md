@@ -25,6 +25,7 @@ docs/hedging/classic_projection_price_rules.md
 docs/hedging/classic_to_canonical_conversion.md
 docs/hedging/component_catalog.md
 docs/hedging/component_categories_and_projection_listeners.md
+docs/hedging/currency_component_model.md
 docs/hedging/data_viewer.md
 docs/hedging/feature_level_perspective_switching.md
 docs/hedging/financial_settlement.md
@@ -229,6 +230,7 @@ requirements/packages/P0037-component-catalog-and-projected-component-glossary.m
 requirements/packages/P0038-runtime-component-code-cleanup.md
 requirements/packages/P0039-data-viewer-projection-cleanup.md
 requirements/packages/P0040-position-calloff-ui-and-derivative-names.md
+requirements/packages/P0041-currency-portfolio-and-forecast-purchase-flow.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
