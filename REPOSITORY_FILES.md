@@ -183,6 +183,10 @@ requirements/package-runs/P0037/design.md
 requirements/package-runs/P0037/findings.md
 requirements/package-runs/P0037/functions.md
 requirements/package-runs/P0037/review.md
+requirements/package-runs/P0038/design.md
+requirements/package-runs/P0038/findings.md
+requirements/package-runs/P0038/functions.md
+requirements/package-runs/P0038/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -222,6 +226,7 @@ requirements/packages/P0034-universal-model-perspective-features.md
 requirements/packages/P0035-single-portfolio-feature-perspective-tabs.md
 requirements/packages/P0036-peaks-classic-forecast-and-hedge-forecast.md
 requirements/packages/P0037-component-catalog-and-projected-component-glossary.md
+requirements/packages/P0038-runtime-component-code-cleanup.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
@@ -267,6 +272,7 @@ src/settlement/spotActuals.ts
 src/settlement/staticSpotActualPrices.ts
 tests/README.md
 tests/database/calloffTransactionModel.test.ts
+tests/database/componentCodes.test.ts
 tests/database/customerProductSchema.test.ts
 tests/database/pocSeedData.test.ts
 tests/hedging/applicationConfig.test.ts

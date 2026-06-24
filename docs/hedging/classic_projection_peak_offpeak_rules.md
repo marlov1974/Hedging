@@ -1,5 +1,7 @@
 # Classic Projection Peak Offpeak Rules
 
+For projected Classic names and canonical component-code rules, see [Component Catalog](component_catalog.md).
+
 ## Purpose
 
 Peaks.Classic presents customer calloffs as Offpeak and Peak levels.
