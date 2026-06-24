@@ -232,6 +232,7 @@ requirements/packages/P0039-data-viewer-projection-cleanup.md
 requirements/packages/P0040-position-calloff-ui-and-derivative-names.md
 requirements/packages/P0041-currency-portfolio-and-forecast-purchase-flow.md
 requirements/packages/P0042-value-unit-views-and-sek-reporting.md
+requirements/packages/P0043-projected-model-report-basis.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
