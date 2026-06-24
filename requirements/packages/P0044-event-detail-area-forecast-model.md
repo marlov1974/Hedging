@@ -376,8 +376,6 @@ Open design reservation:
 The model may later support unmarked/unallocated SYS rows, but that is not the default in this package.
 ```
 
-Note: the original design request ended with an incomplete bullet: `köp av sys sk...`. This package interprets that as requiring explicit SYS purchase handling, but the final detailed wording should be confirmed in the completion report if new information is provided.
-
 ## 10. Projections and reports
 
 Classic and Modern projected models should carry the new event/event_detail and price-area structure.
