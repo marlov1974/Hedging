@@ -51,6 +51,7 @@ docs/hedging/position_report.md
 docs/hedging/product_packages_and_feature_sets.md
 docs/hedging/projection_mw_and_price_rules.md
 docs/hedging/single_demo_portfolio.md
+docs/hedging/two_legged_market_basis_target_model.md
 docs/hedging/universal_model_demo_tool.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
@@ -188,6 +189,7 @@ requirements/package-runs/P0038/design.md
 requirements/package-runs/P0038/findings.md
 requirements/package-runs/P0038/functions.md
 requirements/package-runs/P0038/review.md
+requirements/package-runs/P0047/start-instructions.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -236,6 +238,14 @@ requirements/packages/P0043-projected-model-report-basis.md
 requirements/packages/P0044-event-detail-area-forecast-model.md
 requirements/packages/P0045-baseloads-rebalance-calloff-and-position-report.md
 requirements/packages/P0046-hedging-server-basic-auth-local-secret.md
+requirements/packages/P0047-two-legged-transaction-model.md
+requirements/packages/P0048-modern-customer-canonical.md
+requirements/packages/P0049-market-bases-canonical.md
+requirements/packages/P0050-baseloads-from-market-canonical.md
+requirements/packages/P0051-rebalance-product-migration.md
+requirements/packages/P0052-market-only-q-profile-adjustments.md
+requirements/packages/P0053-projection-read-model-cleanup.md
+requirements/packages/P0054-legacy-compatibility-cleanup.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
