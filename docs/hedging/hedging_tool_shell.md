@@ -149,9 +149,30 @@ http://127.0.0.1:5175/hedging
 
 Use `-- --host 0.0.0.0 --port <port>` to expose it on the LAN during local testing.
 
+## Basic Auth For LAN Or Internet Exposure
+
+P0046 adds optional HTTP Basic Auth for the Hedging server. When `HEDGING_PASSWORD` is set, every Hedging server route requires Basic Auth. Any username is accepted; only the password is checked.
+
+Store the password only in a local gitignored file such as `.env.local`:
+
+```text
+HEDGING_PASSWORD=<local password>
+```
+
+Start the server with the local env file loaded:
+
+```bash
+set -a
+. ./.env.local
+set +a
+npm run hedging:tool -- --host 0.0.0.0 --port 5175
+```
+
+If `HEDGING_PASSWORD` is unset, local development behavior is unchanged and no Basic Auth challenge is required.
+
 ## Known PoC Limitations
 
 - In-memory database only.
-- No authentication or session management.
+- Basic Auth is simple PoC bot protection, not account or session management.
 - No persistence between server restarts.
 - Feature authorization is product-context based, not user based.

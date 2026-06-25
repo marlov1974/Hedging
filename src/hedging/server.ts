@@ -9,7 +9,14 @@ import type { HedgingFeatureId } from "./features.ts";
 import type { PerspectiveId } from "./applicationConfig.ts";
 
 export function createHedgingToolServer(database: PrototypeDatabase = createPocSeedData()) {
+  const authPassword = process.env.HEDGING_PASSWORD;
+
   return createServer(async (request, response) => {
+    if (authPassword && !isRequestAuthorized(request, authPassword)) {
+      writeUnauthorized(response);
+      return;
+    }
+
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
 
     if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/hedging")) {
@@ -260,6 +267,47 @@ function readPerspectiveFromForm(body: URLSearchParams): PerspectiveId | undefin
 function writeHtml(response: ServerResponse, statusCode: number, body: string): void {
   response.writeHead(statusCode, { "content-type": "text/html; charset=utf-8" });
   response.end(body);
+}
+
+export function isRequestAuthorized(request: IncomingMessage, password: string): boolean {
+  const authorization = request.headers.authorization;
+  if (!authorization?.startsWith("Basic ")) {
+    return false;
+  }
+
+  const credentials = decodeBasicCredentials(authorization.slice("Basic ".length));
+  if (!credentials) {
+    return false;
+  }
+
+  return credentials.password === password;
+}
+
+function decodeBasicCredentials(encoded: string): { username: string; password: string } | null {
+  let decoded: string;
+  try {
+    decoded = Buffer.from(encoded, "base64").toString("utf8");
+  } catch {
+    return null;
+  }
+
+  const separatorIndex = decoded.indexOf(":");
+  if (separatorIndex === -1) {
+    return null;
+  }
+
+  return {
+    username: decoded.slice(0, separatorIndex),
+    password: decoded.slice(separatorIndex + 1),
+  };
+}
+
+function writeUnauthorized(response: ServerResponse): void {
+  response.writeHead(401, {
+    "content-type": "text/plain; charset=utf-8",
+    "www-authenticate": 'Basic realm="Hedging"',
+  });
+  response.end("Unauthorized");
 }
 
 function readArg(name: string): string | undefined {

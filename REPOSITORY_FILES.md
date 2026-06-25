@@ -3,6 +3,7 @@
 Tracked files:
 
 ```text
+.gitignore
 AGENTS.md
 PROJECT_OVERVIEW.md
 README.md
@@ -215,6 +216,9 @@ requirements/package-runs/P0044/review.md
 requirements/package-runs/P0045/design.md
 requirements/package-runs/P0045/functions.md
 requirements/package-runs/P0045/review.md
+requirements/package-runs/P0046/design.md
+requirements/package-runs/P0046/functions.md
+requirements/package-runs/P0046/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -263,6 +267,7 @@ requirements/packages/P0042-value-unit-views-and-sek-reporting.md
 requirements/packages/P0043-projected-model-report-basis.md
 requirements/packages/P0044-event-detail-area-forecast-model.md
 requirements/packages/P0045-baseloads-rebalance-calloff-and-position-report.md
+requirements/packages/P0046-hedging-server-basic-auth-local-secret.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/eventForecasts.ts
@@ -330,6 +335,7 @@ tests/hedging/legacyCalloffList.test.ts
 tests/hedging/peaksCalloffTransactionList.test.ts
 tests/hedging/portfolioDetails.test.ts
 tests/hedging/positionReport.test.ts
+tests/hedging/serverAuth.test.ts
 tests/price-api/priceApi.test.ts
 tests/price-api/priceApiV2.test.ts
 tests/price-api/realProviders.test.ts
