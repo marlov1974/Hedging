@@ -246,6 +246,7 @@ requirements/packages/P0051-rebalance-product-migration.md
 requirements/packages/P0052-market-only-q-profile-adjustments.md
 requirements/packages/P0053-projection-read-model-cleanup.md
 requirements/packages/P0054-legacy-compatibility-cleanup.md
+requirements/packages/P0055-commercial-components-and-baseloads-upgrade-conversion.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/fixtures.ts
