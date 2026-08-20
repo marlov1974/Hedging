@@ -17,9 +17,23 @@ import { createForecastEventDetailsForForecast } from "./eventForecasts.ts";
 export const CALENDAR_SET_ID = "CAL_SE_TRADING";
 
 export const COMPONENTS_BY_PRODUCT = new Map([
-  ["Baseloads", ["base.sys", "base.epad"]],
+  ["Baseloads", ["base.sys", "base.epad", "fee.calloff"]],
   ["Peaks.Classic", ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys", "peak.epad", "currency.eursek"]],
-  ["Peaks.Modern", ["allocation.peak.sys", "allocation.peak.epad", "base.sys", "base.epad", "peak.sys", "peak.epad", "currency.eursek"]],
+  [
+    "Peaks.Modern",
+    [
+      "allocation.peak.sys",
+      "allocation.peak.epad",
+      "base.sys",
+      "base.epad",
+      "peak.sys",
+      "peak.epad",
+      "fee.calloff",
+      "premium.q_term",
+      "premium.p_agent",
+      "currency.eursek",
+    ],
+  ],
   [
     "Profiles.Classic",
     ["base.classic.sys", "base.classic.epad", "peak.classic.sys", "peak.classic.epad", "profile.sys", "profile.epad", "volume"],
@@ -50,6 +64,9 @@ export const Q_FACTOR_RANGES = new Map([
   ["profile.epad", [1.03, 1.09]],
   ["volume", [0, 0]],
   ["currency.eursek", [0, 0]],
+  ["fee.calloff", [0, 0]],
+  ["premium.q_term", [0, 0]],
+  ["premium.p_agent", [0, 0]],
 ]);
 
 const PRICE_BY_COMPONENT = new Map([
@@ -72,6 +89,9 @@ const PRICE_BY_COMPONENT = new Map([
   ["profile.epad", 2],
   ["volume", 4],
   ["currency.eursek", 11.25],
+  ["fee.calloff", 0.75],
+  ["premium.q_term", 1.25],
+  ["premium.p_agent", 0.5],
 ]);
 
 const PRODUCT_SEEDS = [
@@ -289,6 +309,12 @@ function productItemFor(componentCode: string): string {
   }
   if (componentCode === "peak.sys" || componentCode === "peak.epad" || componentCode.startsWith("peak.premium.")) {
     return "peak";
+  }
+  if (componentCode === "fee.calloff") {
+    return "fee";
+  }
+  if (componentCode.startsWith("premium.")) {
+    return "premium";
   }
   return componentCode.split(".")[0];
 }

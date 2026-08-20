@@ -397,6 +397,7 @@ describe("Forecast hedge feature", () => {
     assert.equal(event.event_type, "PURCHASE");
 
     const details = getEventDetails(database, event.event_id);
+    const customerDetails = details.filter((detail) => detail.leg_type === "CUSTOMER");
     const baseSys = details.filter((detail) => detail.component_code === "base.sys");
     const peakSys = details.filter((detail) => detail.component_code === "peak.sys");
     const areaBase = details.filter((detail) => /^base\.(sto|mal|lul|sun)$/.test(detail.component_code));
@@ -407,6 +408,14 @@ describe("Forecast hedge feature", () => {
     assert.deepEqual(peakSys.map((detail) => detail.price_area), ["STO"]);
     assert.deepEqual(areaBase.map((detail) => detail.component_code), ["base.sto"]);
     assert.deepEqual(areaPeak.map((detail) => detail.component_code), ["peak.sto"]);
+    assert.deepEqual(customerDetails.map((detail) => detail.component_code), [
+      "fee.calloff",
+      "modern.base",
+      "modern.peak",
+      "premium.p_agent",
+      "premium.q_term",
+    ]);
+    assert.equal(customerDetails.every((detail) => detail.quantity_type === "MWh"), true);
     assert.ok(currency);
     assert.equal(currency.price_area, null);
     assert.equal(currency.quantity_type, "EUR");
@@ -641,6 +650,63 @@ describe("Forecast hedge feature", () => {
     assert.equal(currency?.q_factor, 0);
   });
 
+  it("explicit Modern purchase stores Modern customer leg details", () => {
+    const database = createPocSeedData();
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_MODERN_CUSTOMER_LEG",
+    });
+
+    const details = getEventDetails(database, "EVT:PURCHASE:CAL_MODERN_CUSTOMER_LEG").filter((detail) => detail.leg_type === "CUSTOMER");
+
+    assert.deepEqual(
+      details.map((detail) => [detail.component_code, detail.quantity]),
+      [
+        ["fee.calloff", 110],
+        ["modern.base", 100],
+        ["modern.peak", 10],
+        ["premium.p_agent", 10],
+        ["premium.q_term", 10],
+      ],
+    );
+    assert.equal(details.every((detail) => detail.quantity_type === "MWh"), true);
+  });
+
+  it("explicit Modern purchase creates value-preserving market base rows with stored factor", () => {
+    const database = createPocSeedData();
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_MODERN_MARKET_BASE",
+    });
+
+    const details = getEventDetails(database, "EVT:PURCHASE:CAL_MODERN_MARKET_BASE");
+    const customerPeak = details.find((detail) => detail.leg_type === "CUSTOMER" && detail.component_code === "modern.peak");
+    assert.ok(customerPeak);
+    const marketPeak = details.find((detail) => detail.leg_type === "MARKET" && detail.linked_detail_id === customerPeak.event_detail_id);
+    assert.ok(marketPeak);
+
+    assert.equal(marketPeak.component_code, "market.base.sto");
+    assert.notEqual(marketPeak.factor, 1);
+    assert.equal(marketPeak.factor_type, "Q_FACTOR");
+    assert.equal(marketPeak.quantity, Number((customerPeak.quantity * (marketPeak.factor ?? 0)).toFixed(6)));
+    assert.equal(
+      Number((marketPeak.quantity * (marketPeak.price ?? 0)).toFixed(6)),
+      Number((customerPeak.quantity * (customerPeak.price ?? 0)).toFixed(6)),
+    );
+  });
+
   it("explicit Classic purchase allows partial currency coverage", () => {
     const database = createPocSeedData();
     const result = createExplicitClassicHedgePurchase(database, {
@@ -662,6 +728,26 @@ describe("Forecast hedge feature", () => {
     assert.equal(result.transactions.length, 7);
     assert.equal(currency?.quantity, 1000);
     assert.equal(currency?.price, 11.2);
+  });
+
+  it("explicit Classic purchase stores Modern customer leg details and no Classic source details", () => {
+    const database = createPocSeedData();
+    createExplicitClassicHedgePurchase(database, {
+      portfolio_id: "CUS01-0",
+      month: "2027-01",
+      offpeak_mwh: 80,
+      peak_mwh: 20,
+      offpeak_price_eur_per_mwh: 40,
+      peak_price_eur_per_mwh: 15,
+      date: "2027-01-15",
+      calloff_id: "CAL_CLASSIC_CUSTOMER_LEG",
+    });
+
+    const details = getEventDetails(database, "EVT:PURCHASE:CAL_CLASSIC_CUSTOMER_LEG");
+    const customerDetails = details.filter((detail) => detail.leg_type === "CUSTOMER");
+
+    assert.deepEqual(customerDetails.map((detail) => detail.component_code), ["modern.base", "modern.peak"]);
+    assert.equal(details.some((detail) => detail.component_code.startsWith("classic.")), false);
   });
 
   it("missing q-factor value is rejected", () => {

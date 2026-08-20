@@ -43,6 +43,12 @@ export const TARGET_CANONICAL_PEAKS_COMPONENT_CODES = [
   "peak.sun",
 ] as const;
 
+export const CUSTOMER_CANONICAL_MODERN_COMPONENT_CODES = ["modern.base", "modern.peak"] as const;
+
+export const MARKET_CANONICAL_BASIS_COMPONENT_CODES = ["market.base.sto", "market.base.mal", "market.base.lul", "market.base.sun"] as const;
+
+export const COMMERCIAL_ADD_ON_COMPONENT_CODES = ["fee.calloff", "premium.q_term", "premium.p_agent"] as const;
+
 export const PROJECTED_ONLY_COMPONENT_CODES = [
   "modern.base.sys",
   "modern.base.epad",
@@ -107,6 +113,15 @@ const COMPONENT_METADATA = new Map<string, ComponentMetadata>([
   ["peak.mal", { component_category: "peak", hour_basis: "peak_h" }],
   ["peak.lul", { component_category: "peak", hour_basis: "peak_h" }],
   ["peak.sun", { component_category: "peak", hour_basis: "peak_h" }],
+  ["modern.base", { component_category: "base", hour_basis: "total_h" }],
+  ["modern.peak", { component_category: "peak", hour_basis: "peak_h" }],
+  ["market.base.sto", { component_category: "base", hour_basis: "total_h" }],
+  ["market.base.mal", { component_category: "base", hour_basis: "total_h" }],
+  ["market.base.lul", { component_category: "base", hour_basis: "total_h" }],
+  ["market.base.sun", { component_category: "base", hour_basis: "total_h" }],
+  ["fee.calloff", { component_category: "adjustment", hour_basis: "total_h" }],
+  ["premium.q_term", { component_category: "adjustment", hour_basis: "peak_h" }],
+  ["premium.p_agent", { component_category: "adjustment", hour_basis: "peak_h" }],
   ["profile.peak", { component_category: "profile", hour_basis: "peak_h" }],
   ["profile.15m", { component_category: "profile", hour_basis: "total_h" }],
   ["profile.sys", { component_category: "profile", hour_basis: "total_h" }],
@@ -137,6 +152,15 @@ export function componentCodeConcept(component: string): ComponentCodeConcept {
   if (TARGET_CANONICAL_PEAKS_COMPONENT_CODES.includes(component as (typeof TARGET_CANONICAL_PEAKS_COMPONENT_CODES)[number])) {
     return "canonical";
   }
+  if (CUSTOMER_CANONICAL_MODERN_COMPONENT_CODES.includes(component as (typeof CUSTOMER_CANONICAL_MODERN_COMPONENT_CODES)[number])) {
+    return "canonical";
+  }
+  if (MARKET_CANONICAL_BASIS_COMPONENT_CODES.includes(component as (typeof MARKET_CANONICAL_BASIS_COMPONENT_CODES)[number])) {
+    return "canonical";
+  }
+  if (COMMERCIAL_ADD_ON_COMPONENT_CODES.includes(component as (typeof COMMERCIAL_ADD_ON_COMPONENT_CODES)[number])) {
+    return "canonical";
+  }
   if (isReservedComponentCode(component)) {
     return "reserved";
   }
@@ -144,8 +168,12 @@ export function componentCodeConcept(component: string): ComponentCodeConcept {
 }
 
 export function isCanonicalSourceOfTruthComponentCode(component: string): boolean {
-  return TARGET_CANONICAL_PEAKS_COMPONENT_CODES.includes(
-    canonicalComponentCode(component) as (typeof TARGET_CANONICAL_PEAKS_COMPONENT_CODES)[number],
+  const canonical = canonicalComponentCode(component);
+  return (
+    TARGET_CANONICAL_PEAKS_COMPONENT_CODES.includes(canonical as (typeof TARGET_CANONICAL_PEAKS_COMPONENT_CODES)[number]) ||
+    CUSTOMER_CANONICAL_MODERN_COMPONENT_CODES.includes(canonical as (typeof CUSTOMER_CANONICAL_MODERN_COMPONENT_CODES)[number]) ||
+    MARKET_CANONICAL_BASIS_COMPONENT_CODES.includes(canonical as (typeof MARKET_CANONICAL_BASIS_COMPONENT_CODES)[number]) ||
+    COMMERCIAL_ADD_ON_COMPONENT_CODES.includes(canonical as (typeof COMMERCIAL_ADD_ON_COMPONENT_CODES)[number])
   );
 }
 

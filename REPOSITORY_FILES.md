@@ -32,6 +32,7 @@ docs/hedging/event_detail_model.md
 docs/hedging/feature_level_perspective_switching.md
 docs/hedging/financial_settlement.md
 docs/hedging/hedging_tool_shell.md
+docs/hedging/legacy_compatibility.md
 docs/hedging/modern_projected_calloffs.md
 docs/hedging/modern_projected_model.md
 docs/hedging/modern_projected_transactions.md
@@ -53,6 +54,7 @@ docs/hedging/position_report.md
 docs/hedging/product_packages_and_feature_sets.md
 docs/hedging/projection_mw_and_price_rules.md
 docs/hedging/single_demo_portfolio.md
+docs/hedging/two_legged_market_basis_target_model.md
 docs/hedging/universal_model_demo_tool.md
 docs/market-derivation/market_derivation.md
 docs/market-derivation/q_factor_model.md
@@ -219,6 +221,16 @@ requirements/package-runs/P0045/review.md
 requirements/package-runs/P0046/design.md
 requirements/package-runs/P0046/functions.md
 requirements/package-runs/P0046/review.md
+requirements/package-runs/P0047/review.md
+requirements/package-runs/P0047/start-instructions.md
+requirements/package-runs/P0048/review.md
+requirements/package-runs/P0049/review.md
+requirements/package-runs/P0050/review.md
+requirements/package-runs/P0051/review.md
+requirements/package-runs/P0052/review.md
+requirements/package-runs/P0053/review.md
+requirements/package-runs/P0054/review.md
+requirements/package-runs/P0055/review.md
 requirements/packages/P0001-bootstrap-cleanup.md
 requirements/packages/P0002-product-vocabulary.md
 requirements/packages/P0003-calloff-transaction-model.md
@@ -268,6 +280,15 @@ requirements/packages/P0043-projected-model-report-basis.md
 requirements/packages/P0044-event-detail-area-forecast-model.md
 requirements/packages/P0045-baseloads-rebalance-calloff-and-position-report.md
 requirements/packages/P0046-hedging-server-basic-auth-local-secret.md
+requirements/packages/P0047-two-legged-transaction-model.md
+requirements/packages/P0048-modern-customer-canonical.md
+requirements/packages/P0049-market-bases-canonical.md
+requirements/packages/P0050-baseloads-from-market-canonical.md
+requirements/packages/P0051-rebalance-product-migration.md
+requirements/packages/P0052-market-only-q-profile-adjustments.md
+requirements/packages/P0053-projection-read-model-cleanup.md
+requirements/packages/P0054-legacy-compatibility-cleanup.md
+requirements/packages/P0055-commercial-components-and-baseloads-upgrade-conversion.md
 src/README.md
 src/database/canonicalComponents.ts
 src/database/eventForecasts.ts
@@ -279,6 +300,7 @@ src/database/types.ts
 src/database/validation.ts
 src/hedging/HedgingToolView.ts
 src/hedging/applicationConfig.ts
+src/hedging/baseloadsProjection.ts
 src/hedging/calloffList.ts
 src/hedging/classicProjection.ts
 src/hedging/componentPricing.ts
@@ -291,10 +313,12 @@ src/hedging/forecastFeature.ts
 src/hedging/forecastHedge.ts
 src/hedging/legacyCalloffList.ts
 src/hedging/marketProjection.ts
+src/hedging/marketOnlyAdjustment.ts
 src/hedging/modernProjection.ts
 src/hedging/peaksCalloffTransactionList.ts
 src/hedging/portfolioDetails.ts
 src/hedging/positionReport.ts
+src/hedging/projectionReadModels.ts
 src/hedging/server.ts
 src/hedging/viewEconomics.ts
 src/price-api/blockProviders.ts
@@ -332,6 +356,7 @@ tests/hedging/forecastFeature.test.ts
 tests/hedging/forecastHedge.test.ts
 tests/hedging/hedgingTool.test.ts
 tests/hedging/legacyCalloffList.test.ts
+tests/hedging/marketOnlyAdjustment.test.ts
 tests/hedging/peaksCalloffTransactionList.test.ts
 tests/hedging/portfolioDetails.test.ts
 tests/hedging/positionReport.test.ts

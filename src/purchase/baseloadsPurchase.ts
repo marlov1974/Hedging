@@ -7,8 +7,15 @@ import {
   type ProductConfigurationComponent,
 } from "../database/types.ts";
 import { getPortfolioProductComponents, getQFactorValuesBySet, insertCalloff, insertTransaction } from "../database/repository.ts";
-import { getCanonicalForecastForPriceArea, SUPPORTED_PRICE_AREAS, type SupportedPriceArea } from "../database/eventForecasts.ts";
+import {
+  createPurchaseEventForCalloff,
+  createRebalanceEventForCalloff,
+  getCanonicalForecastForPriceArea,
+  SUPPORTED_PRICE_AREAS,
+  type SupportedPriceArea,
+} from "../database/eventForecasts.ts";
 import { resolveConfiguredComponentPrice } from "../hedging/componentPricing.ts";
+import { deriveModernFromForecast } from "../hedging/modernProjection.ts";
 import { expandPeriodMonths, findPurchasePeriod, type PurchasePeriodOption } from "./periodOptions.ts";
 
 const BASELOADS_PRODUCT_NAME = "Baseloads";
@@ -55,6 +62,27 @@ export type BaseloadsRebalanceResult = {
   rows: BaseloadsRebalanceRow[];
 };
 
+export type BaseloadsUpgradeInput = BaseloadsRebalanceInput & {
+  target_product_name?: "Peaks.Modern";
+};
+
+export type BaseloadsUpgradeResult = {
+  market_rebalance: BaseloadsRebalanceResult;
+  customer_conversion: {
+    calloff: Calloff;
+    rows: BaseloadsUpgradeConversionRow[];
+  };
+};
+
+export type BaseloadsUpgradeConversionRow = {
+  month: string;
+  price_area: SupportedPriceArea;
+  open_market_base_mwh: number;
+  effective_market_base_price: number;
+  modern_base_mwh: number;
+  modern_peak_mwh: number;
+};
+
 export class PurchaseError extends Error {
   readonly code: "invalid_input" | "not_found";
 
@@ -79,8 +107,94 @@ export function purchaseBaseloads(database: PrototypeDatabase, input: BaseloadsP
     period,
     mw: input.mw,
   });
+  createPurchaseEventForCalloff(database, {
+    calloff,
+    transactions,
+    source: "baseloads_purchase",
+    customer_hedge_policy: "none",
+    market_basis_policy: "from_baseloads_transactions",
+    commercial_add_ons: true,
+  });
 
   return { calloff, transactions, period };
+}
+
+export function upgradeBaseloadsToPeaksModern(database: PrototypeDatabase, input: BaseloadsUpgradeInput): BaseloadsUpgradeResult {
+  const period = validateRebalanceInput(database, input);
+  const priceArea = normalizePriceArea(input.price_area);
+  const targetPercentage = parseTargetPercentage(input.target_percentage_of_forecast);
+  const rows = buildBaseloadsUpgradeMarketRows(database, {
+    portfolio_id: input.portfolio_id,
+    period,
+    price_area: priceArea,
+    target_percentage: targetPercentage,
+  });
+  const activeRows = rows.filter((row) => Math.abs(row.rebalance_delta_mwh) > 0.000001);
+  const marketCalloff = createBaseloadsCalloff(database, {
+    portfolio_id: input.portfolio_id,
+    date: input.date ?? currentIsoDate(),
+    delivery_start_month: period.start_month,
+    delivery_end_month: period.end_month,
+    calloff_id: input.calloff_id ? `${input.calloff_id}-MARKET_REBALANCE` : undefined,
+  });
+  const marketTransactions = createBaseloadsRebalanceTransactions(database, {
+    calloff: marketCalloff,
+    price_area: priceArea,
+    rows: activeRows,
+  });
+  createRebalanceEventForCalloff(database, {
+    calloff: marketCalloff,
+    transactions: marketTransactions,
+    source: "MARKET_REBALANCE_CALLOFF",
+    customer_hedge_policy: "none",
+    market_basis_policy: "from_baseloads_transactions",
+    commercial_add_ons: false,
+  });
+
+  const conversionRows = buildBaseloadsUpgradeConversionRows(database, {
+    portfolio_id: input.portfolio_id,
+    period,
+    price_area: priceArea,
+    target_percentage: targetPercentage,
+  });
+  const conversionCalloff = createTargetProductCalloff(database, {
+    product_name: input.target_product_name ?? "Peaks.Modern",
+    portfolio_id: input.portfolio_id,
+    date: input.date ?? currentIsoDate(),
+    delivery_start_month: period.start_month,
+    delivery_end_month: period.end_month,
+    calloff_id: input.calloff_id ? `${input.calloff_id}-CUSTOMER_CONVERSION` : undefined,
+  });
+  createPurchaseEventForCalloff(database, {
+    calloff: conversionCalloff,
+    transactions: [],
+    source: "CUSTOMER_CONVERSION_CALLOFF",
+    modern_customer_rows: conversionRows.map((row) => ({
+      month: row.month,
+      price_area: row.price_area,
+      modern_base_mwh: row.modern_base_mwh,
+      modern_peak_mwh: row.modern_peak_mwh,
+      modern_base_price: row.effective_market_base_price,
+      modern_peak_price: row.effective_market_base_price,
+    })),
+    market_basis_policy: "none",
+    commercial_add_ons: true,
+  });
+
+  return {
+    market_rebalance: {
+      calloff: marketCalloff,
+      transactions: marketTransactions,
+      period,
+      price_area: priceArea,
+      target_percentage: targetPercentage,
+      rows,
+    },
+    customer_conversion: {
+      calloff: conversionCalloff,
+      rows: conversionRows,
+    },
+  };
 }
 
 export function rebalanceBaseloadsToForecast(
@@ -119,6 +233,19 @@ export function rebalanceBaseloadsToForecast(
     calloff,
     price_area: priceArea,
     rows: activeRows,
+  });
+  createRebalanceEventForCalloff(database, {
+    calloff,
+    transactions,
+    source: "baseloads_rebalance",
+    modern_customer_rows: activeRows.map((row) => ({
+      month: row.month,
+      price_area: priceArea,
+      modern_base_mwh: row.rebalance_delta_mwh,
+      modern_peak_mwh: 0,
+      modern_base_price: getBaseloadsCombinedBasePrice(database, calloff.portfolio_id, calloff.product_id, row.month),
+      modern_peak_price: null,
+    })),
   });
 
   return {
@@ -302,7 +429,7 @@ function buildBaseloadsRebalanceRows(
       throw new PurchaseError("not_found", `missing forecast row for ${input.portfolio_id} ${month} ${input.price_area}`);
     }
     const targetBaseMwh = forecast.mwh * input.target_percentage;
-    const currentBaseMwh = getCurrentBaseSysMwh(database, input.portfolio_id, month);
+    const currentBaseMwh = getCurrentOpenMarketBaseMwh(database, input.portfolio_id, month, input.price_area);
     const deltaMwh = targetBaseMwh - currentBaseMwh;
     return {
       month,
@@ -314,7 +441,171 @@ function buildBaseloadsRebalanceRows(
   });
 }
 
-function getCurrentBaseSysMwh(database: PrototypeDatabase, portfolioId: string, month: string): number {
+function buildBaseloadsUpgradeMarketRows(
+  database: PrototypeDatabase,
+  input: {
+    portfolio_id: string;
+    period: PurchasePeriodOption;
+    price_area: SupportedPriceArea;
+    target_percentage: number;
+  },
+): BaseloadsRebalanceRow[] {
+  return expandPeriodMonths(input.period).map((month) => {
+    const targetMarketBaseMwh = calculateUpgradeTargetMarketBaseMwh(database, {
+      portfolio_id: input.portfolio_id,
+      month,
+      price_area: input.price_area,
+      target_percentage: input.target_percentage,
+    });
+    const currentBaseMwh = getCurrentOpenMarketBaseMwh(database, input.portfolio_id, month, input.price_area);
+    const deltaMwh = targetMarketBaseMwh - currentBaseMwh;
+    return {
+      month,
+      target_base_mwh: roundQuantity(targetMarketBaseMwh),
+      current_base_mwh: roundQuantity(currentBaseMwh),
+      rebalance_delta_mwh: roundQuantity(deltaMwh),
+      derivative_name: formatBaseloadsUpgradeDerivativeName(month, input.price_area),
+    };
+  });
+}
+
+function buildBaseloadsUpgradeConversionRows(
+  database: PrototypeDatabase,
+  input: {
+    portfolio_id: string;
+    period: PurchasePeriodOption;
+    price_area: SupportedPriceArea;
+    target_percentage: number;
+  },
+): BaseloadsUpgradeConversionRow[] {
+  return expandPeriodMonths(input.period).map((month) => {
+    const modern = calculateUpgradeTargetModernShape(database, {
+      portfolio_id: input.portfolio_id,
+      month,
+      price_area: input.price_area,
+      target_percentage: input.target_percentage,
+    });
+    const openMarketBaseMwh = getCurrentOpenMarketBaseMwh(database, input.portfolio_id, month, input.price_area);
+    const effectivePrice = getCurrentOpenMarketBaseEffectivePrice(database, input.portfolio_id, month, input.price_area);
+    return {
+      month,
+      price_area: input.price_area,
+      open_market_base_mwh: roundQuantity(openMarketBaseMwh),
+      effective_market_base_price: roundPrice(effectivePrice),
+      modern_base_mwh: modern.modern_base_mwh,
+      modern_peak_mwh: modern.modern_peak_mwh,
+    };
+  });
+}
+
+function calculateUpgradeTargetMarketBaseMwh(
+  database: PrototypeDatabase,
+  input: { portfolio_id: string; month: string; price_area: SupportedPriceArea; target_percentage: number },
+): number {
+  const modern = calculateUpgradeTargetModernShape(database, input);
+  const baseFactor = getQFactorForComponentCodeMonth(database, "base.sys", input.month);
+  const peakFactor = getQFactorForComponentCodeMonth(database, "peak.sys", input.month);
+  return roundQuantity(modern.modern_base_mwh * baseFactor + modern.modern_peak_mwh * peakFactor);
+}
+
+function calculateUpgradeTargetModernShape(
+  database: PrototypeDatabase,
+  input: { portfolio_id: string; month: string; price_area: SupportedPriceArea; target_percentage: number },
+): { modern_base_mwh: number; modern_peak_mwh: number } {
+  const forecast = getCanonicalForecastForPriceArea(database, input.portfolio_id, input.month, input.price_area);
+  if (!forecast) {
+    throw new PurchaseError("not_found", `missing forecast row for ${input.portfolio_id} ${input.month} ${input.price_area}`);
+  }
+  const calendar = getCalendar(database, input.month);
+  const modern = deriveModernFromForecast({
+    total_mwh: forecast.mwh * input.target_percentage,
+    peak_pct: forecast.peak_pct,
+    total_h: calendar.total_h,
+    peak_h: calendar.peak_h,
+  });
+  return {
+    modern_base_mwh: modern.modern_base_mwh,
+    modern_peak_mwh: modern.modern_peak_mwh,
+  };
+}
+
+function getCurrentOpenMarketBaseMwh(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  month: string,
+  priceArea: SupportedPriceArea,
+): number {
+  const marketBaseMwh = getCurrentMarketBasisMwh(database, portfolioId, month, priceArea);
+  if (marketBaseMwh !== null) {
+    return marketBaseMwh;
+  }
+  return getCurrentCompatibilityBaseSysMwh(database, portfolioId, month);
+}
+
+function getCurrentMarketBasisMwh(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  month: string,
+  priceArea: SupportedPriceArea,
+): number | null {
+  const activeEventIds = new Set(
+    [...database.events.values()]
+      .filter(
+        (event) =>
+          event.portfolio_id === portfolioId &&
+          event.status === "active" &&
+          (event.event_type === "PURCHASE" || event.event_type === "REBALANCE"),
+      )
+      .map((event) => event.event_id),
+  );
+  const details = [...database.eventDetails.values()].filter(
+    (detail) =>
+      activeEventIds.has(detail.event_id) &&
+      detail.leg_type === "MARKET" &&
+      detail.period === month &&
+      detail.price_area === priceArea &&
+      detail.component_code === `market.base.${priceArea.toLowerCase()}`,
+  );
+  if (details.length === 0) {
+    return null;
+  }
+  return details.reduce((sum, detail) => sum + detail.quantity, 0);
+}
+
+function getCurrentOpenMarketBaseEffectivePrice(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  month: string,
+  priceArea: SupportedPriceArea,
+): number {
+  const activeEventIds = new Set(
+    [...database.events.values()]
+      .filter(
+        (event) =>
+          event.portfolio_id === portfolioId &&
+          event.status === "active" &&
+          (event.event_type === "PURCHASE" || event.event_type === "REBALANCE"),
+      )
+      .map((event) => event.event_id),
+  );
+  const details = [...database.eventDetails.values()].filter(
+    (detail) =>
+      activeEventIds.has(detail.event_id) &&
+      detail.leg_type === "MARKET" &&
+      detail.period === month &&
+      detail.price_area === priceArea &&
+      detail.component_code === `market.base.${priceArea.toLowerCase()}` &&
+      detail.price !== null,
+  );
+  const volume = details.reduce((sum, detail) => sum + detail.quantity, 0);
+  if (Math.abs(volume) <= 0.000001) {
+    return 0;
+  }
+  const value = details.reduce((sum, detail) => sum + detail.quantity * (detail.price ?? 0), 0);
+  return value / volume;
+}
+
+function getCurrentCompatibilityBaseSysMwh(database: PrototypeDatabase, portfolioId: string, month: string): number {
   const calloffIds = new Set(
     [...database.calloffs.values()].filter((calloff) => calloff.portfolio_id === portfolioId).map((calloff) => calloff.calloff_id),
   );
@@ -360,6 +651,38 @@ function getBaseloadsProduct(database: PrototypeDatabase): ProductConfiguration 
   return product;
 }
 
+function getTargetProduct(database: PrototypeDatabase, productName: "Peaks.Modern"): ProductConfiguration {
+  const product = [...database.productConfigurations.values()].find((candidate) => candidate.name === productName);
+  if (!product) {
+    throw new PurchaseError("not_found", `missing ${productName} product configuration`);
+  }
+  return product;
+}
+
+function createTargetProductCalloff(
+  database: PrototypeDatabase,
+  input: {
+    product_name: "Peaks.Modern";
+    portfolio_id: string;
+    date: string;
+    delivery_start_month: string;
+    delivery_end_month: string;
+    calloff_id?: string;
+  },
+): Calloff {
+  const product = getTargetProduct(database, input.product_name);
+  return wrapDatabaseError(() =>
+    insertCalloff(database, {
+      calloff_id: input.calloff_id ?? nextCalloffId(database),
+      product_id: product.product_id,
+      portfolio_id: input.portfolio_id,
+      date: input.date,
+      delivery_start_month: input.delivery_start_month,
+      delivery_end_month: input.delivery_end_month,
+    }),
+  );
+}
+
 function getBaseloadsComponents(database: PrototypeDatabase, productId: string): ProductConfigurationComponent[] {
   const components = BASELOADS_COMPONENTS.map((componentCode) => {
     const component = [...database.productConfigurationComponents.values()].find(
@@ -372,6 +695,13 @@ function getBaseloadsComponents(database: PrototypeDatabase, productId: string):
   });
 
   return components;
+}
+
+function getBaseloadsCombinedBasePrice(database: PrototypeDatabase, portfolioId: string, productId: string, month: string): number {
+  return getBaseloadsComponents(database, productId).reduce((sum, component) => {
+    const qFactor = getQFactorForComponentMonth(database, portfolioId, component, month);
+    return sum + resolveConfiguredComponentPrice(database, component, qFactor);
+  }, 0);
 }
 
 function getQFactorForComponentMonth(
@@ -400,6 +730,18 @@ function getQFactorForComponentMonth(
   return value.value;
 }
 
+function getQFactorForComponentCodeMonth(database: PrototypeDatabase, componentCode: string, month: string): number {
+  const qFactorSet = [...database.qFactorSets.values()].find((candidate) => candidate.component === componentCode);
+  if (!qFactorSet) {
+    throw new PurchaseError("not_found", `missing Q-factor set for ${componentCode}`);
+  }
+  const value = getQFactorValuesBySet(database, qFactorSet.qfactor_set_id).find((candidate) => candidate.month === month);
+  if (!value) {
+    throw new PurchaseError("not_found", `missing Q-factor value for ${componentCode} ${month}`);
+  }
+  return value.value;
+}
+
 function getCalendar(database: PrototypeDatabase, month: string) {
   const calendar = [...database.calendars.values()].find((candidate) => candidate.month === month);
   if (!calendar) {
@@ -416,7 +758,15 @@ function formatBaseloadsRebalanceDerivativeName(month: string, priceArea: Suppor
   return `Baseloads Rebalance Month ${month} ${priceArea}`;
 }
 
+function formatBaseloadsUpgradeDerivativeName(month: string, priceArea: SupportedPriceArea): string {
+  return `Baseloads Upgrade Market Rebalance Month ${month} ${priceArea}`;
+}
+
 function roundQuantity(value: number): number {
+  return Number(value.toFixed(6));
+}
+
+function roundPrice(value: number): number {
   return Number(value.toFixed(6));
 }
 

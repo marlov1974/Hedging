@@ -4,7 +4,16 @@ import type { PrototypeDatabase } from "../database/schema.ts";
 import type { Calloff, ComponentCategory, CustomerTransaction, HedgingEvent } from "../database/types.ts";
 import { deriveClassicFromForecast } from "./classicProjection.ts";
 import { deriveModernFromForecast } from "./modernProjection.ts";
+import { getBaseloadsMarketProjectionRowsForPortfolioYear, type BaseloadsMarketProjectionRow } from "./baseloadsProjection.ts";
 import { getMarketProjectionRows } from "./marketProjection.ts";
+import {
+  getClassicCustomerProjectionRowsForPortfolioYear,
+  getMarketBasisPositionRowsForPortfolioYear,
+  getModernCustomerCanonicalRowsForPortfolioYear,
+  type ClassicCustomerProjectionRow,
+  type MarketBasisPositionRow,
+  type ModernCustomerCanonicalRow,
+} from "./projectionReadModels.ts";
 import {
   getClassicProjectedModelRowsForPortfolioYear,
   getPeaksClassicCalloffTransactionRows,
@@ -19,6 +28,11 @@ const EPSILON = 0.000001;
 export type DataViewerTableId =
   | "events"
   | "event-details"
+  | "customer-legs"
+  | "market-legs"
+  | "modern-customer-canonical"
+  | "classic-customer-projection"
+  | "market-basis-position"
   | "classic-projected-forecast"
   | "modern-projected-forecast"
   | "baseloads-projected-transactions"
@@ -92,6 +106,7 @@ export type RawEventDetailRow = {
   event_id: string;
   event_detail_id: string;
   event_type: string;
+  leg_type: string;
   period: string;
   component_code: string;
   component_concept: ComponentCodeConcept;
@@ -102,6 +117,8 @@ export type RawEventDetailRow = {
   price_type: string | null;
   factor: number | null;
   factor_type: string | null;
+  reason: string | null;
+  linked_detail_id: string | null;
 };
 
 export type ClassicProjectedForecastRow = {
@@ -140,12 +157,14 @@ export type ModernProjectedCalloffRow = {
 export type BaseloadsProjectedTransactionRow = {
   calloff_id: string;
   month: string;
-  component: "baseloads.base.sys" | "baseloads.base.epad";
+  component: "baseloads.base.sys" | "baseloads.base.epad" | "baseloads.market.base";
   component_concept: "projected";
   mwh: number;
   price: number | null;
   value: number;
   source_component: string;
+  shape?: BaseloadsMarketProjectionRow["shape"];
+  source_detail_count?: number;
 };
 
 export type ModernProjectedTransactionRow = PeaksProjectedModelTransactionRow;
@@ -166,6 +185,9 @@ export type DataViewerRows = {
   rows:
     | RawEventRow[]
     | RawEventDetailRow[]
+    | ModernCustomerCanonicalRow[]
+    | ClassicCustomerProjectionRow[]
+    | MarketBasisPositionRow[]
     | RawCalloffRow[]
     | RawTransactionRow[]
     | ClassicProjectedForecastRow[]
@@ -191,6 +213,7 @@ export class DataViewerError extends Error {
 export function getDataViewerTables(): DataViewerTable[] {
   const rawDescription = "Stored source-of-truth events and event details.";
   const projectedDescription = "Derived customer-facing views built from canonical rows.";
+  const compatibilityDescription = "Legacy compatibility/debug views kept for older fixtures and tests.";
   const marketDescription = "Derived market/internal rows; sys and epad are price dimensions, not additive physical volume.";
   return [
     {
@@ -206,6 +229,34 @@ export function getDataViewerTables(): DataViewerTable[] {
       view_group_id: "raw-canonical",
       view_group_label: "Raw canonical",
       description: rawDescription,
+    },
+    {
+      table_id: "customer-legs",
+      label: "Raw Customer Legs",
+      view_group_id: "raw-canonical",
+      view_group_label: "Raw canonical",
+      description: rawDescription,
+    },
+    {
+      table_id: "market-legs",
+      label: "Raw Market Legs",
+      view_group_id: "raw-canonical",
+      view_group_label: "Raw canonical",
+      description: rawDescription,
+    },
+    {
+      table_id: "modern-customer-canonical",
+      label: "Modern Customer Canonical",
+      view_group_id: "projected-customer",
+      view_group_label: "Projected customer views",
+      description: projectedDescription,
+    },
+    {
+      table_id: "classic-customer-projection",
+      label: "Classic Customer Projection",
+      view_group_id: "projected-customer",
+      view_group_label: "Projected customer views",
+      description: projectedDescription,
     },
     {
       table_id: "classic-projected-forecast",
@@ -237,10 +288,10 @@ export function getDataViewerTables(): DataViewerTable[] {
     },
     {
       table_id: "classic-projected-transactions",
-      label: "Classic Projected Transactions",
+      label: "Compatibility Classic Projected Transactions",
       view_group_id: "projected-customer",
       view_group_label: "Projected customer views",
-      description: projectedDescription,
+      description: compatibilityDescription,
     },
     {
       table_id: "modern-projected-calloffs",
@@ -251,14 +302,21 @@ export function getDataViewerTables(): DataViewerTable[] {
     },
     {
       table_id: "modern-projected-transactions",
-      label: "Modern Projected Transactions",
+      label: "Compatibility Modern Projected Transactions",
       view_group_id: "projected-customer",
       view_group_label: "Projected customer views",
-      description: projectedDescription,
+      description: compatibilityDescription,
     },
     {
       table_id: "market-projection",
       label: "Market Projection",
+      view_group_id: "market-internal",
+      view_group_label: "Market/internal views",
+      description: marketDescription,
+    },
+    {
+      table_id: "market-basis-position",
+      label: "Market Basis Position",
       view_group_id: "market-internal",
       view_group_label: "Market/internal views",
       description: marketDescription,
@@ -273,7 +331,14 @@ export function getDataViewerYears(database: PrototypeDatabase, portfolioId: str
   const years = new Set([...database.calendars.values()].map((calendar) => calendar.month.slice(0, 4)));
 
   const forecastTable = tableId === "classic-projected-forecast" || tableId === "modern-projected-forecast";
-  const eventTable = tableId === "events" || tableId === "event-details";
+  const eventTable =
+    tableId === "events" ||
+    tableId === "event-details" ||
+    tableId === "customer-legs" ||
+    tableId === "market-legs" ||
+    tableId === "modern-customer-canonical" ||
+    tableId === "classic-customer-projection" ||
+    tableId === "market-basis-position";
   const transactionMonthTable = tableId === "transactions" || tableId === "market-projection";
 
   if (eventTable) {
@@ -418,6 +483,7 @@ export function getRawEventDetailsForPortfolioYear(
           event_id: event.event_id,
           event_detail_id: detail.event_detail_id,
           event_type: event.event_type,
+          leg_type: detail.leg_type,
           period: detail.period,
           component_code: detail.component_code,
           component_concept: componentCodeConcept(detail.component_code),
@@ -428,6 +494,8 @@ export function getRawEventDetailsForPortfolioYear(
           price_type: detail.price_type,
           factor: detail.factor,
           factor_type: detail.factor_type,
+          reason: detail.reason,
+          linked_detail_id: detail.linked_detail_id,
         })),
     )
     .sort(
@@ -436,6 +504,22 @@ export function getRawEventDetailsForPortfolioYear(
         (left.price_area ?? "").localeCompare(right.price_area ?? "") ||
         left.component_code.localeCompare(right.component_code),
     );
+}
+
+export function getRawCustomerLegsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): RawEventDetailRow[] {
+  return getRawEventDetailsForPortfolioYear(database, portfolioId, year).filter((row) => row.leg_type === "CUSTOMER");
+}
+
+export function getRawMarketLegsForPortfolioYear(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  year: string,
+): RawEventDetailRow[] {
+  return getRawEventDetailsForPortfolioYear(database, portfolioId, year).filter((row) => row.leg_type === "MARKET");
 }
 
 export function getClassicProjectedForecastForPortfolioYear(
@@ -547,6 +631,11 @@ export function getBaseloadsProjectedTransactionsForPortfolioYear(
   validatePortfolio(database, portfolioId);
   validateYear(year);
 
+  const marketRows = getBaseloadsMarketProjectionRowsForPortfolioYear(database, portfolioId, year);
+  if (marketRows.length > 0) {
+    return marketRows;
+  }
+
   const calloffIds = new Set(
     getPortfolioCalloffs(database, portfolioId)
       .filter((calloff) => calloff.delivery_start_month.startsWith(`${year}-`))
@@ -646,6 +735,34 @@ export function getDataViewerRows(
     };
   }
 
+  if (tableId === "customer-legs") {
+    return {
+      table_id: tableId,
+      rows: getRawCustomerLegsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "market-legs") {
+    return {
+      table_id: tableId,
+      rows: getRawMarketLegsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "modern-customer-canonical") {
+    return {
+      table_id: tableId,
+      rows: getModernCustomerCanonicalRowsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "classic-customer-projection") {
+    return {
+      table_id: tableId,
+      rows: getClassicCustomerProjectionRowsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
   if (tableId === "classic-projected-forecast") {
     return {
       table_id: tableId,
@@ -699,6 +816,13 @@ export function getDataViewerRows(
     return {
       table_id: tableId,
       rows: getMarketProjectionRowsForPortfolioYear(database, portfolioId, year),
+    };
+  }
+
+  if (tableId === "market-basis-position") {
+    return {
+      table_id: tableId,
+      rows: getMarketBasisPositionRowsForPortfolioYear(database, portfolioId, year),
     };
   }
 

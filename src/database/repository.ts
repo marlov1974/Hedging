@@ -6,6 +6,8 @@ import {
   type CalloffWithTransactions,
   type Customer,
   type EventDetail,
+  type EventDetailInput,
+  type EventDetailLegType,
   type CustomerForecast,
   type CustomerPortfolio,
   type CustomerPortfolioWithForecasts,
@@ -116,25 +118,27 @@ export function insertEvent(database: PrototypeDatabase, input: HedgingEvent): H
   return input;
 }
 
-export function insertEventDetail(database: PrototypeDatabase, input: EventDetail): EventDetail {
+export function insertEventDetail(database: PrototypeDatabase, input: EventDetailInput): EventDetail {
   assertUniqueKey(database.eventDetails, input.event_detail_id, "event_detail_id");
   assertRequiredString(input.event_id, "event_id");
   assertKnownComponentCode(input.component_code);
   assertMonth(input.period, "period");
   assertFiniteNumber(input.quantity, "quantity");
   assertRequiredString(input.quantity_type, "quantity_type");
-  assertEventDetailNormalizedFields(input);
 
   const event = database.events.get(input.event_id);
   if (!event) {
     throw new DatabaseError("not_found", `event_id ${input.event_id} does not exist`);
   }
-  if (requiresPriceArea(input.component_code, event.event_type) && !input.price_area) {
+  const detail = normalizeEventDetail(input);
+  assertEventDetailNormalizedFields(detail);
+  assertLinkedEventDetail(database, detail, event);
+  if (requiresPriceArea(detail.component_code, event.event_type) && !detail.price_area) {
     throw new DatabaseError("invalid_input", `price_area is required for ${input.component_code}`);
   }
 
-  database.eventDetails.set(input.event_detail_id, input);
-  return input;
+  database.eventDetails.set(detail.event_detail_id, detail);
+  return detail;
 }
 
 export function insertProductConfiguration(database: PrototypeDatabase, input: ProductConfiguration): ProductConfiguration {
@@ -314,15 +318,31 @@ function assertNormalizedTransactionFields(input: CustomerTransaction): void {
   if (input.quantity_type !== undefined && input.quantity_type !== "MW" && input.quantity_type !== "EUR") {
     throw new DatabaseError("invalid_input", "quantity_type must be MW or EUR");
   }
-  if (input.price_type !== undefined && input.price_type !== "EUR_PER_MWH" && input.price_type !== "SEK_PER_EUR") {
-    throw new DatabaseError("invalid_input", "price_type must be EUR_PER_MWH or SEK_PER_EUR");
+  if (
+    input.price_type !== undefined &&
+    input.price_type !== "EUR_PER_MWH" &&
+    input.price_type !== "SEK_PER_MWH" &&
+    input.price_type !== "LOCAL_CCY_PER_MWH" &&
+    input.price_type !== "SEK_PER_EUR"
+  ) {
+    throw new DatabaseError("invalid_input", "price_type must be EUR_PER_MWH, SEK_PER_MWH, LOCAL_CCY_PER_MWH or SEK_PER_EUR");
   }
   if (input.factor_type !== undefined && input.factor_type !== null && input.factor_type !== "Q_FACTOR") {
     throw new DatabaseError("invalid_input", "factor_type must be Q_FACTOR or null");
   }
 }
 
+function normalizeEventDetail(input: EventDetailInput): EventDetail {
+  return {
+    ...input,
+    leg_type: input.leg_type ?? "MARKET",
+    reason: input.reason ?? null,
+    linked_detail_id: input.linked_detail_id ?? null,
+  };
+}
+
 function assertEventDetailNormalizedFields(input: EventDetail): void {
+  assertEventDetailLegType(input.leg_type);
   if (input.price !== null) {
     assertFiniteNumber(input.price, "price");
   }
@@ -332,11 +352,45 @@ function assertEventDetailNormalizedFields(input: EventDetail): void {
   if (input.quantity_type !== "MW" && input.quantity_type !== "MWh" && input.quantity_type !== "EUR") {
     throw new DatabaseError("invalid_input", "quantity_type must be MW, MWh or EUR");
   }
-  if (input.price_type !== null && input.price_type !== "EUR_PER_MWH" && input.price_type !== "SEK_PER_EUR") {
-    throw new DatabaseError("invalid_input", "price_type must be EUR_PER_MWH, SEK_PER_EUR or null");
+  if (
+    input.price_type !== null &&
+    input.price_type !== "EUR_PER_MWH" &&
+    input.price_type !== "SEK_PER_MWH" &&
+    input.price_type !== "LOCAL_CCY_PER_MWH" &&
+    input.price_type !== "SEK_PER_EUR"
+  ) {
+    throw new DatabaseError("invalid_input", "price_type must be EUR_PER_MWH, SEK_PER_MWH, LOCAL_CCY_PER_MWH, SEK_PER_EUR or null");
   }
-  if (input.factor_type !== null && input.factor_type !== "Q_FACTOR") {
-    throw new DatabaseError("invalid_input", "factor_type must be Q_FACTOR or null");
+  if (input.factor_type !== null && input.factor_type !== "Q_FACTOR" && input.factor_type !== "PROFILE_FACTOR") {
+    throw new DatabaseError("invalid_input", "factor_type must be Q_FACTOR, PROFILE_FACTOR or null");
+  }
+  if (input.reason !== null && input.reason !== "Q_FACTOR_UPDATE" && input.reason !== "PROFILE_FACTOR_UPDATE") {
+    throw new DatabaseError("invalid_input", "reason must be Q_FACTOR_UPDATE, PROFILE_FACTOR_UPDATE or null");
+  }
+}
+
+function assertEventDetailLegType(value: EventDetailLegType): void {
+  if (value !== "CUSTOMER" && value !== "MARKET") {
+    throw new DatabaseError("invalid_input", "leg_type must be CUSTOMER or MARKET");
+  }
+}
+
+function assertLinkedEventDetail(database: PrototypeDatabase, input: EventDetail, event: HedgingEvent): void {
+  if (input.linked_detail_id === null) {
+    return;
+  }
+  const linkedDetail = database.eventDetails.get(input.linked_detail_id);
+  if (!linkedDetail) {
+    throw new DatabaseError("not_found", `linked_detail_id ${input.linked_detail_id} does not exist`);
+  }
+  if (linkedDetail.event_id !== input.event_id) {
+    if (event.event_type === "ADJUSTMENT" && input.leg_type === "MARKET" && linkedDetail.leg_type === "CUSTOMER") {
+      const linkedEvent = database.events.get(linkedDetail.event_id);
+      if (linkedEvent?.portfolio_id === event.portfolio_id) {
+        return;
+      }
+    }
+    throw new DatabaseError("invalid_input", "linked_detail_id must reference the same event");
   }
 }
 
@@ -344,7 +398,10 @@ function requiresPriceArea(componentCode: string, eventType: string): boolean {
   if (/^(base|peak)\.(sto|mal|lul|sun)$/.test(componentCode)) {
     return true;
   }
-  if (eventType === "PURCHASE" && (componentCode === "base.sys" || componentCode === "peak.sys")) {
+  if (/^market\.base\.(sto|mal|lul|sun)$/.test(componentCode)) {
+    return true;
+  }
+  if ((eventType === "PURCHASE" || eventType === "REBALANCE") && (componentCode === "base.sys" || componentCode === "peak.sys")) {
     return true;
   }
   return false;

@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   COMPATIBILITY_ALIAS_COMPONENT_CODES,
+  COMMERCIAL_ADD_ON_COMPONENT_CODES,
+  CUSTOMER_CANONICAL_MODERN_COMPONENT_CODES,
+  MARKET_CANONICAL_BASIS_COMPONENT_CODES,
   PROJECTED_ONLY_COMPONENT_CODES,
   RESERVED_COMPONENT_CODES,
   TARGET_CANONICAL_PEAKS_COMPONENT_CODES,
@@ -28,6 +31,37 @@ describe("component code classification", () => {
       assert.equal(isPersistableComponentCode(component), true);
       assert.equal(isProjectedOnlyComponentCode(component), false);
       assert.equal(isKnownComponentCode(component), true);
+    }
+  });
+
+  it("recognizes Modern customer leg components as source-of-truth capable", () => {
+    for (const component of CUSTOMER_CANONICAL_MODERN_COMPONENT_CODES) {
+      assert.equal(componentCodeConcept(component), "canonical");
+      assert.equal(isCanonicalSourceOfTruthComponentCode(component), true);
+      assert.equal(isPersistableComponentCode(component), true);
+      assert.equal(isProjectedOnlyComponentCode(component), false);
+      assert.equal(isKnownComponentCode(component), true);
+    }
+  });
+
+  it("recognizes market basis components as source-of-truth capable", () => {
+    for (const component of MARKET_CANONICAL_BASIS_COMPONENT_CODES) {
+      assert.equal(componentCodeConcept(component), "canonical");
+      assert.equal(isCanonicalSourceOfTruthComponentCode(component), true);
+      assert.equal(isPersistableComponentCode(component), true);
+      assert.equal(isKnownComponentCode(component), true);
+      assert.equal(getComponentMetadata(component).component_category, "base");
+      assert.equal(getComponentMetadata(component).hour_basis, "total_h");
+    }
+  });
+
+  it("recognizes commercial customer add-on components as source-of-truth capable", () => {
+    for (const component of COMMERCIAL_ADD_ON_COMPONENT_CODES) {
+      assert.equal(componentCodeConcept(component), "canonical");
+      assert.equal(isCanonicalSourceOfTruthComponentCode(component), true);
+      assert.equal(isPersistableComponentCode(component), true);
+      assert.equal(isKnownComponentCode(component), true);
+      assert.equal(getComponentMetadata(component).component_category, "adjustment");
     }
   });
 

@@ -10,7 +10,7 @@ It distinguishes:
 - projected component names used only in feature projections and views,
 - deprecated aliases retained only for compatibility.
 
-Only canonical components are source-of-truth transaction component codes.
+Only canonical components are source-of-truth component codes.
 
 Projected components exist only in feature projections/views.
 
@@ -19,6 +19,8 @@ Runtime validation must reject projected component names where persisted source-
 For `currency.eursek` quantity and price semantics, see [Currency Component Model](currency_component_model.md).
 
 For generic `event` and `event_detail` source rows, see [Event Detail Model](event_detail_model.md).
+
+For the remaining P0054 compatibility surface, see [Legacy Compatibility](legacy_compatibility.md).
 
 ## 2. Layer Overview
 
@@ -68,6 +70,36 @@ peak.sun
 ```
 
 P0044 adds explicit price-area components for event details. New forecast event details use `base.<area>` and `peak.<area>` instead of generic EPAD forecast rows.
+
+P0048 adds Modern customer canonical components for `CUSTOMER` event details:
+
+```text
+modern.base
+modern.peak
+```
+
+These represent the customer/product-facing leg. They are distinct from the Modern projected dimension names `modern.base.sys`, `modern.base.epad`, `modern.peak.sys` and `modern.peak.epad`, which remain projection-only.
+
+P0049 adds Market basis canonical components for `MARKET` event details:
+
+```text
+market.base.sto
+market.base.mal
+market.base.lul
+market.base.sun
+```
+
+These represent market/risk/settlement basis exposure. They are created from Modern customer leg rows using the factor stored at decision time.
+
+P0055 adds commercial customer add-on components for `CUSTOMER` event details:
+
+```text
+fee.calloff
+premium.q_term
+premium.p_agent
+```
+
+These are configured as product price components and stored as separate customer details. They are not folded into hedge component prices and do not create market legs by default.
 
 ### `allocation.peak.sys`
 
@@ -186,6 +218,16 @@ P0044 adds explicit price-area components for event details. New forecast event 
 | hour basis | `peak_h` |
 | price_area required | yes |
 | meaning | explicit price-area peak exposure |
+
+### Commercial Add-On Components
+
+| Component | Category | Persisted source of truth | Unit | Price behavior |
+| --- | --- | --- | --- | --- |
+| `fee.calloff` | `adjustment` | yes | MWh | configured per MWh; quantity is always positive |
+| `premium.q_term` | `adjustment` | yes | MWh | configured per MWh; signed quantity follows `modern.peak` |
+| `premium.p_agent` | `adjustment` | yes | MWh | configured per MWh; signed quantity follows `modern.peak` in the PoC |
+
+Generated add-on event details store the selected configured price and a reference to the price component used at calloff time.
 
 ### Broader Reserved Canonical Components
 

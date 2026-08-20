@@ -12,6 +12,7 @@ import {
   getPositionReportRows,
   getPositionReportYears,
 } from "../../src/hedging/positionReport.ts";
+import { createExplicitModernHedgePurchase } from "../../src/hedging/forecastHedge.ts";
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
 import { purchaseBaseloads } from "../../src/purchase/baseloadsPurchase.ts";
 
@@ -50,7 +51,7 @@ describe("Position Report", () => {
       reportable_base_mwh: 14880,
       hedge_value: 647726.4,
       effective_month_hedge_price: 43.53,
-      transaction_count: 2,
+      transaction_count: 1,
     });
   });
 
@@ -121,6 +122,108 @@ describe("Position Report", () => {
       coverage_pct: 0,
       warnings: ["missing_currency_row"],
     });
+  });
+
+  it("Modern Position Report reads Modern customer canonical rows before compatibility projections", () => {
+    const database = createPocSeedData();
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_P0053_MODERN_REPORT",
+    });
+    database.transactions.clear();
+
+    assert.deepEqual(getModernPositionReportRows(database, "CUS02-0", "2027"), [
+      {
+        month: "2027-01",
+        base_mwh: 100,
+        peak_epad_mwh: 10,
+        base_price: 45,
+        peak_price: 12,
+        power_value_eur: 4620,
+        currency_covered_eur: null,
+        currency_value_sek: null,
+        display_currency: "EUR",
+        display_value: 4620,
+        coverage_pct: 0,
+        warnings: [],
+      },
+    ]);
+  });
+
+  it("Classic Position Report reads Classic projection from Modern customer canonical rows", () => {
+    const database = createPocSeedData();
+    const calendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
+    assert.ok(calendar);
+    calendar.total_h = 744;
+    calendar.peak_h = 320;
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_P0053_CLASSIC_REPORT",
+    });
+    database.transactions.clear();
+
+    assert.deepEqual(getClassicPositionReportRows(database, "CUS02-0", "2027"), [
+      {
+        month: "2027-01",
+        offpeak_mwh: 56.989247,
+        peak_epad_mwh: 53.010753,
+        offpeak_price: 45,
+        peak_price: 38.774848,
+        power_value_eur: 4620,
+        currency_covered_eur: null,
+        currency_value_sek: null,
+        display_currency: "EUR",
+        display_value: 4620,
+        coverage_pct: 0,
+        warnings: [],
+      },
+    ]);
+  });
+
+  it("Classic and Modern reports ignore compatibility transaction mutations when target event details exist", () => {
+    const database = createPocSeedData();
+    const calendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
+    assert.ok(calendar);
+    calendar.total_h = 744;
+    calendar.peak_h = 320;
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_P0054_TARGET_SOURCE",
+    });
+    for (const transaction of database.transactions.values()) {
+      if (transaction.calloff_id === "CAL_P0054_TARGET_SOURCE") {
+        transaction.mw = 999;
+        transaction.quantity = 999;
+        transaction.price = 999;
+      }
+    }
+
+    const modern = getModernPositionReportRows(database, "CUS02-0", "2027")[0];
+    const classic = getClassicPositionReportRows(database, "CUS02-0", "2027")[0];
+
+    assert.equal(modern.base_mwh, 100);
+    assert.equal(modern.peak_epad_mwh, 10);
+    assert.equal(modern.power_value_eur, 4620);
+    assert.equal(classic.power_value_eur, 4620);
+    assert.notEqual(modern.base_mwh, 999 * 744);
   });
 
   it("Modern Position Report can be built directly from projected model rows", () => {

@@ -4,6 +4,18 @@ P0020 adds the first monthly financial settlement report to the hedging tool.
 
 The report is a PoC feature for Baseloads hedges. It uses synthetic in-memory hedge transactions and P0019 static monthly spot actuals.
 
+P0049 lets settlement read canonical market-basis event details when they are present:
+
+```text
+market.base.<area>
+```
+
+The old transaction-based Baseloads grouping remains as a compatibility fallback.
+
+P0051 includes active `REBALANCE` events in the same market-basis settlement read model. Product-change/rebalance deltas therefore affect settlement through market leg rows instead of rewriting the original purchase rows.
+
+P0052 includes active market-only `ADJUSTMENT` events by default. Factor-only market deltas therefore follow the same market-basis settlement path and are also included in later Baseloads downgrade/projection reads unless explicitly waived by a later package.
+
 For the normalized currency model introduced in P0041, see [Currency Component Model](currency_component_model.md). Power rows remain EUR-denominated; `currency.eursek` rows are separate currency legs and are not MWh exposure.
 
 ## Month Selector
@@ -79,7 +91,7 @@ Positive value means spot price is above hedge price.
 - Baseloads only.
 - Uses static synthetic spot actuals.
 - Uses the P0019 `STO` static price-area bridge while seeded portfolios currently use `SE3`.
-- In-memory transactions only.
+- In-memory prototype data only.
 
 ## P0042 Currency Note
 

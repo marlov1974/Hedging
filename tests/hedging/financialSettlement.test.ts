@@ -60,6 +60,16 @@ describe("Financial Settlement", () => {
     assert.equal(settlement.rows[0].hedge_volume_mwh, 7440);
   });
 
+  it("reads market basis event details when available", () => {
+    const database = createDatabaseWithJanuaryHedge();
+    database.transactions.clear();
+    const row = calculateFinancialSettlementForMonth(database, "CUS00-0", "2027-01").rows[0];
+
+    assert.equal(row.component_group, "market.base");
+    assert.equal(row.hedge_volume_mwh, 7440);
+    assert.equal(row.hedge_price, 43.53);
+  });
+
   it("applies financial settlement sign convention formula", () => {
     const database = createDatabaseWithJanuaryHedge();
     const row = calculateFinancialSettlementForMonth(database, "CUS00-0", "2027-01").rows[0];

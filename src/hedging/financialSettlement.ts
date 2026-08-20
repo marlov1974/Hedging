@@ -1,17 +1,18 @@
 import type { PrototypeDatabase } from "../database/schema.ts";
-import type { CustomerTransaction, ProductConfigurationComponent } from "../database/types.ts";
+import type { CustomerTransaction, EventDetail, HedgingEvent, ProductConfigurationComponent } from "../database/types.ts";
 import { getMonthlySpotActual } from "../settlement/spotActuals.ts";
 import { formatDerivativeName } from "./derivativeNames.ts";
 import { isBaseloadsPortfolio } from "./features.ts";
 
 const SETTLEMENT_PRICE_AREA = "STO";
 const BASELOAD_COMPONENTS = new Set(["base.sys", "base.epad"]);
+const MARKET_BASE_COMPONENT_PATTERN = /^market\.base\.(sto|mal|lul|sun)$/;
 
 export type FinancialSettlementRow = {
   month: string;
   calloff_id: string;
   derivative_name: string;
-  component_group: "base.sys + base.epad";
+  component_group: "base.sys + base.epad" | "market.base";
   hedge_volume_mwh: number;
   hedge_price: number;
   monthly_spot_price: number;
@@ -29,7 +30,7 @@ export type CombinedSysAndEpadHedge = {
   hedge_volume_mwh: number;
   hedge_price: number;
   derivative_name: string;
-  component_group: "base.sys + base.epad";
+  component_group: "base.sys + base.epad" | "market.base";
   components: string[];
 };
 
@@ -45,6 +46,16 @@ export function calculateFinancialSettlementForMonth(
   month: string,
 ): FinancialSettlementResult {
   const spotActual = getMonthlySpotActualForSettlement(month);
+  const marketBasisRows = getMarketBasisSettlementRows(database, portfolioId, month, spotActual.monthly_average_price);
+  if (marketBasisRows.length > 0) {
+    return {
+      month,
+      monthly_spot_price: spotActual.monthly_average_price,
+      spot_source_name: spotActual.source_name,
+      rows: marketBasisRows,
+    };
+  }
+
   const transactions = getBaseloadsTransactionsForPortfolio(database, portfolioId).filter((transaction) => transaction.month === month);
   const groupedTransactions = groupTransactionsByCalloff(transactions);
 
@@ -71,6 +82,74 @@ export function calculateFinancialSettlementForMonth(
     spot_source_name: spotActual.source_name,
     rows,
   };
+}
+
+function getMarketBasisSettlementRows(
+  database: PrototypeDatabase,
+  portfolioId: string,
+  month: string,
+  monthlySpotPrice: number,
+): FinancialSettlementRow[] {
+  const events = [...database.events.values()]
+    .filter(
+      (event) =>
+        event.portfolio_id === portfolioId &&
+        event.status === "active" &&
+        (event.event_type === "PURCHASE" || event.event_type === "REBALANCE" || event.event_type === "ADJUSTMENT"),
+    )
+    .sort((left, right) => left.created_order - right.created_order || left.event_id.localeCompare(right.event_id));
+
+  return events
+    .map((event) => marketBasisSettlementRowForEvent(database, event, month, monthlySpotPrice))
+    .filter((row): row is FinancialSettlementRow => Boolean(row))
+    .filter((row) => row.hedge_volume_mwh > 0);
+}
+
+function marketBasisSettlementRowForEvent(
+  database: PrototypeDatabase,
+  event: HedgingEvent,
+  month: string,
+  monthlySpotPrice: number,
+): FinancialSettlementRow | undefined {
+  const details = [...database.eventDetails.values()].filter(
+    (detail) =>
+      detail.event_id === event.event_id &&
+      detail.period === month &&
+      detail.leg_type === "MARKET" &&
+      MARKET_BASE_COMPONENT_PATTERN.test(detail.component_code),
+  );
+  if (details.length === 0) {
+    return undefined;
+  }
+
+  const hedgeVolume = details.reduce((sum, detail) => sum + detail.quantity, 0);
+  const hedgeValue = details.reduce((sum, detail) => sum + detail.quantity * (detail.price ?? 0), 0);
+  const hedgePrice = hedgeVolume === 0 ? 0 : roundPrice(hedgeValue / hedgeVolume);
+  const priceArea = details.find((detail) => detail.price_area)?.price_area ?? SETTLEMENT_PRICE_AREA;
+
+  return {
+    month,
+    calloff_id: calloffIdFromPurchaseEvent(event.event_id),
+    derivative_name: formatDerivativeName("market.base", [month], priceArea),
+    component_group: "market.base",
+    hedge_volume_mwh: roundMwh(hedgeVolume),
+    hedge_price: hedgePrice,
+    monthly_spot_price: monthlySpotPrice,
+    financial_settlement: hedgeVolume * (monthlySpotPrice - hedgePrice),
+  };
+}
+
+function calloffIdFromPurchaseEvent(eventId: string): string {
+  if (eventId.startsWith("EVT:PURCHASE:")) {
+    return eventId.slice("EVT:PURCHASE:".length);
+  }
+  if (eventId.startsWith("EVT:REBALANCE:")) {
+    return eventId.slice("EVT:REBALANCE:".length);
+  }
+  if (eventId.startsWith("EVT:ADJUSTMENT:")) {
+    return eventId.slice("EVT:ADJUSTMENT:".length);
+  }
+  return eventId;
 }
 
 export function combineSysAndEpadHedgePrice(database: PrototypeDatabase, transactions: CustomerTransaction[]): CombinedSysAndEpadHedge {
@@ -186,4 +265,8 @@ function getWeightedComponentPrice(
 
 function roundPrice(price: number): number {
   return Math.round(price * 100) / 100;
+}
+
+function roundMwh(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
 }

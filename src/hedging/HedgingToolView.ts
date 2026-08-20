@@ -1,5 +1,5 @@
 import type { PrototypeDatabase } from "../database/schema.ts";
-import type { BaseloadsPurchaseResult } from "../purchase/baseloadsPurchase.ts";
+import type { BaseloadsPurchaseResult, BaseloadsUpgradeResult } from "../purchase/baseloadsPurchase.ts";
 import { getBaseloadsPurchasePeriods } from "../purchase/periodOptions.ts";
 import {
   getDataViewerPerspectiveOptions,
@@ -46,6 +46,11 @@ import {
   type ModernPositionReportRow,
   type PositionReportRow,
 } from "./positionReport.ts";
+import type {
+  ClassicCustomerProjectionRow,
+  MarketBasisPositionRow,
+  ModernCustomerCanonicalRow,
+} from "./projectionReadModels.ts";
 import { getPortfolioOptions, type HedgingFeatureId, type PortfolioOption } from "./features.ts";
 
 export type HedgingToolState = {
@@ -69,6 +74,12 @@ export type HedgingToolState = {
   forecast_hedge_result?: ForecastHedgeAcceptResult;
   error?: string;
   purchase_result?: BaseloadsPurchaseResult;
+  baseloads_upgrade_input?: {
+    period_id?: string;
+    price_area?: string;
+    target_percentage_of_forecast?: string;
+  };
+  baseloads_upgrade_result?: BaseloadsUpgradeResult;
 };
 
 const DEMO_PORTFOLIO_ID = "CUS00-0";
@@ -438,14 +449,18 @@ function renderActiveFeature(
 function renderBuyBaseloads(selectedPortfolio: PortfolioOption, state: HedgingToolState): string {
   const periods = getBaseloadsPurchasePeriods();
   const selectedPeriodId = state.selected_period_id ?? periods[0]?.period_id ?? "";
+  const upgradePeriodId = state.baseloads_upgrade_input?.period_id ?? selectedPeriodId;
+  const upgradePriceArea = state.baseloads_upgrade_input?.price_area ?? "STO";
+  const upgradeTargetPercentage = state.baseloads_upgrade_input?.target_percentage_of_forecast ?? "50";
 
   return `<div class="stack">
     <div>
       <h2>Buy Baseloads</h2>
-      <p>Create a Baseloads call-off and monthly component transactions.</p>
+      <p>Create Baseloads call-offs and convert open Baseloads exposure to Modern customer components.</p>
     </div>
     ${state.error ? `<div class="notice error">${escapeHtml(state.error)}</div>` : ""}
     ${state.purchase_result ? `<div class="notice success">Calloff ${escapeHtml(state.purchase_result.calloff.calloff_id)} created with ${state.purchase_result.transactions.length} transactions.</div>` : ""}
+    ${state.baseloads_upgrade_result ? renderBaseloadsUpgradeResult(state.baseloads_upgrade_result) : ""}
     <form method="post" action="/hedging/buy-baseloads" class="stack">
       <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
       <div class="form-grid">
@@ -462,6 +477,50 @@ function renderBuyBaseloads(selectedPortfolio: PortfolioOption, state: HedgingTo
       </div>
       <button class="primary" type="submit">Confirm purchase</button>
     </form>
+    <section class="panel">
+      <div class="stack">
+        <div>
+          <h3>Convert Baseloads To Modern</h3>
+          <p>Run market rebalance first, then create Modern customer conversion details from the resulting market position.</p>
+        </div>
+        <form method="post" action="/hedging/upgrade-baseloads-to-modern" class="stack">
+          <input type="hidden" name="portfolio_id" value="${escapeHtml(selectedPortfolio.portfolio_id)}">
+          <div class="form-grid">
+            <label>
+              Period
+              <select name="period_id">
+                ${periods.map((period) => `<option value="${escapeHtml(period.period_id)}"${period.period_id === upgradePeriodId ? " selected" : ""}>${escapeHtml(period.label)}</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              Price area
+              <select name="price_area">
+                ${["STO", "MAL", "LUL", "SUN"].map((area) => `<option value="${area}"${area === upgradePriceArea ? " selected" : ""}>${area}</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              Target % of forecast
+              <input name="target_percentage_of_forecast" type="number" min="0" max="100" step="0.001" required value="${escapeHtml(upgradeTargetPercentage)}">
+            </label>
+          </div>
+          <button class="primary" type="submit">Convert to Modern</button>
+        </form>
+      </div>
+    </section>
+  </div>`;
+}
+
+function renderBaseloadsUpgradeResult(result: BaseloadsUpgradeResult): string {
+  const marketRows = result.market_rebalance.rows;
+  const conversionRows = result.customer_conversion.rows;
+  const marketDelta = marketRows.reduce((sum, row) => sum + row.rebalance_delta_mwh, 0);
+  const customerVolume = conversionRows.reduce((sum, row) => sum + Math.abs(row.modern_base_mwh) + Math.abs(row.modern_peak_mwh), 0);
+
+  return `<div class="notice success">
+    Conversion created:
+    ${escapeHtml(result.market_rebalance.calloff?.calloff_id ?? "no-market-delta")}
+    and ${escapeHtml(result.customer_conversion.calloff.calloff_id)}.
+    Market delta ${formatNumber(marketDelta)} MWh, customer conversion volume ${formatNumber(customerVolume)} MWh.
   </div>`;
 }
 
@@ -1216,6 +1275,9 @@ function renderDataViewerRows(
     | RawTransactionRow[]
     | RawEventRow[]
     | RawEventDetailRow[]
+    | ModernCustomerCanonicalRow[]
+    | ClassicCustomerProjectionRow[]
+    | MarketBasisPositionRow[]
     | ClassicProjectedForecastRow[]
     | ModernProjectedForecastRow[]
     | BaseloadsProjectedTransactionRow[]
@@ -1237,8 +1299,16 @@ function renderDataViewerRows(
     return renderModernProjectedCalloffsTable(rows as ModernProjectedCalloffRow[]);
   }
 
-  if (tableId === "event-details") {
+  if (tableId === "event-details" || tableId === "customer-legs" || tableId === "market-legs") {
     return renderRawEventDetailsTable(rows as RawEventDetailRow[]);
+  }
+
+  if (tableId === "modern-customer-canonical") {
+    return renderModernCustomerCanonicalTable(rows as ModernCustomerCanonicalRow[]);
+  }
+
+  if (tableId === "classic-customer-projection") {
+    return renderClassicCustomerProjectionTable(rows as ClassicCustomerProjectionRow[]);
   }
 
   if (tableId === "classic-projected-forecast") {
@@ -1267,6 +1337,10 @@ function renderDataViewerRows(
 
   if (tableId === "market-projection") {
     return renderMarketProjectionTable(rows as DataViewerMarketProjectionRow[]);
+  }
+
+  if (tableId === "market-basis-position") {
+    return renderMarketBasisPositionTable(rows as MarketBasisPositionRow[]);
   }
 
   return renderMarketProjectionTable(rows as DataViewerMarketProjectionRow[]);
@@ -1375,6 +1449,7 @@ function renderRawEventDetailsTable(rows: RawEventDetailRow[]): string {
         <th>event_id</th>
         <th>event_detail_id</th>
         <th>event_type</th>
+        <th>leg_type</th>
         <th>period</th>
         <th>component_code</th>
         <th>component_concept</th>
@@ -1385,6 +1460,8 @@ function renderRawEventDetailsTable(rows: RawEventDetailRow[]): string {
         <th>price_type</th>
         <th>factor</th>
         <th>factor_type</th>
+        <th>reason</th>
+        <th>linked_detail_id</th>
       </tr>
     </thead>
     <tbody>
@@ -1394,6 +1471,7 @@ function renderRawEventDetailsTable(rows: RawEventDetailRow[]): string {
             <td>${escapeHtml(row.event_id)}</td>
             <td>${escapeHtml(row.event_detail_id)}</td>
             <td>${escapeHtml(row.event_type)}</td>
+            <td>${escapeHtml(row.leg_type)}</td>
             <td>${escapeHtml(row.period)}</td>
             <td>${escapeHtml(row.component_code)}</td>
             <td>${escapeHtml(row.component_concept)}</td>
@@ -1404,6 +1482,8 @@ function renderRawEventDetailsTable(rows: RawEventDetailRow[]): string {
             <td>${escapeHtml(row.price_type ?? "")}</td>
             <td class="number">${formatOptionalNumber(row.factor)}</td>
             <td>${escapeHtml(row.factor_type ?? "")}</td>
+            <td>${escapeHtml(row.reason ?? "")}</td>
+            <td>${escapeHtml(row.linked_detail_id ?? "")}</td>
           </tr>`,
         )
         .join("")}
@@ -1469,6 +1549,82 @@ function renderModernProjectedForecastTable(rows: ModernProjectedForecastRow[]):
   </table>`;
 }
 
+function renderModernCustomerCanonicalTable(rows: ModernCustomerCanonicalRow[]): string {
+  return `<table>
+    <thead>
+      <tr>
+        <th>calloff_id</th>
+        <th>event_id</th>
+        <th>event_detail_id</th>
+        <th>event_type</th>
+        <th>month</th>
+        <th>component</th>
+        <th>component_concept</th>
+        <th>price_area</th>
+        <th>mwh</th>
+        <th>price</th>
+        <th>value</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeHtml(row.calloff_id)}</td>
+            <td>${escapeHtml(row.event_id)}</td>
+            <td>${escapeHtml(row.event_detail_id)}</td>
+            <td>${escapeHtml(row.event_type)}</td>
+            <td>${escapeHtml(row.month)}</td>
+            <td>${escapeHtml(row.component)}</td>
+            <td>${escapeHtml(row.component_concept)}</td>
+            <td>${escapeHtml(row.price_area ?? "")}</td>
+            <td class="number">${formatNumber(row.mwh)}</td>
+            <td class="number">${formatOptionalNumber(row.price)}</td>
+            <td class="number">${formatNumber(row.value)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
+}
+
+function renderClassicCustomerProjectionTable(rows: ClassicCustomerProjectionRow[]): string {
+  return `<table>
+    <thead>
+      <tr>
+        <th>calloff_id</th>
+        <th>event_id</th>
+        <th>month</th>
+        <th>component</th>
+        <th>component_concept</th>
+        <th>mwh</th>
+        <th>price</th>
+        <th>value</th>
+        <th>source_components</th>
+        <th>source_event_detail_ids</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeHtml(row.calloff_id)}</td>
+            <td>${escapeHtml(row.event_id)}</td>
+            <td>${escapeHtml(row.month)}</td>
+            <td>${escapeHtml(row.component)}</td>
+            <td>${escapeHtml(row.component_concept)}</td>
+            <td class="number">${formatNumber(row.mwh)}</td>
+            <td class="number">${formatOptionalNumber(row.price)}</td>
+            <td class="number">${formatNumber(row.value)}</td>
+            <td>${escapeHtml(row.source_components)}</td>
+            <td>${escapeHtml(row.source_event_detail_ids)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
+}
+
 function renderBaseloadsProjectedTransactionsTable(rows: BaseloadsProjectedTransactionRow[]): string {
   return `<table>
     <thead>
@@ -1481,6 +1637,7 @@ function renderBaseloadsProjectedTransactionsTable(rows: BaseloadsProjectedTrans
         <th>price</th>
         <th>value</th>
         <th>source_component</th>
+        <th>shape</th>
       </tr>
     </thead>
     <tbody>
@@ -1495,6 +1652,7 @@ function renderBaseloadsProjectedTransactionsTable(rows: BaseloadsProjectedTrans
             <td class="number">${formatOptionalNumber(row.price)}</td>
             <td class="number">${formatNumber(row.value)}</td>
             <td>${escapeHtml(row.source_component)}</td>
+            <td>${escapeHtml(row.shape ?? "")}</td>
           </tr>`,
         )
         .join("")}
@@ -1656,6 +1814,45 @@ function renderMarketProjectionTable(rows: DataViewerMarketProjectionRow[]): str
   </table>`;
 }
 
+function renderMarketBasisPositionTable(rows: MarketBasisPositionRow[]): string {
+  return `<table>
+    <thead>
+      <tr>
+        <th>calloff_id</th>
+        <th>event_id</th>
+        <th>event_type</th>
+        <th>month</th>
+        <th>component</th>
+        <th>component_concept</th>
+        <th>price_area</th>
+        <th>mwh</th>
+        <th>price</th>
+        <th>value</th>
+        <th>source_detail_count</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeHtml(row.calloff_id)}</td>
+            <td>${escapeHtml(row.event_id)}</td>
+            <td>${escapeHtml(row.event_type)}</td>
+            <td>${escapeHtml(row.month)}</td>
+            <td>${escapeHtml(row.component)}</td>
+            <td>${escapeHtml(row.component_concept)}</td>
+            <td>${escapeHtml(row.price_area ?? "")}</td>
+            <td class="number">${formatNumber(row.mwh)}</td>
+            <td class="number">${formatOptionalNumber(row.price)}</td>
+            <td class="number">${formatNumber(row.value)}</td>
+            <td class="number">${formatNumber(row.source_detail_count)}</td>
+          </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>`;
+}
+
 function renderMonthSelect(name: string, months: string[], selectedMonth: string): string {
   return `<select name="${escapeHtml(name)}">
     ${months.map((month) => `<option value="${escapeHtml(month)}"${month === selectedMonth ? " selected" : ""}>${escapeHtml(month)}</option>`).join("")}
@@ -1756,25 +1953,38 @@ function defaultTableForDataViewerPerspective(view: DataViewerPerspectiveId): Da
     return "baseloads-projected-transactions";
   }
   if (view === "classic") {
-    return "classic-projected-calloffs";
+    return "classic-customer-projection";
   }
   if (view === "modern") {
-    return "modern-projected-transactions";
+    return "modern-customer-canonical";
   }
   return "events";
 }
 
 function tableBelongsToDataViewerPerspective(tableId: DataViewerTableId, view: DataViewerPerspectiveId): boolean {
   if (view === "canonical") {
-    return tableId === "events" || tableId === "event-details";
+    return (
+      tableId === "events" ||
+      tableId === "event-details" ||
+      tableId === "customer-legs" ||
+      tableId === "market-legs"
+    );
   }
   if (view === "baseloads") {
-    return tableId === "baseloads-projected-transactions";
+    return tableId === "baseloads-projected-transactions" || tableId === "market-basis-position";
   }
   if (view === "classic") {
-    return tableId === "classic-projected-calloffs" || tableId === "classic-projected-transactions" || tableId === "classic-projected-forecast";
+    return (
+      tableId === "classic-customer-projection" ||
+      tableId === "classic-projected-calloffs" ||
+      tableId === "classic-projected-forecast"
+    );
   }
-  return tableId === "modern-projected-calloffs" || tableId === "modern-projected-transactions" || tableId === "modern-projected-forecast";
+  return (
+    tableId === "modern-customer-canonical" ||
+    tableId === "modern-projected-calloffs" ||
+    tableId === "modern-projected-forecast"
+  );
 }
 
 function renderPerspectiveHidden(perspectiveId: PerspectiveId | undefined): string {

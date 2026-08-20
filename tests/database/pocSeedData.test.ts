@@ -13,6 +13,7 @@ import {
   canonicalComponentCode,
   canonicalProductPackageName,
   componentCodeConcept,
+  isCompatibilityAliasComponentCode,
   isCustomerProjectionComponent,
   isInternalProjectionComponent,
   isMarketProjectionComponent,
@@ -281,6 +282,19 @@ describe("P0015 PoC seed data", () => {
     assert.ok(profilesClassic.has("profile.epad"));
     assert.ok(profilesModern.has("profile.sys"));
     assert.ok(profilesModern.has("profile.epad"));
+  });
+
+  it("does not store deprecated compatibility aliases in seed product component rows", () => {
+    const database = createPocSeedData();
+
+    assert.equal(
+      [...database.productConfigurationComponents.values()].some((component) => isCompatibilityAliasComponentCode(component.component)),
+      false,
+    );
+    assert.equal(
+      [...database.qFactorSets.values()].some((set) => isCompatibilityAliasComponentCode(set.component)),
+      false,
+    );
   });
 
   it("normalizes deprecated product package aliases", () => {

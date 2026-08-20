@@ -1,5 +1,14 @@
 import type { PrototypeDatabase } from "./schema.ts";
-import type { Calloff, CustomerForecast, CustomerTransaction, EventDetail, HedgingEvent } from "./types.ts";
+import type {
+  Calloff,
+  CustomerForecast,
+  CustomerTransaction,
+  EventDetail,
+  EventDetailPriceType,
+  HedgingEvent,
+  PriceComponent,
+  ProductConfigurationComponent,
+} from "./types.ts";
 import { insertEvent, insertEventDetail } from "./repository.ts";
 
 export const SUPPORTED_PRICE_AREAS = ["STO", "MAL", "LUL", "SUN"] as const;
@@ -22,6 +31,19 @@ export type CanonicalForecast = {
 export type PurchaseEventResult = {
   event: HedgingEvent;
   event_details: EventDetail[];
+};
+
+export type CustomerHedgePolicy = "derive_modern" | "none";
+
+export type MarketBasisPolicy = "from_customer" | "from_baseloads_transactions" | "none";
+
+export type ModernCustomerEventDetailInput = {
+  month: string;
+  price_area: string | null;
+  modern_base_mwh: number;
+  modern_peak_mwh: number;
+  modern_base_price: number | null;
+  modern_peak_price: number | null;
 };
 
 const PRICE_AREA_SHARES: PriceAreaShare[] = [
@@ -56,6 +78,7 @@ export function createForecastEventDetailsForForecast(
     insertEventDetail(database, {
       event_detail_id: forecastEventDetailId(eventId, `base.${priceArea.toLowerCase()}`),
       event_id: eventId,
+      leg_type: "MARKET",
       component_code: `base.${priceArea.toLowerCase()}`,
       period: forecast.month,
       price_area: priceArea,
@@ -69,6 +92,7 @@ export function createForecastEventDetailsForForecast(
     insertEventDetail(database, {
       event_detail_id: forecastEventDetailId(eventId, `peak.${priceArea.toLowerCase()}`),
       event_id: eventId,
+      leg_type: "MARKET",
       component_code: `peak.${priceArea.toLowerCase()}`,
       period: forecast.month,
       price_area: priceArea,
@@ -218,32 +242,263 @@ export function getForecastAreaShares(database: PrototypeDatabase, portfolioId: 
 
 export function createPurchaseEventForCalloff(
   database: PrototypeDatabase,
-  input: { calloff: Calloff; transactions: CustomerTransaction[]; source?: string },
+  input: {
+    calloff: Calloff;
+    transactions: CustomerTransaction[];
+    source?: string;
+    modern_customer_rows?: ModernCustomerEventDetailInput[];
+    customer_hedge_policy?: CustomerHedgePolicy;
+    market_basis_policy?: MarketBasisPolicy;
+    commercial_add_ons?: boolean;
+  },
 ): PurchaseEventResult {
-  const eventId = purchaseEventId(input.calloff.calloff_id);
-  const event = upsertEvent(database, {
-    event_id: eventId,
-    portfolio_id: input.calloff.portfolio_id,
+  return createCalloffEvent(database, {
+    ...input,
     event_type: "PURCHASE",
+    event_id: purchaseEventId(input.calloff.calloff_id),
+    source: input.source ?? "forecast_hedge",
+  });
+}
+
+export function createRebalanceEventForCalloff(
+  database: PrototypeDatabase,
+  input: {
+    calloff: Calloff;
+    transactions: CustomerTransaction[];
+    source?: string;
+    modern_customer_rows?: ModernCustomerEventDetailInput[];
+    customer_hedge_policy?: CustomerHedgePolicy;
+    market_basis_policy?: MarketBasisPolicy;
+    commercial_add_ons?: boolean;
+  },
+): PurchaseEventResult {
+  return createCalloffEvent(database, {
+    ...input,
+    event_type: "REBALANCE",
+    event_id: rebalanceEventId(input.calloff.calloff_id),
+    source: input.source ?? "rebalance",
+  });
+}
+
+function createCalloffEvent(
+  database: PrototypeDatabase,
+  input: {
+    calloff: Calloff;
+    transactions: CustomerTransaction[];
+    event_type: "PURCHASE" | "REBALANCE";
+    event_id: string;
+    source: string;
+    modern_customer_rows?: ModernCustomerEventDetailInput[];
+    customer_hedge_policy?: CustomerHedgePolicy;
+    market_basis_policy?: MarketBasisPolicy;
+    commercial_add_ons?: boolean;
+  },
+): PurchaseEventResult {
+  const event = upsertEvent(database, {
+    event_id: input.event_id,
+    portfolio_id: input.calloff.portfolio_id,
+    event_type: input.event_type,
     version: 1,
     created_at: input.calloff.date,
-    created_order: nextEventOrder(database, eventId),
-    source: input.source ?? "forecast_hedge",
+    created_order: nextEventOrder(database, input.event_id),
+    source: input.source,
     status: "active",
   });
 
-  deleteEventDetails(database, eventId);
+  deleteEventDetails(database, input.event_id);
   const eventDetails: EventDetail[] = [];
+  const customerHedgePolicy = input.customer_hedge_policy ?? "derive_modern";
+  const customerDetails =
+    customerHedgePolicy === "none"
+      ? []
+      : input.modern_customer_rows
+        ? modernCustomerEventDetailsForRows(input.event_id, input.modern_customer_rows)
+        : modernCustomerEventDetailsForTransactions(database, input.event_id, input.transactions);
+  eventDetails.push(...customerDetails.map((detail) => insertEventDetail(database, detail)));
+  const marketBasisPolicy = input.market_basis_policy ?? "from_customer";
+  const marketBasisDetails =
+    marketBasisPolicy === "from_customer"
+      ? marketBasisEventDetailsForCustomerDetails(database, input.event_id, input.transactions, customerDetails)
+      : marketBasisPolicy === "from_baseloads_transactions"
+        ? marketBasisEventDetailsForBaseloadsTransactions(database, input.event_id, input.calloff, input.transactions)
+        : [];
+  eventDetails.push(...marketBasisDetails.map((detail) => insertEventDetail(database, detail)));
+  if (input.commercial_add_ons) {
+    eventDetails.push(
+      ...commercialAddOnEventDetailsForCalloff(database, input.event_id, input.calloff, input.transactions, customerDetails).map((detail) =>
+        insertEventDetail(database, detail),
+      ),
+    );
+  }
   for (const transaction of input.transactions) {
     const component = database.productConfigurationComponents.get(transaction.productcomponent_id)?.component;
     if (!component) {
       continue;
     }
-    const details = eventDetailsForTransaction(database, eventId, input.calloff, transaction, component);
+    const details = eventDetailsForTransaction(database, input.event_id, input.calloff, transaction, component);
     eventDetails.push(...details.map((detail) => insertEventDetail(database, detail)));
   }
 
   return { event, event_details: eventDetails };
+}
+
+function marketBasisEventDetailsForBaseloadsTransactions(
+  database: PrototypeDatabase,
+  eventId: string,
+  calloff: Calloff,
+  transactions: CustomerTransaction[],
+): EventDetail[] {
+  const groups = new Map<string, { month: string; price_area: SupportedPriceArea; transactions: CustomerTransaction[] }>();
+  for (const transaction of transactions) {
+    const component = database.productConfigurationComponents.get(transaction.productcomponent_id)?.component;
+    if (component !== "base.sys" && component !== "base.epad") {
+      continue;
+    }
+    const priceArea = normalizeMarketBasisPriceArea(transaction.price_area ?? null);
+    const key = `${transaction.month}|${priceArea}`;
+    const group = groups.get(key) ?? { month: transaction.month, price_area: priceArea, transactions: [] };
+    group.transactions.push(transaction);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()].flatMap((group) => {
+    const baseSys = transactionForComponent(database, group.transactions, "base.sys");
+    if (!baseSys) {
+      return [];
+    }
+    const calendar = [...database.calendars.values()].find((candidate) => candidate.month === group.month);
+    const quantity = roundQuantity(transactionQuantity(baseSys) * (calendar?.total_h ?? 1));
+    return [
+      {
+        event_detail_id: `${eventId}:MARKET:${group.month}:baseloads:market.base.${group.price_area.toLowerCase()}`,
+        event_id: eventId,
+        leg_type: "MARKET",
+        component_code: `market.base.${group.price_area.toLowerCase()}`,
+        period: group.month,
+        price_area: group.price_area,
+        quantity,
+        quantity_type: "MWh",
+        price: combinedComponentPrice(database, group.transactions, ["base.sys", "base.epad"]),
+        price_type: "EUR_PER_MWH",
+        factor: 1,
+        factor_type: "Q_FACTOR",
+        reason: null,
+        linked_detail_id: null,
+      },
+    ];
+  });
+}
+
+function commercialAddOnEventDetailsForCalloff(
+  database: PrototypeDatabase,
+  eventId: string,
+  calloff: Calloff,
+  transactions: CustomerTransaction[],
+  customerDetails: EventDetail[],
+): EventDetail[] {
+  const details: EventDetail[] = [];
+  const feeComponent = configuredCommercialComponent(database, calloff.product_id, "fee.calloff");
+  if (feeComponent) {
+    for (const [month, volume] of customerCalloffVolumesByMonth(database, transactions, customerDetails)) {
+      details.push(commercialAddOnDetail(eventId, month, "fee.calloff", roundQuantity(Math.abs(volume)), feeComponent, null));
+    }
+  }
+
+  for (const peakDetail of customerDetails.filter((detail) => detail.component_code === "modern.peak")) {
+    for (const componentCode of ["premium.q_term", "premium.p_agent"] as const) {
+      const premiumComponent = configuredCommercialComponent(database, calloff.product_id, componentCode);
+      if (!premiumComponent) {
+        continue;
+      }
+      details.push(
+        commercialAddOnDetail(eventId, peakDetail.period, componentCode, roundQuantity(peakDetail.quantity), premiumComponent, peakDetail.event_detail_id),
+      );
+    }
+  }
+
+  return details;
+}
+
+function customerCalloffVolumesByMonth(
+  database: PrototypeDatabase,
+  transactions: CustomerTransaction[],
+  customerDetails: EventDetail[],
+): Map<string, number> {
+  const volumes = new Map<string, number>();
+  const hedgeCustomerDetails = customerDetails.filter(
+    (detail) => detail.component_code === "modern.base" || detail.component_code === "modern.peak",
+  );
+  if (hedgeCustomerDetails.length > 0) {
+    for (const detail of hedgeCustomerDetails) {
+      volumes.set(detail.period, (volumes.get(detail.period) ?? 0) + Math.abs(detail.quantity));
+    }
+    return volumes;
+  }
+
+  for (const transaction of transactions) {
+    const component = database.productConfigurationComponents.get(transaction.productcomponent_id)?.component;
+    if (component !== "base.sys") {
+      continue;
+    }
+    const calendar = [...database.calendars.values()].find((candidate) => candidate.month === transaction.month);
+    const volume = transactionQuantity(transaction) * (calendar?.total_h ?? 1);
+    volumes.set(transaction.month, (volumes.get(transaction.month) ?? 0) + Math.abs(volume));
+  }
+  return volumes;
+}
+
+function configuredCommercialComponent(
+  database: PrototypeDatabase,
+  productId: string,
+  componentCode: "fee.calloff" | "premium.q_term" | "premium.p_agent",
+): { component: ProductConfigurationComponent; price: PriceComponent } | null {
+  const component = [...database.productConfigurationComponents.values()].find(
+    (candidate) => candidate.product_id === productId && candidate.component === componentCode,
+  );
+  if (!component) {
+    return null;
+  }
+  const price = [...database.priceComponents.values()].find((candidate) => candidate.productcomponent_id === component.productcomponent_id);
+  return price ? { component, price } : null;
+}
+
+function commercialAddOnDetail(
+  eventId: string,
+  month: string,
+  componentCode: "fee.calloff" | "premium.q_term" | "premium.p_agent",
+  quantity: number,
+  configured: { component: ProductConfigurationComponent; price: PriceComponent },
+  linkedDetailId: string | null,
+): EventDetail {
+  return {
+    event_detail_id: `${eventId}:CUSTOMER:${month}:${componentCode}`,
+    event_id: eventId,
+    leg_type: "CUSTOMER",
+    component_code: componentCode,
+    period: month,
+    price_area: null,
+    quantity,
+    quantity_type: "MWh",
+    price: configured.price.price,
+    price_type: priceTypeForCurrency(configured.price.currency),
+    price_component_id: configured.price.pricecomponent_id,
+    price_source: configured.component.productcomponent_id,
+    factor: null,
+    factor_type: null,
+    reason: null,
+    linked_detail_id: linkedDetailId,
+  };
+}
+
+function priceTypeForCurrency(currency: string): EventDetailPriceType {
+  const normalized = currency.trim().toUpperCase();
+  if (normalized === "EUR") {
+    return "EUR_PER_MWH";
+  }
+  if (normalized === "SEK") {
+    return "SEK_PER_MWH";
+  }
+  return "LOCAL_CCY_PER_MWH";
 }
 
 export function getEventDetails(database: PrototypeDatabase, eventId: string): EventDetail[] {
@@ -296,6 +551,255 @@ function eventDetailsForTransaction(
   });
 }
 
+function modernCustomerEventDetailsForTransactions(
+  database: PrototypeDatabase,
+  eventId: string,
+  transactions: CustomerTransaction[],
+): EventDetail[] {
+  const transactionsByMonth = new Map<string, CustomerTransaction[]>();
+  for (const transaction of transactions) {
+    if (transaction.quantity_type === "EUR") {
+      continue;
+    }
+    const monthTransactions = transactionsByMonth.get(transaction.month) ?? [];
+    monthTransactions.push(transaction);
+    transactionsByMonth.set(transaction.month, monthTransactions);
+  }
+
+  return [...transactionsByMonth.entries()].flatMap(([month, monthTransactions]) => {
+    const basis = deriveModernCustomerBasisForMonth(database, month, monthTransactions);
+    if (!basis) {
+      return [];
+    }
+    const priceArea = monthTransactions.find((transaction) => transaction.price_area)?.price_area ?? null;
+    const details: EventDetail[] = [
+      {
+        event_detail_id: modernCustomerEventDetailId(eventId, month, "modern.base"),
+        event_id: eventId,
+        leg_type: "CUSTOMER",
+        component_code: "modern.base",
+        period: month,
+        price_area: priceArea,
+        quantity: basis.modern_base_mwh,
+        quantity_type: "MWh",
+        price: basis.modern_base_price,
+        price_type: basis.modern_base_price === null ? null : "EUR_PER_MWH",
+        factor: null,
+        factor_type: null,
+        reason: null,
+        linked_detail_id: null,
+      },
+    ];
+    if (Math.abs(basis.modern_peak_mwh) > 0.000001) {
+      details.push({
+        event_detail_id: modernCustomerEventDetailId(eventId, month, "modern.peak"),
+        event_id: eventId,
+        leg_type: "CUSTOMER",
+        component_code: "modern.peak",
+        period: month,
+        price_area: priceArea,
+        quantity: basis.modern_peak_mwh,
+        quantity_type: "MWh",
+        price: basis.modern_peak_price,
+        price_type: basis.modern_peak_price === null ? null : "EUR_PER_MWH",
+        factor: null,
+        factor_type: null,
+        reason: null,
+        linked_detail_id: null,
+      });
+    }
+    return details;
+  });
+}
+
+function modernCustomerEventDetailsForRows(eventId: string, rows: ModernCustomerEventDetailInput[]): EventDetail[] {
+  return rows.flatMap((row) => {
+    const details: EventDetail[] = [
+      {
+        event_detail_id: modernCustomerEventDetailId(eventId, row.month, "modern.base"),
+        event_id: eventId,
+        leg_type: "CUSTOMER",
+        component_code: "modern.base",
+        period: row.month,
+        price_area: row.price_area,
+        quantity: roundQuantity(row.modern_base_mwh),
+        quantity_type: "MWh",
+        price: row.modern_base_price,
+        price_type: row.modern_base_price === null ? null : "EUR_PER_MWH",
+        factor: null,
+        factor_type: null,
+        reason: null,
+        linked_detail_id: null,
+      },
+    ];
+    if (Math.abs(row.modern_peak_mwh) > 0.000001) {
+      details.push({
+        event_detail_id: modernCustomerEventDetailId(eventId, row.month, "modern.peak"),
+        event_id: eventId,
+        leg_type: "CUSTOMER",
+        component_code: "modern.peak",
+        period: row.month,
+        price_area: row.price_area,
+        quantity: roundQuantity(row.modern_peak_mwh),
+        quantity_type: "MWh",
+        price: row.modern_peak_price,
+        price_type: row.modern_peak_price === null ? null : "EUR_PER_MWH",
+        factor: null,
+        factor_type: null,
+        reason: null,
+        linked_detail_id: null,
+      });
+    }
+    return details;
+  });
+}
+
+function marketBasisEventDetailsForCustomerDetails(
+  database: PrototypeDatabase,
+  eventId: string,
+  transactions: CustomerTransaction[],
+  customerDetails: EventDetail[],
+): EventDetail[] {
+  return customerDetails
+    .filter((detail) => detail.component_code === "modern.base" || detail.component_code === "modern.peak")
+    .map((detail) => {
+      const priceArea = normalizeMarketBasisPriceArea(detail.price_area ?? firstTransactionPriceArea(transactions));
+      const factor = marketFactorForCustomerDetail(database, transactions, detail);
+      return {
+        event_detail_id: marketBasisEventDetailId(eventId, detail.period, detail.component_code, priceArea),
+        event_id: eventId,
+        leg_type: "MARKET",
+        component_code: `market.base.${priceArea.toLowerCase()}`,
+        period: detail.period,
+        price_area: priceArea,
+        quantity: roundQuantity(detail.quantity * factor),
+        quantity_type: "MWh",
+        price: detail.price === null ? null : roundPrice(detail.price / factor),
+        price_type: detail.price_type,
+        factor,
+        factor_type: "Q_FACTOR",
+        reason: null,
+        linked_detail_id: detail.event_detail_id,
+      };
+    });
+}
+
+function firstTransactionPriceArea(transactions: CustomerTransaction[]): string | null {
+  return transactions.find((transaction) => transaction.price_area)?.price_area ?? null;
+}
+
+function normalizeMarketBasisPriceArea(value: string | null): SupportedPriceArea {
+  const normalized = String(value ?? "STO").trim().toUpperCase();
+  return SUPPORTED_PRICE_AREAS.includes(normalized as SupportedPriceArea) ? (normalized as SupportedPriceArea) : "STO";
+}
+
+function marketFactorForCustomerDetail(
+  database: PrototypeDatabase,
+  transactions: CustomerTransaction[],
+  detail: EventDetail,
+): number {
+  const componentCode = detail.component_code === "modern.peak" ? "peak.sys" : "base.sys";
+  const transaction = transactionForComponent(database, transactions, componentCode);
+  return transaction?.factor ?? transaction?.q_factor ?? 1;
+}
+
+function deriveModernCustomerBasisForMonth(
+  database: PrototypeDatabase,
+  month: string,
+  transactions: CustomerTransaction[],
+):
+  | {
+      modern_base_mwh: number;
+      modern_peak_mwh: number;
+      modern_base_price: number | null;
+      modern_peak_price: number | null;
+    }
+  | undefined {
+  const calendar = [...database.calendars.values()].find((candidate) => candidate.month === month);
+  if (!calendar) {
+    return undefined;
+  }
+  const baseSys = transactionForComponent(database, transactions, "base.sys");
+  if (!baseSys) {
+    return undefined;
+  }
+  const peakSys = transactionForComponent(database, transactions, "peak.sys");
+  const allocationPeakSys = transactionForComponent(database, transactions, "allocation.peak.sys");
+  const offpeakH = calendar.total_h - calendar.peak_h;
+  if (offpeakH <= 0) {
+    return undefined;
+  }
+
+  const baseMw = transactionQuantity(baseSys);
+  const allocationPeakMw = allocationPeakSys ? transactionQuantity(allocationPeakSys) : baseMw + transactionQuantity(peakSys);
+  const modernBaseMw = (baseMw * calendar.total_h - allocationPeakMw * calendar.peak_h) / offpeakH;
+  const modernPeakMw = allocationPeakMw - modernBaseMw;
+  const modernBaseMwh = roundQuantity(modernBaseMw * calendar.total_h);
+  const modernPeakMwh = roundQuantity(modernPeakMw * calendar.peak_h);
+  const modernBasePrice = combinedComponentPrice(database, transactions, ["base.sys", "base.epad"]);
+  const totalValue = transactionValue(database, transactions, calendar.total_h, calendar.peak_h);
+  const modernPeakPrice =
+    modernBasePrice === null || Math.abs(modernPeakMwh) <= 0.000001
+      ? null
+      : roundPrice((totalValue - modernBaseMwh * modernBasePrice) / modernPeakMwh);
+
+  return {
+    modern_base_mwh: modernBaseMwh,
+    modern_peak_mwh: modernPeakMwh,
+    modern_base_price: modernBasePrice,
+    modern_peak_price: modernPeakPrice,
+  };
+}
+
+function transactionForComponent(
+  database: PrototypeDatabase,
+  transactions: CustomerTransaction[],
+  componentCode: string,
+): CustomerTransaction | undefined {
+  return transactions.find((transaction) => database.productConfigurationComponents.get(transaction.productcomponent_id)?.component === componentCode);
+}
+
+function transactionQuantity(transaction: CustomerTransaction | undefined): number {
+  return transaction?.quantity ?? transaction?.mw ?? 0;
+}
+
+function combinedComponentPrice(
+  database: PrototypeDatabase,
+  transactions: CustomerTransaction[],
+  componentCodes: string[],
+): number | null {
+  let price = 0;
+  for (const componentCode of componentCodes) {
+    const transaction = transactionForComponent(database, transactions, componentCode);
+    const componentPrice = transaction ? transactionPrice(database, transaction) : null;
+    if (componentPrice === null) {
+      return null;
+    }
+    price += componentPrice;
+  }
+  return roundPrice(price);
+}
+
+function transactionValue(database: PrototypeDatabase, transactions: CustomerTransaction[], totalH: number, peakH: number): number {
+  return transactions.reduce((sum, transaction) => {
+    const price = transactionPrice(database, transaction);
+    if (price === null) {
+      return sum;
+    }
+    const componentCode = database.productConfigurationComponents.get(transaction.productcomponent_id)?.component;
+    const hours = componentCode?.startsWith("peak.") ? peakH : totalH;
+    return sum + transactionQuantity(transaction) * hours * price;
+  }, 0);
+}
+
+function transactionPrice(database: PrototypeDatabase, transaction: CustomerTransaction): number | null {
+  if (transaction.price !== undefined) {
+    return transaction.price;
+  }
+  const price = [...database.priceComponents.values()].find((candidate) => candidate.productcomponent_id === transaction.productcomponent_id);
+  return price?.price ?? null;
+}
+
 function eventDetailFromTransaction(
   eventId: string,
   transaction: CustomerTransaction,
@@ -308,6 +812,7 @@ function eventDetailFromTransaction(
   return {
     event_detail_id: purchaseEventDetailId(eventId, transaction.transaction_id, componentCode, priceArea, index),
     event_id: eventId,
+    leg_type: "MARKET",
     component_code: componentCode,
     period: transaction.month,
     price_area: priceArea,
@@ -317,6 +822,8 @@ function eventDetailFromTransaction(
     price_type: transaction.price_type ?? null,
     factor: transaction.factor ?? null,
     factor_type: transaction.factor_type ?? null,
+    reason: null,
+    linked_detail_id: null,
   };
 }
 
@@ -385,6 +892,10 @@ function purchaseEventId(calloffId: string): string {
   return `EVT:PURCHASE:${calloffId}`;
 }
 
+function rebalanceEventId(calloffId: string): string {
+  return `EVT:REBALANCE:${calloffId}`;
+}
+
 function forecastEventDetailId(eventId: string, componentCode: string): string {
   return `${eventId}:${componentCode}`;
 }
@@ -397,6 +908,14 @@ function purchaseEventDetailId(
   index: number,
 ): string {
   return `${eventId}:${transactionId}:${componentCode}:${priceArea ?? "NA"}:${String(index).padStart(2, "0")}`;
+}
+
+function modernCustomerEventDetailId(eventId: string, month: string, componentCode: string): string {
+  return `${eventId}:CUSTOMER:${month}:${componentCode}`;
+}
+
+function marketBasisEventDetailId(eventId: string, month: string, customerComponentCode: string, priceArea: SupportedPriceArea): string {
+  return `${eventId}:MARKET:${month}:${customerComponentCode}:market.base.${priceArea.toLowerCase()}`;
 }
 
 function forecastDetailMwh(database: PrototypeDatabase, detail: EventDetail): number {
@@ -433,5 +952,9 @@ function roundStoredQuantity(value: number): number {
 }
 
 function roundDecimal(value: number): number {
+  return Number(value.toFixed(6));
+}
+
+function roundPrice(value: number): number {
   return Number(value.toFixed(6));
 }

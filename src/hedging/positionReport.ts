@@ -7,7 +7,14 @@ import {
   getModernProjectedModelRowsForPortfolioYear,
   type PeaksProjectedModelTransactionRow,
 } from "./peaksCalloffTransactionList.ts";
+import { getBaseloadsMarketProjectionRowsForPortfolioYear } from "./baseloadsProjection.ts";
 import { resolveTransactionComponentPrice } from "./componentPricing.ts";
+import {
+  getClassicCustomerProjectionRowsForPortfolioYear,
+  getModernCustomerCanonicalRowsForPortfolioYear,
+  type ClassicCustomerProjectionRow,
+  type ModernCustomerCanonicalRow,
+} from "./projectionReadModels.ts";
 import type { DisplayCurrency } from "./viewEconomics.ts";
 
 export type MonthlyComponentPositionRow = {
@@ -84,6 +91,17 @@ export function getBaseloadsPositionReportRows(
   portfolioId: string,
   year: string,
 ): BaseloadsPositionReportRow[] {
+  const marketRows = getBaseloadsMarketProjectionRowsForPortfolioYear(database, portfolioId, year);
+  if (marketRows.length > 0) {
+    return marketRows.map((row) => ({
+      month: row.month,
+      reportable_base_mwh: row.mwh,
+      hedge_value: row.value,
+      effective_month_hedge_price: row.price,
+      transaction_count: row.source_detail_count,
+    }));
+  }
+
   return buildBaseloadsPositionReportRowsFromTransactions(
     database,
     getPortfolioTransactions(database, portfolioId).filter((transaction) => transaction.month.startsWith(`${year}-`)),
@@ -141,6 +159,10 @@ export function getClassicPositionReportRows(
   portfolioId: string,
   year: string,
 ): ClassicPositionReportRow[] {
+  const projectionRows = getClassicCustomerProjectionRowsForPortfolioYear(database, portfolioId, year);
+  if (projectionRows.length > 0) {
+    return buildClassicPositionReportRowsFromCustomerProjectionRows(projectionRows);
+  }
   return buildClassicPositionReportRowsFromProjectedModelRows(getClassicProjectedModelRowsForPortfolioYear(database, portfolioId, year));
 }
 
@@ -149,6 +171,10 @@ export function getModernPositionReportRows(
   portfolioId: string,
   year: string,
 ): ModernPositionReportRow[] {
+  const canonicalRows = getModernCustomerCanonicalRowsForPortfolioYear(database, portfolioId, year);
+  if (canonicalRows.length > 0) {
+    return buildModernPositionReportRowsFromCustomerCanonicalRows(canonicalRows);
+  }
   return buildModernPositionReportRowsFromProjectedModelRows(getModernProjectedModelRowsForPortfolioYear(database, portfolioId, year));
 }
 
@@ -232,6 +258,110 @@ export function buildModernPositionReportRowsFromProjectedModelRows(
     coverage_pct: values.coverage_weight === 0 ? null : round(values.coverage_value / values.coverage_weight),
     warnings: values.warnings,
   }));
+}
+
+export function buildModernPositionReportRowsFromCustomerCanonicalRows(
+  rows: ModernCustomerCanonicalRow[],
+): ModernPositionReportRow[] {
+  const groups = new Map<
+    string,
+    {
+      base_mwh: number;
+      peak_mwh: number;
+      base_value: number;
+      peak_value: number;
+    }
+  >();
+
+  for (const row of rows) {
+    const aggregate = groups.get(row.month) ?? {
+      base_mwh: 0,
+      peak_mwh: 0,
+      base_value: 0,
+      peak_value: 0,
+    };
+    if (row.component === "modern.base") {
+      aggregate.base_mwh += row.mwh;
+      aggregate.base_value += row.value;
+    }
+    if (row.component === "modern.peak") {
+      aggregate.peak_mwh += row.mwh;
+      aggregate.peak_value += row.value;
+    }
+    groups.set(row.month, aggregate);
+  }
+
+  return [...groups.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([month, values]) => {
+      const powerValueEur = values.base_value + values.peak_value;
+      return {
+        month,
+        base_mwh: round(values.base_mwh),
+        peak_epad_mwh: round(values.peak_mwh),
+        base_price: weightedPrice(values.base_value, values.base_mwh),
+        peak_price: weightedPrice(values.peak_value, values.peak_mwh),
+        power_value_eur: round(powerValueEur),
+        currency_covered_eur: null,
+        currency_value_sek: null,
+        display_currency: "EUR",
+        display_value: round(powerValueEur),
+        coverage_pct: Math.abs(powerValueEur) <= 0.000001 ? null : 0,
+        warnings: [],
+      };
+    });
+}
+
+export function buildClassicPositionReportRowsFromCustomerProjectionRows(
+  rows: ClassicCustomerProjectionRow[],
+): ClassicPositionReportRow[] {
+  const groups = new Map<
+    string,
+    {
+      offpeak_mwh: number;
+      peak_mwh: number;
+      offpeak_value: number;
+      peak_value: number;
+    }
+  >();
+
+  for (const row of rows) {
+    const aggregate = groups.get(row.month) ?? {
+      offpeak_mwh: 0,
+      peak_mwh: 0,
+      offpeak_value: 0,
+      peak_value: 0,
+    };
+    if (row.component === "classic.offpeak") {
+      aggregate.offpeak_mwh += row.mwh;
+      aggregate.offpeak_value += row.value;
+    }
+    if (row.component === "classic.peak") {
+      aggregate.peak_mwh += row.mwh;
+      aggregate.peak_value += row.value;
+    }
+    groups.set(row.month, aggregate);
+  }
+
+  return [...groups.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([month, values]) => {
+      const powerValueEur = values.offpeak_value + values.peak_value;
+      return {
+        month,
+        offpeak_mwh: round(values.offpeak_mwh),
+        peak_epad_mwh: round(values.peak_mwh),
+        offpeak_price: weightedPrice(values.offpeak_value, values.offpeak_mwh),
+        peak_price: weightedPrice(values.peak_value, values.peak_mwh),
+        power_value_eur: round(powerValueEur),
+        currency_covered_eur: null,
+        currency_value_sek: null,
+        display_currency: "EUR",
+        display_value: round(powerValueEur),
+        coverage_pct: Math.abs(powerValueEur) <= 0.000001 ? null : 0,
+        warnings: [],
+      };
+    });
 }
 
 function aggregateProjectedModelRows(

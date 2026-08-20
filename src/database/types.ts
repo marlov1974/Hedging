@@ -29,7 +29,7 @@ export type CustomerForecast = {
   peak_pct: number;
 };
 
-export type EventType = "FORECAST" | "PURCHASE" | "ADJUSTMENT" | "CORRECTION" | "CANCELLATION" | "SETTLEMENT";
+export type EventType = "FORECAST" | "PURCHASE" | "REBALANCE" | "ADJUSTMENT" | "CORRECTION" | "CANCELLATION" | "SETTLEMENT";
 
 export type EventStatus = "active" | "cancelled";
 
@@ -46,19 +46,35 @@ export type HedgingEvent = {
 
 export type EventDetailQuantityType = "MW" | "MWh" | "EUR";
 
+export type EventDetailLegType = "CUSTOMER" | "MARKET";
+
+export type EventDetailFactorType = "Q_FACTOR" | "PROFILE_FACTOR";
+
+export type EventDetailReason = "Q_FACTOR_UPDATE" | "PROFILE_FACTOR_UPDATE";
+
+export type EventDetailPriceType = "EUR_PER_MWH" | "SEK_PER_MWH" | "LOCAL_CCY_PER_MWH" | "SEK_PER_EUR";
+
 export type EventDetail = {
   event_detail_id: string;
   event_id: string;
+  leg_type: EventDetailLegType;
   component_code: string;
   period: string;
   price_area: string | null;
   quantity: number;
   quantity_type: EventDetailQuantityType;
   price: number | null;
-  price_type: "EUR_PER_MWH" | "SEK_PER_EUR" | null;
+  price_type: EventDetailPriceType | null;
+  price_component_id?: string | null;
+  price_source?: string | null;
   factor: number | null;
-  factor_type: "Q_FACTOR" | null;
+  factor_type: EventDetailFactorType | null;
+  reason: EventDetailReason | null;
+  linked_detail_id: string | null;
 };
+
+export type EventDetailInput = Omit<EventDetail, "leg_type" | "reason" | "linked_detail_id"> &
+  Partial<Pick<EventDetail, "leg_type" | "reason" | "linked_detail_id">>;
 
 export type ProductConfiguration = {
   product_id: string;
@@ -128,7 +144,7 @@ export type CustomerTransaction = {
   quantity?: number;
   quantity_type?: "MW" | "EUR";
   price?: number;
-  price_type?: "EUR_PER_MWH" | "SEK_PER_EUR";
+  price_type?: EventDetailPriceType;
   factor?: number | null;
   factor_type?: "Q_FACTOR" | null;
 };

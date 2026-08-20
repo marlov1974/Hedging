@@ -11,6 +11,15 @@ base.sys
 base.epad
 ```
 
+P0055 mirrors the calloff into event details as market-near Baseloads:
+
+```text
+MARKET   market.base.<area>
+CUSTOMER fee.calloff
+```
+
+Baseloads does not create a `modern.base` customer hedge detail by default.
+
 ## Period Options
 
 The dropdown is deterministic:
@@ -70,6 +79,48 @@ A quarter has three months and Baseloads has two components, so a quarter create
 3 months * 2 components = 6 transactions
 ```
 
+## Rebalance Events
+
+P0051 records Baseloads rebalance actions as `REBALANCE` events. The rebalance target is compared with the current open market basis position:
+
+```text
+market_delta = target_market_position - current_open_market_position
+```
+
+The current open market position is read from active `market.base.<area>` event details when available. Older transaction rows remain a compatibility fallback.
+
+Generated derivative names are assigned to the compatibility transaction rows when the rebalance call-off is created.
+
+## Commercial Fee
+
+`fee.calloff` is configured as a Baseloads product price component.
+
+The generated fee event detail:
+
+```text
+leg_type = CUSTOMER
+component_code = fee.calloff
+quantity_type = MWh
+price_type = EUR_PER_MWH
+```
+
+The fee quantity is based on absolute customer-facing calloff volume and does not double count the paired `base.sys` and `base.epad` transaction rows in the same calloff. Separate calloffs are charged separately.
+
+## Baseloads To Modern Upgrade
+
+P0055 adds `upgradeBaseloadsToPeaksModern`.
+
+The upgrade runs in two linked calloffs:
+
+```text
+<id>-MARKET_REBALANCE
+<id>-CUSTOMER_CONVERSION
+```
+
+The market rebalance calloff calculates target Modern shape from the forecast percentage, converts it to market base using Q-factors, compares it with the current open `market.base.<area>` position, and trades only the delta.
+
+The customer conversion calloff runs after the market rebalance. It reads the resulting open market base position, calculates effective market price from stored market value divided by volume, creates Modern customer details, and adds configured customer add-ons. It does not trade extra market delta.
+
 ## Q-factor Read
 
 For each portfolio/product component/month, the purchase logic reads:
@@ -101,4 +152,4 @@ Use `-- --port <port>` to select another port.
 - No authentication or sessions.
 - In-memory database only.
 - No production deployment flow.
-- Pricing display is intentionally minimal; the core scope is call-off and transaction creation.
+- Pricing display is intentionally minimal; the core scope is call-off, transaction and event-detail creation.

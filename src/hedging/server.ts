@@ -3,7 +3,7 @@ import { createPocSeedData } from "../database/pocSeedData.ts";
 import type { PrototypeDatabase } from "../database/schema.ts";
 import { acceptForecastHedgeProfile, buildForecastHedgeProfile, ForecastHedgeError } from "./forecastHedge.ts";
 import { ForecastFeatureError, updateForecastRows } from "./forecastFeature.ts";
-import { PurchaseError, purchaseBaseloads } from "../purchase/baseloadsPurchase.ts";
+import { PurchaseError, purchaseBaseloads, upgradeBaseloadsToPeaksModern } from "../purchase/baseloadsPurchase.ts";
 import { renderHedgingTool } from "./HedgingToolView.ts";
 import type { HedgingFeatureId } from "./features.ts";
 import type { PerspectiveId } from "./applicationConfig.ts";
@@ -62,6 +62,53 @@ export function createHedgingToolServer(database: PrototypeDatabase = createPocS
             feature_id: "buy-baseloads",
             selected_period_id: period_id,
             mw: mwText,
+            error: message,
+          }),
+        );
+      }
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/hedging/upgrade-baseloads-to-modern") {
+      const body = await readForm(request);
+      const portfolio_id = String(body.get("portfolio_id") ?? "");
+      const perspective_id = readPerspectiveFromForm(body);
+      const period_id = String(body.get("period_id") ?? "");
+      const price_area = String(body.get("price_area") ?? "");
+      const target_percentage_of_forecast = String(body.get("target_percentage_of_forecast") ?? "");
+
+      try {
+        const baseloads_upgrade_result = upgradeBaseloadsToPeaksModern(database, {
+          portfolio_id,
+          period_id,
+          price_area,
+          target_percentage_of_forecast,
+          date: "2027-01-15",
+          calloff_id: `CAL_UPGRADE_${String(database.calloffs.size).padStart(2, "0")}`,
+        });
+        writeHtml(
+          response,
+          200,
+          renderHedgingTool(database, {
+            portfolio_id,
+            perspective_id,
+            feature_id: "buy-baseloads",
+            selected_period_id: period_id,
+            baseloads_upgrade_input: { period_id, price_area, target_percentage_of_forecast },
+            baseloads_upgrade_result,
+          }),
+        );
+      } catch (error) {
+        const message = error instanceof PurchaseError ? error.message : "Baseloads conversion failed";
+        writeHtml(
+          response,
+          400,
+          renderHedgingTool(database, {
+            portfolio_id,
+            perspective_id,
+            feature_id: "buy-baseloads",
+            selected_period_id: period_id,
+            baseloads_upgrade_input: { period_id, price_area, target_percentage_of_forecast },
             error: message,
           }),
         );

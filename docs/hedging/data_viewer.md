@@ -12,6 +12,7 @@ Related projection documentation:
 
 - [Component Catalog](component_catalog.md)
 - [Event Detail Model](event_detail_model.md)
+- [Legacy Compatibility](legacy_compatibility.md)
 - [Modern Projected Transactions](modern_projected_transactions.md)
 - [Modern Projected Calloffs](modern_projected_calloffs.md)
 - [Classic Projection Peak/Offpeak Rules](classic_projection_peak_offpeak_rules.md)
@@ -22,6 +23,7 @@ The supported table groups are:
 ```text
 Raw canonical
 Projected customer models
+Market/internal views
 ```
 
 The supported tables are:
@@ -29,6 +31,10 @@ The supported tables are:
 ```text
 Canonical Events
 Canonical Event Details
+Raw Customer Legs
+Raw Market Legs
+Modern Customer Canonical
+Classic Customer Projection
 Classic Projected Forecast
 Modern Projected Forecast
 Baseloads Projected Transactions
@@ -36,6 +42,7 @@ Classic Projected Calloffs
 Classic Projected Transactions
 Modern Projected Calloffs
 Modern Projected Transactions
+Market Basis Position
 ```
 
 ## Portfolio Scoping
@@ -62,6 +69,10 @@ The table selector supports:
 ```text
 events
 event-details
+customer-legs
+market-legs
+modern-customer-canonical
+classic-customer-projection
 classic-projected-forecast
 modern-projected-forecast
 baseloads-projected-transactions
@@ -69,6 +80,7 @@ classic-projected-calloffs
 classic-projected-transactions
 modern-projected-calloffs
 modern-projected-transactions
+market-basis-position
 ```
 
 Unknown table values are handled as invalid input.
@@ -106,12 +118,13 @@ detail_count
 
 ## Event Details Raw View
 
-The Canonical Event Details table shows all source event details for selected portfolio/year, including both `FORECAST` and `PURCHASE` event details:
+The Canonical Event Details table shows all source event details for selected portfolio/year, including `FORECAST`, `PURCHASE` and `REBALANCE` event details:
 
 ```text
 event_id
 event_detail_id
 event_type
+leg_type
 period
 component_code
 component_concept
@@ -122,11 +135,27 @@ price
 price_type
 factor
 factor_type
+reason
+linked_detail_id
 ```
 
 Forecast event details use explicit price-area components such as `base.sto` and `peak.sto`. They store power as `MW`; forecast `MWh` is derived from calendar hours and component hour basis. Generic EPAD forecast details are not written for new seed data.
 
 Legacy calloff and transaction rows remain in the compatibility layer for older purchase/report code, but they are not canonical Data Viewer tables.
+
+## P0053 Read Model Tables
+
+P0053 separates target-model read sources:
+
+```text
+Raw Customer Legs           -> CUSTOMER event details
+Raw Market Legs             -> MARKET event details
+Modern Customer Canonical   -> CUSTOMER modern.base / modern.peak details
+Classic Customer Projection -> projection from Modern Customer Canonical
+Market Basis Position       -> MARKET market.base.<area> details
+```
+
+The Modern Customer Canonical and Market Basis Position tables do not silently fall back to old transaction projections. Legacy transaction-derived tables remain available as compatibility/debug views; see [Legacy Compatibility](legacy_compatibility.md).
 
 ## Projected Forecast Views
 
@@ -147,9 +176,15 @@ mwh
 price
 value
 source_component
+shape
+source_detail_count
 ```
 
-`component_concept` is `projected`. The rows are derived from canonical `base.sys` and `base.epad` transactions.
+`component_concept` is `projected`. When market leg event details exist, rows are derived from canonical `market.base.<area>` details on active purchase, rebalance and market-only adjustment events. Signed market quantities and values are aggregated by call-off/month, and price is calculated last as `value / mwh`.
+
+`shape` is `MARKET_NEAR_BASELOADS` when non-zero monthly market volumes are equal for the call-off and `PROFILED_BASELOADS` when monthly market volumes differ.
+
+Older transaction rows remain a compatibility fallback and still derive Baseloads rows from `base.sys` and `base.epad` transactions when no market leg details exist.
 
 ## Classic Projected Calloffs View
 
@@ -229,6 +264,26 @@ dimension_note
 
 If both sys and epad rows are present, they are price dimensions and not additive physical customer volume. The `dimension_note` column states this explicitly.
 
+## Market Basis Position View
+
+The Market Basis Position table shows active market canonical rows from `market.base.<area>` event details:
+
+```text
+calloff_id
+event_id
+event_type
+month
+component
+component_concept
+price_area
+mwh
+price
+value
+source_detail_count
+```
+
+Signed quantities and values are aggregated by event, month and price area. The price is derived last as `value / mwh`.
+
 ## Known PoC Limitations
 
 - Data Viewer is read-only.
@@ -243,11 +298,11 @@ Classic and Modern projected transaction views keep `currency.eursek` as a curre
 
 ## P0043 Projected Model Basis
 
-Classic and Modern projected transaction tables are the report basis for their perspectives:
+Before the two-legged read-model cleanup, Classic and Modern projected transaction tables were the report basis for their perspectives:
 
 ```text
 canonical rows -> Classic projected model -> Classic Calloff List / Classic Position Report
 canonical rows -> Modern projected model  -> Modern Calloff List / Modern Position Report
 ```
 
-Reports should consume projected model rows instead of recalculating Classic or Modern quantities directly from raw canonical rows. If a report needs a field that is not available on the projected model, the projected model contract should be extended first.
+P0053/P0054 keep those projected transaction tables as compatibility/debug paths. Modern and Classic reports now prefer target event-detail read models as described in [Position Report](position_report.md).

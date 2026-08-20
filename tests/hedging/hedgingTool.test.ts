@@ -151,4 +151,14 @@ describe("hedging tool shell", () => {
 
     assert.doesNotMatch(html, /Feature perspective/);
   });
+
+  it("Hedge Baseload exposes Baseloads to Modern conversion controls", () => {
+    const html = renderHedgingTool(createPocSeedData(), { portfolio_id: "CUS00-0", feature_id: "buy-baseloads" });
+
+    assert.match(html, /Convert Baseloads To Modern/);
+    assert.match(html, /action="\/hedging\/upgrade-baseloads-to-modern"/);
+    assert.match(html, /name="price_area"/);
+    assert.match(html, /name="target_percentage_of_forecast"/);
+    assert.match(html, /Convert to Modern/);
+  });
 });

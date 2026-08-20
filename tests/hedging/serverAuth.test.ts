@@ -59,6 +59,27 @@ describe("Hedging server Basic Auth", () => {
       assert.match(body, /Baseloads Portfolio/);
     });
   });
+
+  it("accepts Baseloads to Modern conversion posts", async () => {
+    delete process.env.HEDGING_PASSWORD;
+    await withServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/hedging/upgrade-baseloads-to-modern`, {
+        method: "POST",
+        body: new URLSearchParams({
+          portfolio_id: "CUS00-0",
+          period_id: "month-2027-01",
+          price_area: "STO",
+          target_percentage_of_forecast: "50",
+        }),
+      });
+      const body = await response.text();
+
+      assert.equal(response.status, 200);
+      assert.match(body, /Conversion created/);
+      assert.match(body, /MARKET_REBALANCE/);
+      assert.match(body, /CUSTOMER_CONVERSION/);
+    });
+  });
 });
 
 async function withServer(test: (baseUrl: string) => Promise<void>): Promise<void> {

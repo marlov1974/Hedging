@@ -11,6 +11,7 @@ import { canonicalProductPackageName } from "../database/canonicalComponents.ts"
 import {
   createPurchaseEventForCalloff,
   getCanonicalForecastForPriceArea,
+  type ModernCustomerEventDetailInput,
   SUPPORTED_PRICE_AREAS,
   type SupportedPriceArea,
 } from "../database/eventForecasts.ts";
@@ -420,7 +421,13 @@ export function acceptForecastHedgeProfile(
   const powerTransactions = createForecastHedgeTransactions(database, { calloff, rows: profile.rows, price_area: normalized.price_area });
   const currencyTransactions = createCurrencyTransactionsForPowerRows(database, calloff, powerTransactions);
   const transactions = [...powerTransactions, ...currencyTransactions];
-  createPurchaseEventForCalloff(database, { calloff, transactions });
+  createPurchaseEventForCalloff(database, {
+    calloff,
+    transactions,
+    modern_customer_rows:
+      normalized.perspective_id === "modern" ? modernCustomerRowsFromProfile(profile.rows, normalized.price_area) : undefined,
+    commercial_add_ons: normalized.perspective_id === "modern",
+  });
 
   return { calloff, transactions, profile };
 }
@@ -599,8 +606,40 @@ function createExplicitHedgePurchase(
     fxRate: input.fx_rate ?? 11.25,
   });
   const transactions = currencyTransaction ? [...powerTransactions, currencyTransaction] : powerTransactions;
-  createPurchaseEventForCalloff(database, { calloff, transactions, source: "explicit_purchase" });
+  createPurchaseEventForCalloff(database, {
+    calloff,
+    transactions,
+    source: "explicit_purchase",
+    modern_customer_rows:
+      input.perspective_id === "modern"
+        ? [
+            {
+              month: input.month,
+              price_area: "STO",
+              modern_base_mwh: input.row.modern_base_mwh,
+              modern_peak_mwh: input.row.modern_peak_mwh,
+              modern_base_price: input.first_price_eur_per_mwh,
+              modern_peak_price: input.second_price_eur_per_mwh,
+            },
+          ]
+        : undefined,
+    commercial_add_ons: input.perspective_id === "modern",
+  });
   return { calloff, transactions, profile };
+}
+
+function modernCustomerRowsFromProfile(
+  rows: ForecastHedgeProfileRow[],
+  priceArea: SupportedPriceArea,
+): ModernCustomerEventDetailInput[] {
+  return rows.map((row) => ({
+    month: row.month,
+    price_area: priceArea,
+    modern_base_mwh: row.modern_base_mwh,
+    modern_peak_mwh: row.modern_peak_mwh,
+    modern_base_price: null,
+    modern_peak_price: null,
+  }));
 }
 
 function applyExplicitPowerPrices(

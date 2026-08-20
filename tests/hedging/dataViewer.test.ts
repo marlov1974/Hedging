@@ -9,8 +9,10 @@ import {
   getClassicProjectedForecastForPortfolioYear,
   getBaseloadsProjectedTransactionsForPortfolioYear,
   getModernProjectedForecastForPortfolioYear,
+  getRawCustomerLegsForPortfolioYear,
   getRawEventDetailsForPortfolioYear,
   getRawEventsForPortfolioYear,
+  getRawMarketLegsForPortfolioYear,
   getClassicProjectedCalloffsForPortfolioYear,
   getMarketProjectionRowsForPortfolioYear,
   getModernProjectedCalloffsForPortfolioYear,
@@ -19,7 +21,14 @@ import {
   getRawTransactionsForPortfolioYear,
 } from "../../src/hedging/dataViewer.ts";
 import { getApplicationFeaturesForPortfolio } from "../../src/hedging/applicationConfig.ts";
+import { createExplicitModernHedgePurchase } from "../../src/hedging/forecastHedge.ts";
 import { renderHedgingTool } from "../../src/hedging/HedgingToolView.ts";
+import {
+  getClassicCustomerProjectionRowsForPortfolioYear,
+  getMarketBasisPositionRowsForPortfolioYear,
+  getModernCustomerCanonicalRowsForPortfolioYear,
+} from "../../src/hedging/projectionReadModels.ts";
+import { purchaseBaseloads, rebalanceBaseloadsToForecast } from "../../src/purchase/baseloadsPurchase.ts";
 
 describe("Data Viewer", () => {
   it("appears in shared application feature lists", () => {
@@ -32,7 +41,7 @@ describe("Data Viewer", () => {
 
   it("renders Canonical table selector by default", () => {
     const html = renderHedgingTool(createDataViewerDatabase(), {
-      portfolio_id: "CUS00-0",
+      portfolio_id: "CUS02-0",
       feature_id: "data-viewer",
     });
 
@@ -40,6 +49,8 @@ describe("Data Viewer", () => {
     assert.match(html, /name="selected_table"/);
     assert.match(html, /Canonical Events/);
     assert.match(html, /Canonical Event Details/);
+    assert.match(html, /Raw Customer Legs/);
+    assert.match(html, /Raw Market Legs/);
     assert.doesNotMatch(html, /Canonical Raw Calloffs/);
     assert.doesNotMatch(html, /Canonical Raw Transactions/);
     assert.doesNotMatch(html, /Market Projection/);
@@ -51,7 +62,7 @@ describe("Data Viewer", () => {
 
   it("renders projected table selector options for selected perspective views", () => {
     const baseloadsHtml = renderHedgingTool(createDataViewerDatabase(), {
-      portfolio_id: "CUS00-0",
+      portfolio_id: "CUS02-0",
       feature_id: "data-viewer",
       selected_view: "baseloads",
     });
@@ -67,9 +78,11 @@ describe("Data Viewer", () => {
     });
 
     assert.match(baseloadsHtml, /Baseloads Projected Transactions/);
-    assert.match(classicHtml, /Classic Projected Calloffs/);
+    assert.match(classicHtml, /Classic Customer Projection/);
     assert.match(modernHtml, /Modern Projected Calloffs/);
-    assert.match(modernHtml, /Modern Projected Transactions/);
+    assert.match(modernHtml, /Modern Customer Canonical/);
+    assert.doesNotMatch(classicHtml, /Compatibility Classic Projected Transactions/);
+    assert.doesNotMatch(modernHtml, /Compatibility Modern Projected Transactions/);
   });
 
   it("renders year selector", () => {
@@ -90,6 +103,10 @@ describe("Data Viewer", () => {
       [
         "events",
         "event-details",
+        "customer-legs",
+        "market-legs",
+        "modern-customer-canonical",
+        "classic-customer-projection",
         "classic-projected-forecast",
         "modern-projected-forecast",
         "baseloads-projected-transactions",
@@ -98,6 +115,7 @@ describe("Data Viewer", () => {
         "modern-projected-calloffs",
         "modern-projected-transactions",
         "market-projection",
+        "market-basis-position",
       ],
     );
   });
@@ -188,10 +206,40 @@ describe("Data Viewer", () => {
 
     assert.equal(rows.length, 96);
     assert.equal(rows[0].event_type, "FORECAST");
+    assert.equal(rows.every((row) => row.leg_type === "MARKET"), true);
     assert.equal(rows.some((row) => row.component_code === "base.sto" && row.price_area === "STO"), true);
     assert.equal(rows.some((row) => row.component_code === "base.sto" && row.quantity_type === "MW" && row.quantity === 0.661290323), true);
     assert.equal(rows.some((row) => row.component_code === "peak.sto" && row.quantity_type === "MW" && row.quantity === 0.732142857), true);
     assert.equal(rows.some((row) => row.component_code === "base.epad"), false);
+  });
+
+  it("Data Viewer exposes raw customer and market legs separately", () => {
+    const database = createPocSeedData();
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_P0053_LEGS",
+    });
+
+    const customerRows = getRawCustomerLegsForPortfolioYear(database, "CUS02-0", "2027");
+    const marketRows = getRawMarketLegsForPortfolioYear(database, "CUS02-0", "2027");
+
+    assert.deepEqual(
+      customerRows.map((row) => [row.leg_type, row.component_code, row.quantity, row.price]).sort(),
+      [
+        ["CUSTOMER", "fee.calloff", 110, 0.75],
+        ["CUSTOMER", "modern.base", 100, 45],
+        ["CUSTOMER", "modern.peak", 10, 12],
+        ["CUSTOMER", "premium.p_agent", 10, 0.5],
+        ["CUSTOMER", "premium.q_term", 10, 1.25],
+      ],
+    );
+    assert.equal(marketRows.some((row) => row.leg_type === "MARKET" && row.component_code === "market.base.sto"), true);
   });
 
   it("Classic and Modern forecast Data Viewer projections use canonical forecast events", () => {
@@ -260,6 +308,118 @@ describe("Data Viewer", () => {
       ["base.epad", "base.sys"],
     );
     assert.equal(rows[0].calloff_id, "CAL10");
+  });
+
+  it("Baseloads Projected Transactions reads market basis rows when available", () => {
+    const database = createPocSeedData();
+    purchaseBaseloads(database, {
+      portfolio_id: "CUS00-0",
+      mw: 10,
+      period_id: "month-2027-01",
+      date: "2027-01-15",
+      calloff_id: "CAL_MARKET_BASIS",
+    });
+
+    const rows = getBaseloadsProjectedTransactionsForPortfolioYear(database, "CUS00-0", "2027");
+
+    assert.deepEqual(
+      rows.map((row) => [row.component, row.mwh, row.price, row.value, row.source_component, row.shape]),
+      [["baseloads.market.base", 7440, 43.53, 323863.2, "market.base", "MARKET_NEAR_BASELOADS"]],
+    );
+  });
+
+  it("Modern Customer Canonical reads Modern customer basis without using projected transaction rows", () => {
+    const database = createPocSeedData();
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_P0053_CUSTOMER",
+    });
+    database.transactions.clear();
+
+    const rows = getModernCustomerCanonicalRowsForPortfolioYear(database, "CUS02-0", "2027");
+
+    assert.deepEqual(
+      rows.map((row) => [row.component, row.mwh, row.price, row.value]),
+      [
+        ["modern.base", 100, 45, 4500],
+        ["modern.peak", 10, 12, 120],
+      ],
+    );
+    assert.equal(rows.every((row) => row.event_detail_id.startsWith("EVT:PURCHASE:CAL_P0053_CUSTOMER")), true);
+  });
+
+  it("Classic Customer Projection reads Classic projection from Modern customer canonical", () => {
+    const database = createPocSeedData();
+    const calendar = [...database.calendars.values()].find((row) => row.month === "2027-01");
+    assert.ok(calendar);
+    calendar.total_h = 744;
+    calendar.peak_h = 320;
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_P0053_CLASSIC",
+    });
+
+    const rows = getClassicCustomerProjectionRowsForPortfolioYear(database, "CUS02-0", "2027");
+
+    assert.deepEqual(
+      rows.map((row) => [row.component, row.mwh, row.value, row.source_components]),
+      [
+        ["classic.offpeak", 56.989247, 2564.516129, "modern.base+modern.peak"],
+        ["classic.peak", 53.010753, 2055.483871, "modern.base+modern.peak"],
+      ],
+    );
+  });
+
+  it("Market Basis Position reads market basis event details", () => {
+    const database = createPocSeedData();
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS02-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_P0053_MARKET",
+    });
+    database.transactions.clear();
+
+    const rows = getMarketBasisPositionRowsForPortfolioYear(database, "CUS02-0", "2027");
+
+    assert.deepEqual(
+      rows.map((row) => [row.component, row.mwh, row.price_area, row.source_detail_count]),
+      [["market.base", 112, "STO", 2]],
+    );
+  });
+
+  it("Baseloads Projected Transactions identifies profiled Baseloads when market volumes differ", () => {
+    const database = createPocSeedData();
+    rebalanceBaseloadsToForecast(database, {
+      portfolio_id: "CUS00-0",
+      period_id: "quarter-2027-q1",
+      price_area: "STO",
+      target_percentage_of_forecast: "50",
+      date: "2027-01-15",
+      calloff_id: "CAL_PROFILED_MARKET_BASIS",
+    });
+
+    const rows = getBaseloadsProjectedTransactionsForPortfolioYear(database, "CUS00-0", "2027");
+
+    assert.equal(rows.length, 3);
+    assert.equal(rows.every((row) => row.shape === "PROFILED_BASELOADS"), true);
+    assert.notEqual(rows[0].mwh, rows[1].mwh);
   });
 
   it("Classic Projected Calloffs shows Peak and Offpeak projection for the same canonical calloff", () => {
@@ -376,8 +536,17 @@ describe("Data Viewer", () => {
   });
 
   it("renders Modern projection tables", () => {
-    const database = createDataViewerDatabase();
-    database.calloffs.get("CAL30")!.portfolio_id = "CUS00-0";
+    const database = createPocSeedData();
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS00-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_P0054_MODERN_VIEW",
+    });
     const calloffsHtml = renderHedgingTool(database, {
       portfolio_id: "CUS00-0",
       feature_id: "data-viewer",
@@ -385,24 +554,33 @@ describe("Data Viewer", () => {
       selected_table: "modern-projected-calloffs",
       selected_year: "2027",
     });
-    const transactionsHtml = renderHedgingTool(database, {
+    const canonicalHtml = renderHedgingTool(database, {
       portfolio_id: "CUS00-0",
       feature_id: "data-viewer",
       selected_view: "modern",
-      selected_table: "modern-projected-transactions",
+      selected_table: "modern-customer-canonical",
       selected_year: "2027",
     });
 
     assert.match(calloffsHtml, /base_mwh/);
-    assert.match(calloffsHtml, /total_value/);
-    assert.match(transactionsHtml, /calloff_id[\s\S]*month[\s\S]*component[\s\S]*mw[\s\S]*price/);
-    assert.match(transactionsHtml, /modern\.base\.sys/);
-    assert.doesNotMatch(transactionsHtml, /<td>allocation\.peak\.sys<\/td>/);
+    assert.match(calloffsHtml, /CAL_P0054_MODERN_VIEW/);
+    assert.match(canonicalHtml, /Modern Customer Canonical/);
+    assert.match(canonicalHtml, /modern\.base/);
+    assert.doesNotMatch(canonicalHtml, /modern\.base\.sys/);
   });
 
   it("renders Baseloads and Classic projection tables", () => {
-    const database = createDataViewerDatabase();
-    database.calloffs.get("CAL30")!.portfolio_id = "CUS00-0";
+    const database = createPocSeedData();
+    createExplicitModernHedgePurchase(database, {
+      portfolio_id: "CUS00-0",
+      month: "2027-01",
+      base_mwh: 100,
+      peak_mwh: 10,
+      base_price_eur_per_mwh: 45,
+      peak_price_eur_per_mwh: 12,
+      date: "2027-01-15",
+      calloff_id: "CAL_P0054_CLASSIC_VIEW",
+    });
     const baseloadsHtml = renderHedgingTool(createDataViewerDatabase(), {
       portfolio_id: "CUS00-0",
       feature_id: "data-viewer",
@@ -414,14 +592,28 @@ describe("Data Viewer", () => {
       portfolio_id: "CUS00-0",
       feature_id: "data-viewer",
       selected_view: "classic",
-      selected_table: "classic-projected-calloffs",
+      selected_table: "classic-customer-projection",
       selected_year: "2027",
     });
 
     assert.match(baseloadsHtml, /baseloads\.base\.sys/);
-    assert.match(classicHtml, /offpeak_mwh[\s\S]*peak_mwh/);
-    assert.match(classicHtml, /CAL30/);
-    assert.match(classicHtml, /Classic Projected Transactions/);
+    assert.match(classicHtml, /classic\.offpeak[\s\S]*classic\.peak/);
+    assert.match(classicHtml, /CAL_P0054_CLASSIC_VIEW/);
+    assert.doesNotMatch(classicHtml, /Compatibility Classic Projected Transactions/);
+  });
+
+  it("keeps legacy projected transaction tables callable but out of perspective selectors", () => {
+    const database = createDataViewerDatabase();
+    const directRows = getDataViewerRows(database, "CUS01-0", "modern-projected-transactions", "2027").rows;
+    const modernHtml = renderHedgingTool(database, {
+      portfolio_id: "CUS00-0",
+      feature_id: "data-viewer",
+      selected_view: "modern",
+      selected_year: "2027",
+    });
+
+    assert.equal(directRows.some((row) => "component" in row && row.component === "modern.base.sys"), true);
+    assert.doesNotMatch(modernHtml, /Compatibility Modern Projected Transactions/);
   });
 
   it("Calloffs table includes raw calloff columns", () => {
@@ -440,7 +632,7 @@ describe("Data Viewer", () => {
       portfolio_id: "CUS02-0",
       feature_id: "data-viewer",
       selected_view: "modern",
-      selected_table: "modern-projected-transactions",
+      selected_table: "modern-customer-canonical",
       selected_year: "2029",
     });
 
