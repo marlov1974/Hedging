@@ -40,3 +40,12 @@ npm test
 git diff --check
 git status --short
 ```
+
+## Restore handoff
+
+For Mac replacement and continuation, `docs/restore_from_github.md` records the
+GitHub remote, continuation branch, local verification command, prototype run
+command, Basic Auth runtime-password handling, and temporary tunnel recreation.
+
+No runtime password, local tunnel URL, or machine-specific secret is stored in
+the repository.

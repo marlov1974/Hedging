@@ -74,6 +74,7 @@ docs/product-configurations/config_peaks.md
 docs/product-configurations/config_profiles.md
 docs/product-configurations/product_configurations.md
 docs/purchase/baseloads_purchase_flow.md
+docs/restore_from_github.md
 docs/settlement/static_spot_actuals.md
 memory/00-index.md
 memory/01-project-overview.md
