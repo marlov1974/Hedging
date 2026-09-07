@@ -12,7 +12,7 @@ For every new AI/chat/Codex session working on this repository:
 2. Read `AGENTS.md`.
 3. Read `memory/bootstrap-manifest.json`.
 4. Read every file listed in the manifest `read_order`, in order.
-5. Read `memory/2026-06-23-canonical-hedging-model-session-summary.md` as the latest canonical hedging model context snapshot.
+5. Read `memory/2026-06-23-canonical-hedging-model-session-summary.md` as the historical canonical prototype baseline, then `memory/2026-09-07-resource-hedging-design-handover.md` for the latest resource-based design handover. Newer focused numbered memories retain precedence over the June baseline; the September handover adds explicit resource/lifecycle decisions and flags unresolved intersections.
 6. Read `REPOSITORY_FILES.md` as the tracked path index when file discovery is needed, when planning source/package inspection, or when a task may add, remove or move tracked files.
 7. Treat `REPOSITORY_FILES.md` as a catalog, not as a command to read every tracked file during ordinary bootstrap.
 8. Read the active package in `requirements/packages/` before editing.

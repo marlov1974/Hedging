@@ -11,7 +11,8 @@
     "memory/08-open-questions.md",
     "requirements/README.md",
     "requirements/packages/P0001-bootstrap-cleanup.md",
-    "memory/2026-06-23-canonical-hedging-model-session-summary.md"
+    "memory/2026-06-23-canonical-hedging-model-session-summary.md",
+    "memory/2026-09-07-resource-hedging-design-handover.md"
   ],
-  "precedence": "Newer focused numbered memory files take precedence over older historical session summaries when they differ."
+  "precedence": "Newer focused numbered memory files take precedence over the June historical snapshot. The September handover adds explicit resource-level placement and lifecycle decisions; unresolved intersections with existing component/settlement rules must be resolved explicitly before implementation."
 }

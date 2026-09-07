@@ -74,7 +74,13 @@ memory/00-index.md
 memory/01-project-overview.md
 memory/02-design-principles.md
 memory/03-component-model.md
+memory/04-domain-architecture.md
+memory/05-b2b-product-components.md
+memory/06-risk-journal-and-events.md
+memory/07-settlement-product-migration.md
+memory/08-open-questions.md
 memory/2026-06-23-canonical-hedging-model-session-summary.md
+memory/2026-09-07-resource-hedging-design-handover.md
 memory/bootstrap-manifest.json
 package.json
 requirements/README.md
