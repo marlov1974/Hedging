@@ -4,7 +4,14 @@
     "memory/01-project-overview.md",
     "memory/02-design-principles.md",
     "memory/03-component-model.md",
+    "memory/04-domain-architecture.md",
+    "memory/05-b2b-product-components.md",
+    "memory/06-risk-journal-and-events.md",
+    "memory/07-settlement-product-migration.md",
+    "memory/08-open-questions.md",
     "requirements/README.md",
-    "requirements/packages/P0001-bootstrap-cleanup.md"
-  ]
+    "requirements/packages/P0001-bootstrap-cleanup.md",
+    "memory/2026-06-23-canonical-hedging-model-session-summary.md"
+  ],
+  "precedence": "Newer focused numbered memory files take precedence over older historical session summaries when they differ."
 }
