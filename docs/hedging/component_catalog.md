@@ -14,6 +14,8 @@ Only canonical components are source-of-truth transaction component codes.
 
 Projected components exist only in feature projections/views.
 
+Runtime validation must reject projected component names where persisted source-of-truth product components or q-factor components are required.
+
 ## 2. Layer Overview
 
 Canonical components:
@@ -299,6 +301,18 @@ include all components
 `q_factor` controls market quantity transformation.
 
 Visibility controls which projections include the component.
+
+Runtime code classifies component-like strings before persistence:
+
+```text
+canonical = current source-of-truth component code
+projected = view/output-only component name
+compatibility_alias = deprecated read-compatible name
+reserved = known metadata outside the current Peaks source-of-truth set
+unknown_adjustment = fallback for unknown or internal adjustment-like values
+```
+
+Only canonical, compatibility alias and reserved metadata entries may be persisted as product component metadata. Projected component names must remain view-only.
 
 ## 8. Physical Volume And Double-Counting Rules
 

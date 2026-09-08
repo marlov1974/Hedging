@@ -1,5 +1,12 @@
 import type { ComponentCategory, ComponentHourBasis, ProductConfigurationComponent } from "./types.ts";
 
+export type ComponentCodeConcept =
+  | "canonical"
+  | "projected"
+  | "compatibility_alias"
+  | "reserved"
+  | "unknown_adjustment";
+
 export type ComponentMetadata = {
   component_category: ComponentCategory;
   hour_basis: ComponentHourBasis;
@@ -18,6 +25,55 @@ export const COMPONENT_ALIASES = new Map([
   ["peak.premium.sys", "peak.sys"],
   ["peak.premium.epad", "peak.epad"],
 ]);
+
+export const TARGET_CANONICAL_PEAKS_COMPONENT_CODES = [
+  "allocation.peak.sys",
+  "allocation.peak.epad",
+  "base.sys",
+  "base.epad",
+  "peak.sys",
+  "peak.epad",
+] as const;
+
+export const PROJECTED_ONLY_COMPONENT_CODES = [
+  "modern.base.sys",
+  "modern.base.epad",
+  "modern.peak.sys",
+  "modern.peak.epad",
+  "classic.offpeak.sys",
+  "classic.offpeak.epad",
+  "classic.peak.sys",
+  "classic.peak.epad",
+] as const;
+
+export const COMPATIBILITY_ALIAS_COMPONENT_CODES = [
+  "allocation.peak",
+  "peak.modern.sys",
+  "peak.modern.epad",
+  "peak.premium.sys",
+  "peak.premium.epad",
+] as const;
+
+export const RESERVED_COMPONENT_CODES = [
+  "base",
+  "sys",
+  "epad",
+  "base.classic.sys",
+  "base.classic.epad",
+  "peak",
+  "offpeak",
+  "peak.classic.sys",
+  "peak.classic.epad",
+  "profile.peak",
+  "profile.15m",
+  "profile.sys",
+  "profile.epad",
+  "volume",
+  "volume.flex",
+  "fixed",
+  "calendar",
+  "currency.sek",
+] as const;
 
 const COMPONENT_METADATA = new Map<string, ComponentMetadata>([
   ["allocation.peak", { component_category: "allocation", hour_basis: "peak_h" }],
@@ -53,8 +109,47 @@ export function canonicalComponentCode(component: string): string {
   return COMPONENT_ALIASES.get(component) ?? component;
 }
 
+export function componentCodeConcept(component: string): ComponentCodeConcept {
+  if (isProjectedOnlyComponentCode(component)) {
+    return "projected";
+  }
+  if (isCompatibilityAliasComponentCode(component)) {
+    return "compatibility_alias";
+  }
+  if (TARGET_CANONICAL_PEAKS_COMPONENT_CODES.includes(component as (typeof TARGET_CANONICAL_PEAKS_COMPONENT_CODES)[number])) {
+    return "canonical";
+  }
+  if (isReservedComponentCode(component)) {
+    return "reserved";
+  }
+  return "unknown_adjustment";
+}
+
+export function isCanonicalSourceOfTruthComponentCode(component: string): boolean {
+  return TARGET_CANONICAL_PEAKS_COMPONENT_CODES.includes(
+    canonicalComponentCode(component) as (typeof TARGET_CANONICAL_PEAKS_COMPONENT_CODES)[number],
+  );
+}
+
+export function isProjectedOnlyComponentCode(component: string): boolean {
+  return PROJECTED_ONLY_COMPONENT_CODES.includes(component as (typeof PROJECTED_ONLY_COMPONENT_CODES)[number]);
+}
+
+export function isCompatibilityAliasComponentCode(component: string): boolean {
+  return COMPATIBILITY_ALIAS_COMPONENT_CODES.includes(component as (typeof COMPATIBILITY_ALIAS_COMPONENT_CODES)[number]);
+}
+
+export function isReservedComponentCode(component: string): boolean {
+  return RESERVED_COMPONENT_CODES.includes(canonicalComponentCode(component) as (typeof RESERVED_COMPONENT_CODES)[number]);
+}
+
+export function isPersistableComponentCode(component: string): boolean {
+  const concept = componentCodeConcept(component);
+  return concept === "canonical" || concept === "compatibility_alias" || concept === "reserved";
+}
+
 export function isKnownComponentCode(component: string): boolean {
-  return COMPONENT_METADATA.has(canonicalComponentCode(component));
+  return componentCodeConcept(component) !== "unknown_adjustment";
 }
 
 export function getComponentMetadata(component: string): ComponentMetadata {

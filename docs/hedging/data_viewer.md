@@ -1,5 +1,7 @@
 # Data Viewer
 
+For canonical versus projected component-name rules, see [Component Catalog](component_catalog.md).
+
 ## Purpose
 
 `Data Viewer` is a read-only PoC transparency feature for inspecting raw portfolio-linked rows and selected compatibility projections.
